@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V19</title>
+    <title>GA Dispatcher V20 - Training Edition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -40,7 +40,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V19</h1>
+    <h1>GA Dispatcher V20</h1>
     <div id="searchIndicator"></div>
     
     <div class="row">
@@ -112,41 +112,58 @@
         "EDMA": { n: "Augsburg", lat: 48.42, lon: 10.93, ctr: true, c: "DE" },
         "EDDM": { n: "München", lat: 48.35, lon: 11.78, ctr: true, c: "DE" },
         "EDDF": { n: "Frankfurt", lat: 50.03, lon: 8.57, ctr: true, c: "DE" },
-        "EDDH": { n: "Hamburg", lat: 53.63, lon: 9.98, ctr: true, c: "DE" },
-        "EDXW": { n: "Sylt", lat: 54.91, lon: 8.34, ctr: true, c: "DE" },
         "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" },
-        "LSZR": { n: "St. Gallen", lat: 47.48, lon: 9.56, ctr: true, c: "CH" },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
-        "LOWS": { n: "Salzburg", lat: 47.79, lon: 13.00, ctr: true, c: "AT" }
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" }
     };
 
     const missions = [
+        // --- KLASSISCHE MISSIONEN ---
         { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein lokaler Unternehmer muss zu einem wichtigen Meeting. Pünktlichkeit wird belohnt." },
-        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs, keine Umwege!" },
-        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Skiausrüstung in der hinteren Ablage." },
-        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil. Bring es schnell hin." },
-        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Sie sind in Boxen, sorge für gute Belüftung." },
-        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast möchte diskret reisen. Sanfte Sinkrate und maximaler Komfort sind Pflicht." },
-        { t: "Uhren-Logistik", i: "⌚", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine absolut sanfte Landung am Zielort." },
-        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv, Verzögerungen unbedingt vermeiden." },
-        { t: "Horse-Vet", i: "🐎", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt. Er hat empfindliches Gerät dabei." },
-        { t: "Gourmet-Trip", i: "🍷", s: "Zwei Weinkenner fliegen zu einer Verkostung. Auf dem Rückweg wird die Maschine wohl etwas schwerer sein." },
-        { t: "Foto-Mission", i: "📸", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet. Halte die Maschine beim Anflug stabil." },
-        { t: "Urgent Mail", i: "📂", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden. Wetterradar im Auge behalten!" },
-        { t: "Tech-Check", i: "⚙️", s: "Überführungsflug zur Werft. Ein kleiner Fehler in der Avionik soll am Zielort behoben werden." },
-        { t: "Organ-Concert", i: "🎻", s: "Ein Musiker transportiert wertvolle Instrumente. Keine abrupten Manöver, die Luftfeuchtigkeit muss stimmen." },
-        { t: "Student Visit", i: "🏠", s: "Ein Student möchte seine Großeltern überraschen. Er hat eine riesige Tasche voller Schmutzwäsche dabei." },
-        { t: "Medicine Emergency", i: "💊", s: "Spezialmedikamente für eine abgelegene Klinik. Zeit ist der entscheidende Faktor bei dieser Mission." },
-        { t: "Real Estate Tour", i: "🏰", s: "Investoren wollen ein großes Anwesen aus der Luft besichtigen. Flieg mehrere langsame Kreise." },
-        { t: "Flight Training", i: "🎓", s: "Ein Übungsflug über weite Distanz. Simuliere einen Instrumentenausfall während des Reiseflugs." },
-        { t: "Regional News", i: "🗞️", s: "Die Sonntagszeitungen für die Außenstellen sind fertig. Lade die Stapel ein und flieg los." },
-        { t: "Wildlife Research", i: "🦌", s: "Biologen müssen Wildbestände zählen. Fliege in niedriger, sicherer Höhe über bewaldetes Gebiet." },
-        { t: "Castle Tour", i: "🏰", s: "Touristen wollen die berühmten Schlösser der Region sehen. Mach ein paar schöne Kurven für die Fotos." },
-        { t: "Flower Delivery", i: "🌹", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit. Achte darauf, dass sie im Laderaum nicht verrutschen." },
-        { t: "Archive Transport", i: "📜", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv. Sie sind schwer und staubig, aber unersetzlich." },
-        { t: "Music Producer", i: "🎧", s: "Ein bekannter Produzent muss mitsamt mobilem Equipment zum nächsten Studio. Er ist etwas nervös." },
-        { t: "Unexpected Guest", i: "🙋", s: "Ein Überraschungsbesuch bei alten Freunden. Du hast einen Kasten lokales Bier als Fracht dabei." }
+        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
+        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Ausrüstung." },
+        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein Bauteil." },
+        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern." },
+        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast möchte diskret reisen. Komfort ist das Wichtigste." },
+        { t: "Uhren-Logistik", i: "⌚", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine Butterlandung." },
+        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
+        { t: "Foto-Mission", i: "📸", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
+        { t: "Gourmet-Trip", i: "🍽️", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        
+        // --- NEUE TRAININGS-MISSIONEN ---
+        { t: "Training: Stall Practice", i: "🎓", s: "Übe während des Fluges zum Ziel verschiedene Stalls: Power-Off (Landing Config) und Power-On (Take-Off Config). Achte auf saubere Recovery!" },
+        { t: "Training: Steep Turns", i: "🔄", s: "Such dir ein markantes Bodenmerkmal auf halber Strecke. Führe zwei Vollkreise (360°) mit 45° Bankwinkel durch. Halte die Höhe exakt (+/- 100ft)." },
+        { t: "Training: Engine Out", i: "🔥", s: "Simuliere im Reiseflug einen Triebwerksausfall. Führe die Checkliste durch, wähle ein Notlandefeld und leite den Gleitflug ein. Starte das Triebwerk bei 1000ft AGL wieder." },
+        { t: "Training: Slow Flight", i: "🐢", s: "Bringe die Comanche in den Bereich der minimalen Steuerbarkeit (Slow Flight). Fliege 5 Minuten lang knapp über Stall-Speed mit ausgefahrenen Klappen." },
+        { t: "Training: Pattern Work", i: "🛫", s: "Der Auftrag ist kurz, aber die Landung muss sitzen. Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden, bevor du final landest." },
+        { t: "Training: Lazy Eights", i: "♾️", s: "Perfektioniere deine Koordination. Führe auf Reiseflughöhe eine Serie von Lazy Eights durch. Achte auf weiche Übergänge und Symmetrie." },
+        { t: "Training: Emergency Descent", i: "📉", s: "Simuliere einen Kabinenbrand oder Druckverlust. Leite einen Notabstieg mit maximal zulässiger Sinkrate ein, ohne das Flugzeug strukturell zu überlasten." },
+        { t: "Training: No-Flap Landing", i: "🚫", s: "Simuliere einen Ausfall der Klappensteuerung. Lande am Zielort ohne Einsatz von Flaps. Achte auf die deutlich höhere Anfluggeschwindigkeit!" },
+        { t: "Training: Crosswind Mastery", i: "💨", s: "Wenn möglich, wähle am Ziel eine Bahn mit Seitenwindkomponente. Übe den 'Wing-Low' Anflug (Sideslip), um genau auf der Centerline aufzusetzen." },
+        { t: "Training: Dead Reckoning", i: "🧭", s: "Schalte das GPS/GNS im Cockpit aus. Navigiere nur mit Stoppuhr, Kompass und markanten Bodenmerkmalen (Flüsse, Autobahnen) zum Ziel." },
+
+        // --- WEITERE MISSIONEN ---
+        { t: "Horse-Vet", i: "🐎", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
+        { t: "Urgent Mail", i: "📂", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
+        { t: "Tech-Check", i: "⚙️", s: "Überführungsflug zur Werft. Ein kleiner Avionik-Fehler soll behoben werden." },
+        { t: "Organ-Concert", i: "🎻", s: "Ein Musiker transportiert wertvolle Instrumente." },
+        { t: "Student Visit", i: "🏠", s: "Ein Student möchte seine Großeltern überraschen." },
+        { t: "Medicine Emergency", i: "💊", s: "Spezialmedikamente für eine abgelegene Klinik." },
+        { t: "Real Estate Tour", i: "🏰", s: "Investoren wollen ein großes Anwesen aus der Luft besichtigen." },
+        { t: "Wildlife Research", i: "🦌", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
+        { t: "Castle Tour", i: "🏰", s: "Touristen wollen die berühmten Schlösser sehen." },
+        { t: "Flower Delivery", i: "🌹", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit." },
+        { t: "Archive Transport", i: "📜", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
+        { t: "Music Producer", i: "🎧", s: "Ein bekannter Produzent muss mitsamt Equipment zum nächsten Studio." },
+        { t: "Unexpected Guest", i: "🙋", s: "Ein Überraschungsbesuch bei alten Freunden." },
+        { t: "Relocation Flight", i: "📦", s: "Jemand zieht um und hat das wichtigste Hab und Gut in Kisten verpackt." },
+        { t: "Avionics Upgrade", i: "📟", s: "Du bringst ein neues Navigationsgerät zur Einbau-Werkstatt." }
     ];
+
+    /* TIPP FÜR DICH:
+       Eigene Missionen hinzufügen: 
+       Einfach eine Zeile oben in der Liste "missions" ergänzen nach dem Schema:
+       { t: "Dein Titel", i: "Emoji", s: "Deine Beschreibungstext" },
+    */
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO;
 
@@ -219,7 +236,7 @@
         document.getElementById("mRoute").innerText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = `${Math.floor(Math.random()*seats)} PAX`;
+        document.getElementById("mPay").innerText = (m.t.includes("Training") || m.t.includes("AOG")) ? "0 PAX" : `${Math.floor(Math.random()*seats)} PAX`;
         document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+20} lbs`;
         document.getElementById("mStory").innerText = m.s;
 
