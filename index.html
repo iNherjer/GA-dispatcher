@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V37 - Custom Map</title>
+    <title>GA Dispatcher V38 - Border Control</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
         
         body { 
             font-family: 'Segoe UI', Roboto, sans-serif; 
-            background-color: var(--bg-dark); /* Fallback, falls Bild nicht lädt */
+            background-color: var(--bg-dark); 
             color: var(--text); 
             margin: 0; padding: 20px 10px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
             /* DEIN NEUER HINTERGRUND */
-            background-image: url('bg.jpg'); /* Achte darauf, dass das Bild so heißt und im selben Ordner liegt */
+            background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -24,17 +24,19 @@
         }
 
         .container { 
-            background-color: rgba(30, 30, 30, 0.90); /* Leicht transparenter, damit die Karte gut durchschimmert */
+            background-color: rgba(30, 30, 30, 0.90); 
             padding: 20px; border-radius: 16px; 
             box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
             max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
-            backdrop-filter: blur(8px); /* Der schöne Milchglas-Effekt */
+            backdrop-filter: blur(8px); 
         }
         
         h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
         #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; }
         label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
         input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
+        .row { display: flex; gap: 8px; }
+        .row div { flex: 1; }
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; }
         .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
@@ -59,7 +61,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V37</h1>
+    <h1>GA Dispatcher V38</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="row">
@@ -70,10 +72,15 @@
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
         <div><label>Distanz</label><select id="distRange">
-            <option value="any">Egal (Zufällig)</option>
-            <option value="short">Short (10-50 NM)</option>
-            <option value="medium">Medium (50-100 NM)</option>
-            <option value="long">Long (100-250 NM)</option>
+            <option value="any">Egal</option>
+            <option value="short">Short (10-50)</option>
+            <option value="medium">Medium (50-100)</option>
+            <option value="long">Long (100-250)</option>
+        </select></div>
+        <div><label>Region</label><select id="regionFilter">
+            <option value="any">Europaweit</option>
+            <option value="de" selected>Nur DE</option>
+            <option value="int">Nur Ausland</option>
         </select></div>
     </div>
 
@@ -209,7 +216,7 @@
         } catch (e) {} return null;
     }
 
-    async function findRandomOnlineDest(lat, lon, rangePref) {
+    async function findRandomOnlineDest(lat, lon, rangePref, regionPref) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM, finalRange;
         
@@ -225,7 +232,8 @@
             if(rangePref === "long") { minNM=100; maxNM=250; }
         }
 
-        indicator.innerText = `Online-Scan: Bereich ${finalRange} (${minNM}-${maxNM} NM)...`;
+        let regionText = regionPref === "de" ? "DE" : (regionPref === "int" ? "Ausland" : "Europa");
+        indicator.innerText = `Online-Scan: ${finalRange} (${minNM}-${maxNM} NM) in ${regionText}...`;
 
         const query = `[out:json][timeout:30];nwr(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"];out center;`;
         try {
@@ -236,8 +244,16 @@
                     const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
                     return { icao: el.tags.icao, n: el.tags.name || "Unknown", lat: coords.lat, lon: coords.lon };
                 }).filter(el => {
+                    // Filter nach Distanz
                     const d = calcNav(lat, lon, el.lat, el.lon).dist;
-                    return d >= minNM && d <= maxNM;
+                    if (d < minNM || d > maxNM) return false;
+                    
+                    // Filter nach Region (DE = ED.. oder ET..)
+                    const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
+                    if (regionPref === "de" && !isDE) return false;
+                    if (regionPref === "int" && isDE) return false;
+                    
+                    return true;
                 });
                 if (filtered.length > 0) return filtered[Math.floor(Math.random()*filtered.length)];
             }
@@ -259,13 +275,24 @@
         const start = await getAirportData(currentStartICAO);
         if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
         
+        const distPref = document.getElementById("distRange").value;
+        const regionPref = document.getElementById("regionFilter").value;
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
-        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, document.getElementById("distRange").value);
+        
+        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref);
         
         if(!dest && !targetDest) {
             dataSource = "Core DB (Fallback)";
-            const keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+            let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+            
+            // Regionen-Filter auch auf Fallback anwenden
+            if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
+            if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
+            
+            // Letztes Sicherheitsnetz falls Filter alles leer macht
+            if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+            
             const fallbackKey = keys[Math.floor(Math.random()*keys.length)];
             dest = coreDB[fallbackKey];
         }
