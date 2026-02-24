@@ -3,51 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V13</title>
+    <title>GA Dispatcher V14</title>
     <style>
-        :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; }
+        :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
         .container { background-color: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; }
         h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 15px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
         label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
-        input, select { width: 100%; padding: 10px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
+        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
         .row { display: flex; gap: 8px; }
         .row div { flex: 1; }
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; }
-        .btn-preset { flex: 1; padding: 6px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-        .slider-container { margin-bottom: 10px; background: #252525; padding: 8px; border-radius: 8px; border: 1px solid #333; }
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
-        input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 10px 0; }
+        input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
-        .btn-main { width: 100%; padding: 14px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
-        .stat-item { font-size: 12px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
-        .tag { display: inline-block; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 9px; margin: 4px 4px 0 0; }
-        .ctr-yes { background-color: #441111; color: #ff9999; border: 1px solid #ff4444; }
-        .ctr-no { background-color: #113311; color: #99ff99; border: 1px solid #44ff44; }
-        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.4; border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
-        .highlight { color: #fff; font-weight: bold; font-size: 14px; }
-        .fuel-box { background: #1a2a3a; padding: 8px; border-radius: 6px; grid-column: span 2; border-left: 3px solid var(--blue); }
-        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 11px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
-        #dbStatus { font-size: 9px; text-align: center; margin-top: 10px; color: #555; }
+        .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin: 5px 5px 0 0; }
+        .ctr-yes { background-color: #441111; color: var(--red); border: 1px solid var(--red); }
+        .ctr-no { background-color: #113311; color: var(--green); border: 1px solid var(--green); }
+        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
+        .highlight { color: #fff; font-weight: bold; font-size: 15px; }
+        .fuel-box { background: #1a2a3a; padding: 10px; border-radius: 6px; grid-column: span 2; border-left: 4px solid var(--blue); }
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 11px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V13</h1>
+    <h1>GA Dispatcher V14</h1>
     
     <div class="row">
-        <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
+        <div><label>Start (ICAO)</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
         <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
-        <div><label>Distanz</label><select id="distRange"><option value="any">Egal</option><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></div>
+        <div><label>Distanz</label><select id="distRange"><option value="any">Egal</option><option value="short">Short (< 50 NM)</option><option value="medium">Medium (50-150)</option><option value="long">Long (> 150)</option></select></div>
     </div>
 
     <div class="preset-row">
@@ -66,31 +65,30 @@
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
-    <button id="mainBtn" class="btn-main" onclick="generateMission()">Auftrag generieren</button>
+    <button class="btn-main" onclick="generateMission()">Auftrag generieren</button>
 
     <div id="briefingBox" class="briefing">
-        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
+        <h2 id="mTitle" style="margin-top:0; color:var(--blue);"></h2>
         <div class="stat-grid">
             <div class="stat-item"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Heading / Dist</span><span id="mNav" class="highlight"></span></div>
-            <div class="fuel-box"><span class="stat-label">Spritbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span> <small style="font-size:9px;">(+45m Res)</small></div>
+            <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
+            <div class="fuel-box"><span class="stat-label">Min. Fuel Load</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span> <small style="font-size:9px;">(+45m Reserve)</small></div>
             <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+            <div class="stat-item"><span class="stat-label">Zuladung Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
         <div id="mTags"></div>
         <p id="mStory" class="story"></p>
         
         <div class="action-row">
-            <button class="btn-action" onclick="openWeather()">🌦️ Wetter</button>
-            <button class="btn-action" onclick="openAIP()" style="border-color:var(--warn); color:var(--warn);">📄 AIP Karten</button>
+            <button class="btn-action" onclick="openWeather()">🌦️ METAR</button>
+            <button class="btn-action" onclick="openAIP()" style="border-color:var(--warn); color:var(--warn);">📄 AIP KARTEN</button>
         </div>
     </div>
-    <div id="dbStatus">Core-DB aktiv (Offline).</div>
 </div>
 
 <script>
-    // MASSIVE INTERNE DATENBANK (Auszug der wichtigsten Plätze DACH)
     const coreDB = {
+        // --- DEUTSCHLAND ---
         "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false, c: "DE" },
         "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false, c: "DE" },
         "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true, c: "DE" },
@@ -118,6 +116,16 @@
         "EDDP": { n: "Leipzig", lat: 51.42, lon: 12.23, ctr: true, c: "DE" },
         "EDDC": { n: "Dresden", lat: 51.13, lon: 13.76, ctr: true, c: "DE" },
         "EDHL": { n: "Lübeck", lat: 53.80, lon: 10.71, ctr: true, c: "DE" },
+        "EDVE": { n: "Braunschweig", lat: 52.31, lon: 10.55, ctr: true, c: "DE" },
+        "EDBC": { n: "Magdeburg", lat: 52.07, lon: 11.62, ctr: false, c: "DE" },
+        "EDHK": { n: "Kiel", lat: 54.37, lon: 10.14, ctr: false, c: "DE" },
+        "EDWI": { n: "Wilhelmshaven", lat: 53.50, lon: 8.05, ctr: false, c: "DE" },
+        "EDRY": { n: "Speyer", lat: 49.30, lon: 8.45, ctr: false, c: "DE" },
+        "EDLN": { n: "Mönchengladbach", lat: 51.23, lon: 6.50, ctr: true, c: "DE" },
+        "EDLW": { n: "Dortmund", lat: 51.51, lon: 7.61, ctr: true, c: "DE" },
+        "EDDE": { n: "Erfurt", lat: 50.97, lon: 10.95, ctr: true, c: "DE" },
+
+        // --- SCHWEIZ ---
         "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" },
         "LSGG": { n: "Genf", lat: 46.23, lon: 6.10, ctr: true, c: "CH" },
         "LSZB": { n: "Bern", lat: 46.91, lon: 7.49, ctr: true, c: "CH" },
@@ -125,34 +133,39 @@
         "LSZS": { n: "Samedan", lat: 46.53, lon: 9.88, ctr: false, c: "CH" },
         "LSMN": { n: "Buochs", lat: 46.97, lon: 8.39, ctr: true, c: "CH" },
         "LSZA": { n: "Lugano", lat: 46.00, lon: 8.91, ctr: true, c: "CH" },
+        "LSGC": { n: "Les Eplatures", lat: 47.08, lon: 6.79, ctr: true, c: "CH" },
+        "LSGK": { n: "Saanen", lat: 46.48, lon: 7.24, ctr: false, c: "CH" },
+        "LSPF": { n: "Schaffhausen", lat: 47.68, lon: 8.51, ctr: false, c: "CH" },
+
+        // --- ÖSTERREICH ---
         "LOWW": { n: "Wien", lat: 48.11, lon: 16.56, ctr: true, c: "AT" },
         "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
         "LOWS": { n: "Salzburg", lat: 47.79, lon: 13.00, ctr: true, c: "AT" },
         "LOWG": { n: "Graz", lat: 46.99, lon: 15.43, ctr: true, c: "AT" },
         "LOWL": { n: "Linz", lat: 48.23, lon: 14.18, ctr: true, c: "AT" },
         "LOWZ": { n: "Zell am See", lat: 47.29, lon: 12.78, ctr: false, c: "AT" },
-        "LOAN": { n: "Wr. Neustadt", lat: 47.84, lon: 16.25, ctr: false, c: "AT" }
+        "LOAN": { n: "Wr. Neustadt", lat: 47.84, lon: 16.25, ctr: false, c: "AT" },
+        "LOIJ": { n: "St. Johann", lat: 47.52, lon: 12.45, ctr: false, c: "AT" },
+        "LOWK": { n: "Klagenfurt", lat: 46.64, lon: 14.33, ctr: true, c: "AT" }
     };
 
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein Termin wartet. Achte auf Pünktlichkeit." },
-        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT! Direkter Kurs erforderlich." },
-        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Viel Gepäck an Bord." },
-        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support für eine gestrandete Maschine am Ziel." },
-        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische Proben. Flugplanung sorgfältig prüfen." }
+        { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein lokaler Geschäftsmann muss zu einem wichtigen Meeting. Er zahlt einen Bonus für Pünktlichkeit." },
+        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs, keine Zeit verlieren!" },
+        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Skiausrüstung in der hinteren Ablage." },
+        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil. Schnellste Route wählen." },
+        { t: "Uhren-Logistik", i: "⌚", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine absolut sanfte Landung am Zielort." },
+        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Sie sind in Boxen, sorge für gute Belüftung." },
+        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv, Verzögerungen vermeiden." },
+        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast möchte diskret reisen. Erwarte viel schweres Gepäck und Champagner-Wünsche." },
+        { t: "Foto-Mission", i: "📸", s: "Ein Immobilienmakler möchte Luftaufnahmen vom Zielgebiet machen. Halte die Maschine beim Anflug stabil." },
+        { t: "Eiliger Postflug", i: "🗞️", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden. Wetterradar im Auge behalten!" },
+        { t: "Gourmet-Ausflug", i: "🍽️", s: "Zwei Weinkenner fliegen zu einem berühmten Restaurant am Platz. Der Rückflug wird wohl schwerer..." },
+        { t: "Medizin-Notfall", i: "💊", s: "Spezialmedikamente für eine Klinik. Zeit ist der entscheidende Faktor bei dieser Mission." },
+        { t: "Technik-Check", i: "⚙️", s: "Überführungsflug zur Werft. Ein kleiner Fehler in der Elektrik soll dort behoben werden." }
     ];
 
-    let onlineAirports = [];
     let currentDest = "";
-
-    // Versuch die Online-DB im Hintergrund zu laden
-    fetch('https://raw.githubusercontent.com/mwigg/airport-codes/master/airports.json')
-        .then(res => res.json())
-        .then(data => {
-            onlineAirports = data;
-            document.getElementById('dbStatus').innerText = "Hybrid-DB aktiv (Online + Core).";
-        })
-        .catch(err => console.log("Online-DB konnte nicht geladen werden - nutze Core-DB."));
 
     function applyPreset(tas, gph, seats) {
         document.getElementById('tasSlider').value = tas; document.getElementById('tasVal').innerText = tas;
@@ -172,24 +185,16 @@
         return { dist, brng };
     }
 
-    async function getAirport(icao) {
-        if (coreDB[icao]) return coreDB[icao];
-        const found = onlineAirports.find(a => a.icao === icao || a.ident === icao);
-        if (found) return { n: found.name, lat: parseFloat(found.latitude_deg), lon: parseFloat(found.longitude_deg), ctr: found.type.includes('medium'), c: found.iso_country };
-        return null;
-    }
-
-    async function generateMission() {
+    function generateMission() {
         const startICAO = document.getElementById("startLoc").value.toUpperCase();
-        const start = await getAirport(startICAO);
+        const start = coreDB[startICAO];
         if (!start) { alert("Start-ICAO unbekannt!"); return; }
 
         let destICAO = document.getElementById("destLoc").value.toUpperCase();
-        let dest = null;
         const range = document.getElementById("distRange").value;
+        let dest = null;
 
         if (!destICAO) {
-            // Zufall aus Core-DB (garantiert Offline-Erfolg)
             let possible = Object.keys(coreDB).filter(i => i !== startICAO);
             let filtered = [];
             for (let i of possible) {
@@ -199,39 +204,38 @@
                 else if (range === "long" && dData.dist > 150) filtered.push({i, d:dData});
                 else if (range === "any") filtered.push({i, d:dData});
             }
-            if (filtered.length === 0) { alert("Kein Ziel in Core-DB gefunden!"); return; }
+            if (filtered.length === 0) { alert("Kein passendes Ziel gefunden!"); return; }
             let res = filtered[Math.floor(Math.random() * filtered.length)];
-            destICAO = res.i;
-            dest = coreDB[destICAO];
+            destICAO = res.i; dest = coreDB[destICAO];
         } else {
-            dest = await getAirport(destICAO);
+            dest = coreDB[destICAO];
+            if (!dest) { alert("Ziel-ICAO nicht in Core-Datenbank!"); return; }
         }
 
-        if (!dest) { alert("Ziel-ICAO unbekannt!"); return; }
-        
         currentDest = destICAO;
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const gph = document.getElementById("gphSlider").value;
         const tas = document.getElementById("tasSlider").value;
         const fuel = Math.ceil((nav.dist / tas * gph) + (0.75 * gph));
         const m = missions[Math.floor(Math.random() * missions.length)];
+        const seats = parseInt(document.getElementById("maxSeats").value);
 
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = `${startICAO} ➔ ${destICAO} (${dest.n})`;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = `${Math.floor(Math.random()*parseInt(document.getElementById("maxSeats").value))} PAX`;
-        document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+10} lbs`;
+        document.getElementById("mPay").innerText = `${Math.floor(Math.random()*seats)} PAX`;
+        document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*350)+10} lbs`;
         document.getElementById("mStory").innerText = m.s;
 
         let tags = dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>';
-        if (start.c !== dest.c) tags += '<span class="tag border-warn">🌐 GRENZE</span>';
+        if (start.c !== dest.c) tags += '<span class="tag border-warn" style="background:#443311; color:#ffcc66; border:1px solid #ff8800;">🌐 GRENZE</span>';
         document.getElementById("mTags").innerHTML = tags;
         document.getElementById("briefingBox").style.display = "block";
     }
 
     function openWeather() { if(currentDest) window.open(`https://metar-taf.com/de/${currentDest}`, '_blank'); }
-    function openAIP() { if(currentDest) window.open(`https://aip.aero/de/vfr/airports/${currentDest}`, '_blank'); }
+    function openAIP() { if(currentDest) window.open(`https://aip.aero/de/vfr/?${currentDest}`, '_blank'); }
 </script>
 
 </body>
