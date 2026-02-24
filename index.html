@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V32</title>
+    <title>GA Dispatcher V33</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -52,7 +52,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V32</h1>
+    <h1>GA Dispatcher V33</h1>
     <div id="searchIndicator">Bereit für die Flugplanung.</div>
     
     <div class="row">
@@ -63,7 +63,7 @@
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
         <div><label>Distanz</label><select id="distRange">
-            <option value="any">Egal</option>
+            <option value="any">Egal (Zufällig)</option>
             <option value="short">Short (10-50 NM)</option>
             <option value="medium">Medium (50-150)</option>
             <option value="long">Long (150-450)</option>
@@ -126,7 +126,7 @@
     };
     
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
         { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
         { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
         { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
@@ -140,7 +140,7 @@
         { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
         { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
         { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
-        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine Klinik." },
+        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
         { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
         { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
         { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische Blumen für eine Hochzeit." },
@@ -180,7 +180,7 @@
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
-        indicator.innerText = `Suche Koordinaten für ${icao}...`;
+        indicator.innerText = `Suche Standortdaten für ${icao}...`;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
@@ -188,14 +188,28 @@
         } catch (e) {} return null;
     }
 
-    async function findRandomOnlineDest(lat, lon, range) {
+    async function findRandomOnlineDest(lat, lon, rangePref) {
         const indicator = document.getElementById('searchIndicator');
+        
         let minNM = 10, maxNM = 50; 
-        if(range==="medium") { minNM = 50; maxNM = 150; }
-        if(range==="long") { minNM = 150; maxNM = 450; }
-        indicator.innerText = `Online-Scan im Bereich ${range} (${minNM}-${maxNM} NM)...`;
+        let currentRange = rangePref;
+        
+        // ECHTE ZUFALLSLOGIK FÜR "EGAL"
+        if(rangePref === "any") {
+            const dice = Math.random();
+            if (dice < 0.33) currentRange = "short";
+            else if (dice < 0.66) currentRange = "medium";
+            else currentRange = "long";
+        }
 
-        const query = `[out:json][timeout:15];node(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
+        if(currentRange === "short") { minNM = 10; maxNM = 50; }
+        if(currentRange === "medium") { minNM = 50; maxNM = 150; }
+        if(currentRange === "long") { minNM = 150; maxNM = 450; }
+
+        indicator.innerText = `Scanner aktiv: Suche im Bereich ${currentRange.toUpperCase()} (${minNM}-${maxNM} NM)...`;
+
+        // Erhöhter Timeout in der Query (30s)
+        const query = `[out:json][timeout:30];node(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
@@ -224,7 +238,7 @@
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
+        if(!start) { alert("Start unbekannt!"); btn.disabled=false; return; }
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
@@ -236,7 +250,7 @@
             dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
         }
 
-        if(!dest) { alert("Kein Ziel gefunden!"); btn.disabled=false; return; }
+        if(!dest) { alert("Kein Ziel gefunden! Versuche es erneut."); btn.disabled=false; return; }
         currentDestICAO = dest.icao || targetDest || document.getElementById("destLoc").value.toUpperCase();
         
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
@@ -276,7 +290,7 @@
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
         
-        // FIX: Sicherer Übertrag
+        // SICHERER ÜBERTRAG: Ziel wird neuer Start
         const nextStart = currentDestICAO;
         localStorage.setItem('last_icao_dest', nextStart);
         document.getElementById('startLoc').value = nextStart;
