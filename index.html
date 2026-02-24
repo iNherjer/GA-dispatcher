@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V36 - Solid Rock</title>
+    <title>GA Dispatcher V36</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -53,7 +53,7 @@
 
 <div class="container">
     <h1>GA Dispatcher V36</h1>
-    <div id="searchIndicator">System bereit.</div>
+    <div id="searchIndicator">Ready for mission planning.</div>
     
     <div class="row">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
@@ -63,7 +63,7 @@
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
         <div><label>Distanz</label><select id="distRange">
-            <option value="any">Egal (Zufällig)</option>
+            <option value="any">Egal (Vollzufall)</option>
             <option value="short">Short (10-50 NM)</option>
             <option value="medium">Medium (50-100 NM)</option>
             <option value="long">Long (100-250 NM)</option>
@@ -119,24 +119,18 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // MASSIVE CORE DB (50+ Airports für 100% Fallback-Sicherheit)
+    // ERWEITERTE CORE DB
     const coreDB = { 
-        "EDTW": {icao:"EDTW", n:"Winzeln", lat:48.279, lon:8.428}, "EDTF": {icao:"EDTF", n:"Freiburg", lat:48.023, lon:7.828},
-        "EDNY": {icao:"EDNY", n:"Friedrichshafen", lat:47.671, lon:9.511}, "EDDS": {icao:"EDDS", n:"Stuttgart", lat:48.689, lon:9.221},
-        "EDMA": {icao:"EDMA", n:"Augsburg", lat:48.42, lon:10.93}, "EDJA": {icao:"EDJA", n:"Memmingen", lat:47.98, lon:10.23},
-        "EDTD": {icao:"EDTD", n:"Donaueschingen", lat:47.97, lon:8.52}, "EDTY": {icao:"EDTY", n:"Schwäbisch Hall", lat:49.11, lon:9.77},
-        "EDRK": {icao:"EDRK", n:"Koblenz", lat:50.32, lon:7.52}, "EDKB": {icao:"EDKB", n:"Bonn-Hangelar", lat:50.76, lon:7.16},
-        "EDLN": {icao:"EDLN", n:"Mönchengladbach", lat:51.23, lon:6.50}, "EDLP": {icao:"EDLP", n:"Paderborn", lat:51.61, lon:8.61},
-        "EDVE": {icao:"EDVE", n:"Braunschweig", lat:52.31, lon:10.55}, "EDDB": {icao:"EDDB", n:"Berlin-Brand.", lat:52.36, lon:13.50},
-        "EDDH": {icao:"EDDH", n:"Hamburg", lat:53.63, lon:9.98}, "EDDW": {icao:"EDDW", n:"Bremen", lat:53.04, lon:8.78},
-        "EDXW": {icao:"EDXW", n:"Sylt", lat:54.91, lon:8.34}, "EDHL": {icao:"EDHL", n:"Lübeck", lat:53.80, lon:10.71},
-        "LOWI": {icao:"LOWI", n:"Innsbruck", lat:47.26, lon:11.34}, "LOWS": {icao:"LOWS", n:"Salzburg", lat:47.79, lon:13.00},
-        "LOWK": {icao:"LOWK", n:"Klagenfurt", lat:46.64, lon:14.33}, "LOWG": {icao:"LOWG", n:"Graz", lat:46.99, lon:15.43},
-        "LSZH": {icao:"LSZH", n:"Zürich", lat:47.46, lon:8.54}, "LSGG": {icao:"LSGG", n:"Genf", lat:46.23, lon:6.10},
-        "LFSB": {icao:"LFSB", n:"Basel", lat:47.59, lon:7.52}, "LFMN": {icao:"LFMN", n:"Nizza", lat:43.66, lon:7.21},
-        "LFML": {icao:"LFML", n:"Marseille", lat:43.43, lon:5.21}, "LFPB": {icao:"LFPB", n:"Paris-Le Bourget", lat:48.96, lon:2.44},
-        "LIML": {icao:"LIML", n:"Mailand-Linate", lat:45.44, lon:9.27}, "LIPZ": {icao:"LIPZ", n:"Venedig", lat:45.50, lon:12.35},
-        "EDMO": {icao:"EDMO", n:"Oberpfaffenhofen", lat:48.08, lon:11.28}, "EDDM": {icao:"EDDM", n:"München", lat:48.35, lon:11.78}
+        "EDTW": { icao: "EDTW", n: "Winzeln", lat: 48.279, lon: 8.428 }, 
+        "EDTF": { icao: "EDTF", n: "Freiburg", lat: 48.023, lon: 7.828 },
+        "EDNY": { icao: "EDNY", n: "Friedrichshafen", lat: 47.671, lon: 9.511 }, 
+        "EDDS": { icao: "EDDS", n: "Stuttgart", lat: 48.689, lon: 9.221 },
+        "LOWI": { icao: "LOWI", n: "Innsbruck", lat: 47.26, lon: 11.34 }, 
+        "LSZH": { icao: "LSZH", n: "Zürich", lat: 47.46, lon: 8.54 },
+        "EDMA": { icao: "EDMA", n: "Augsburg", lat: 48.42, lon: 10.93 },
+        "EDTD": { icao: "EDTD", n: "Donaueschingen", lat: 47.97, lon: 8.52 },
+        "LFSB": { icao: "LFSB", n: "Basel", lat: 47.59, lon: 7.52 },
+        "LFMN": { icao: "LFMN", n: "Nizza", lat: 43.66, lon: 7.21 }
     };
     
     const missions = [
@@ -173,9 +167,7 @@
         { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
         { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
         { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." },
-        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." },
-        { t: "High Priority Courier", i: "📦", cat: "std", s: "Ein extrem wichtiges Paket muss noch heute zugestellt werden." },
-        { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz." }
+        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." }
     ];
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -195,7 +187,7 @@
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
-        indicator.innerText = `Lade Standortdaten: ${icao}...`;
+        indicator.innerText = `Searching coordinates for ${icao}...`;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
@@ -211,17 +203,17 @@
             const roll = Math.random();
             if (roll < 0.33) { minNM=10; maxNM=50; finalRange="SHORT"; }
             else if (roll < 0.66) { minNM=50; maxNM=100; finalRange="MEDIUM"; }
-            else { minNM=100; maxNM=200; finalRange="LONG"; }
+            else { minNM=100; maxNM=250; finalRange="LONG"; }
         } else {
-            finalRange = rangePref.toUpperCase();
-            if(rangePref === "short") { minNM=10; maxNM=50; }
-            if(rangePref === "medium") { minNM=50; maxNM=100; }
-            if(rangePref === "long") { minNM=100; maxNM=200; }
+            if(rangePref === "short") { minNM=10; maxNM=50; finalRange="SHORT"; }
+            if(rangePref === "medium") { minNM=50; maxNM=100; finalRange="MEDIUM"; }
+            if(rangePref === "long") { minNM=100; maxNM=250; finalRange="LONG"; }
         }
 
-        indicator.innerText = `Online-Scan: Bereich ${finalRange} (${minNM}-${maxNM} NM)...`;
+        indicator.innerText = `Online-Scan: ${finalRange} (${minNM}-${maxNM} NM) - excluding gliders...`;
 
-        const query = `[out:json][timeout:30];nwr(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out center;`;
+        // OPTIMIERTER FILTER: Schließt "gliding" und "private" direkt aus
+        const query = `[out:json][timeout:30];nwr(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"];out center;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
@@ -251,22 +243,22 @@
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
+        if(!start) { alert("Start Unknown!"); btn.disabled=false; return; }
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
-        let dataSource = targetDest ? "Manuell" : "Online";
+        let dataSource = targetDest ? "Manual" : "Online";
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, document.getElementById("distRange").value);
         
         if(!dest && !targetDest) {
-            dataSource = "Core DB (Fallback)";
-            // Suche in CoreDB nach passender Distanz
-            const range = document.getElementById("distRange").value;
+            dataSource = "Local DB (Fallback)";
             const keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-            dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
+            const fallbackKey = keys[Math.floor(Math.random()*keys.length)];
+            dest = coreDB[fallbackKey];
         }
 
-        if(!dest) { indicator.innerText = "Fehler: Kein Ziel gefunden."; btn.disabled=false; return; }
+        if(!dest) { indicator.innerText = "Error: No destination found."; btn.disabled=false; return; }
         
+        // ICAO FIX: Sicherstellen, dass ICAO aus dem Objekt kommt
         currentDestICAO = dest.icao; 
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
@@ -283,7 +275,7 @@
         document.getElementById("mStory").innerText = m.s;
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
-        indicator.innerText = `Route bereit (Quelle: ${dataSource}).`;
+        indicator.innerText = `Route ready (Source: ${dataSource}).`;
         btn.disabled = false;
     }
 
@@ -304,17 +296,21 @@
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
-        localStorage.setItem('last_icao_dest', currentMissionData.dest);
-        document.getElementById('startLoc').value = currentMissionData.dest;
+        
+        // --- SICHERER ÜBERTRAG ---
+        const nextStart = currentMissionData.dest;
+        localStorage.setItem('last_icao_dest', nextStart);
+        document.getElementById('startLoc').value = nextStart;
         document.getElementById('destLoc').value = "";
+        
         renderLog(); 
-        alert(`Flug geloggt! Startpunkt auf ${currentMissionData.dest} gesetzt.`);
+        alert(`Flight logged! Start set to ${nextStart}.`);
     }
 
     function renderLog() {
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         const container = document.getElementById('logContent');
-        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge vorhanden.</div>';
+        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">No entries.</div>';
         log.forEach(e => {
             const div = document.createElement('div'); div.className = 'log-entry';
             div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br><b>${e.start} ➔ ${e.dest}</b><br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
@@ -322,7 +318,7 @@
         });
     }
 
-    function clearLog() { if(confirm("Gesamtes Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
+    function clearLog() { if(confirm("Clear log?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
 </script>
 </body>
 </html>
