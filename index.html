@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V14</title>
+    <title>GA Dispatcher V17</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
@@ -20,6 +21,11 @@
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
         .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .btn-main:disabled { opacity: 0.5; cursor: wait; }
+        
+        /* Map Styling */
+        #map { height: 250px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; z-index: 1; }
+        
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
@@ -28,25 +34,27 @@
         .ctr-yes { background-color: #441111; color: var(--red); border: 1px solid var(--red); }
         .ctr-no { background-color: #113311; color: var(--green); border: 1px solid var(--green); }
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
-        .highlight { color: #fff; font-weight: bold; font-size: 15px; }
+        .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .fuel-box { background: #1a2a3a; padding: 10px; border-radius: 6px; grid-column: span 2; border-left: 4px solid var(--blue); }
-        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 11px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; display: none; }
+        #searchIndicator { font-size: 10px; color: var(--blue); text-align: center; margin-bottom: 5px; height: 12px; font-style: italic; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V14</h1>
+    <h1>GA Dispatcher V17</h1>
+    <div id="searchIndicator"></div>
     
     <div class="row">
-        <div><label>Start (ICAO)</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
+        <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
         <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
-        <div><label>Distanz</label><select id="distRange"><option value="any">Egal</option><option value="short">Short (< 50 NM)</option><option value="medium">Medium (50-150)</option><option value="long">Long (> 150)</option></select></div>
+        <div><label>Distanz</label><select id="distRange"><option value="any">Egal</option><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></div>
     </div>
 
     <div class="preset-row">
@@ -56,7 +64,7 @@
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label>Verbrauch (GPH)</label><span id="gphVal" style="color:var(--blue)">14</span></div>
+        <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--blue)">14</span></div>
         <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
     </div>
 
@@ -65,112 +73,83 @@
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
-    <button class="btn-main" onclick="generateMission()">Auftrag generieren</button>
+    <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
+
+    <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
-        <h2 id="mTitle" style="margin-top:0; color:var(--blue);"></h2>
+        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
         <div class="stat-grid">
             <div class="stat-item"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
-            <div class="fuel-box"><span class="stat-label">Min. Fuel Load</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span> <small style="font-size:9px;">(+45m Reserve)</small></div>
+            <div class="fuel-box"><span class="stat-label">Min. Fuel Load</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span></div>
             <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Zuladung Fracht</span><span id="mWeight" class="highlight"></span></div>
+            <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
         <div id="mTags"></div>
         <p id="mStory" class="story"></p>
         
         <div class="action-row">
-            <button class="btn-action" onclick="openWeather()">🌦️ METAR</button>
-            <button class="btn-action" onclick="openAIP()" style="border-color:var(--warn); color:var(--warn);">📄 AIP KARTEN</button>
+            <button id="btnWeather" class="btn-action" style="display:block" onclick="openWeather()">🌦️ METAR</button>
+            <button id="btnAIPDep" class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
+            <button id="btnAIPDest" class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
         </div>
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const coreDB = {
-        // --- DEUTSCHLAND ---
-        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false, c: "DE" },
-        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false, c: "DE" },
-        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true, c: "DE" },
-        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true, c: "DE" },
-        "EDTD": { n: "Donaueschingen", lat: 47.973, lon: 8.522, ctr: false, c: "DE" },
-        "EDTZ": { n: "Konstanz", lat: 47.68, lon: 9.13, ctr: false, c: "DE" },
-        "EDTM": { n: "Mengen", lat: 48.05, lon: 9.37, ctr: false, c: "DE" },
-        "EDTY": { n: "Schwäbisch Hall", lat: 49.11, lon: 9.77, ctr: false, c: "DE" },
-        "EDSB": { n: "Karlsruhe", lat: 48.77, lon: 8.08, ctr: true, c: "DE" },
-        "EDFM": { n: "Mannheim", lat: 49.47, lon: 8.51, ctr: true, c: "DE" },
-        "EDJA": { n: "Memmingen", lat: 47.98, lon: 10.23, ctr: true, c: "DE" },
-        "EDMA": { n: "Augsburg", lat: 48.42, lon: 10.93, ctr: true, c: "DE" },
-        "EDDM": { n: "München", lat: 48.35, lon: 11.78, ctr: true, c: "DE" },
-        "EDDN": { n: "Nürnberg", lat: 49.49, lon: 11.07, ctr: true, c: "DE" },
-        "EDDF": { n: "Frankfurt", lat: 50.03, lon: 8.57, ctr: true, c: "DE" },
-        "EDFE": { n: "Egelsbach", lat: 49.96, lon: 8.64, ctr: false, c: "DE" },
-        "EDRK": { n: "Koblenz", lat: 50.32, lon: 7.52, ctr: false, c: "DE" },
-        "EDDK": { n: "Köln", lat: 50.86, lon: 7.14, ctr: true, c: "DE" },
-        "EDDL": { n: "Düsseldorf", lat: 51.28, lon: 6.76, ctr: true, c: "DE" },
-        "EDDG": { n: "Münster", lat: 52.13, lon: 7.68, ctr: true, c: "DE" },
-        "EDDH": { n: "Hamburg", lat: 53.63, lon: 9.98, ctr: true, c: "DE" },
-        "EDDW": { n: "Bremen", lat: 53.04, lon: 8.78, ctr: true, c: "DE" },
-        "EDXW": { n: "Sylt", lat: 54.91, lon: 8.34, ctr: true, c: "DE" },
-        "EDDB": { n: "Berlin", lat: 52.36, lon: 13.50, ctr: true, c: "DE" },
-        "EDDP": { n: "Leipzig", lat: 51.42, lon: 12.23, ctr: true, c: "DE" },
-        "EDDC": { n: "Dresden", lat: 51.13, lon: 13.76, ctr: true, c: "DE" },
-        "EDHL": { n: "Lübeck", lat: 53.80, lon: 10.71, ctr: true, c: "DE" },
-        "EDVE": { n: "Braunschweig", lat: 52.31, lon: 10.55, ctr: true, c: "DE" },
-        "EDBC": { n: "Magdeburg", lat: 52.07, lon: 11.62, ctr: false, c: "DE" },
-        "EDHK": { n: "Kiel", lat: 54.37, lon: 10.14, ctr: false, c: "DE" },
-        "EDWI": { n: "Wilhelmshaven", lat: 53.50, lon: 8.05, ctr: false, c: "DE" },
-        "EDRY": { n: "Speyer", lat: 49.30, lon: 8.45, ctr: false, c: "DE" },
-        "EDLN": { n: "Mönchengladbach", lat: 51.23, lon: 6.50, ctr: true, c: "DE" },
-        "EDLW": { n: "Dortmund", lat: 51.51, lon: 7.61, ctr: true, c: "DE" },
-        "EDDE": { n: "Erfurt", lat: 50.97, lon: 10.95, ctr: true, c: "DE" },
-
-        // --- SCHWEIZ ---
-        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" },
-        "LSGG": { n: "Genf", lat: 46.23, lon: 6.10, ctr: true, c: "CH" },
-        "LSZB": { n: "Bern", lat: 46.91, lon: 7.49, ctr: true, c: "CH" },
-        "LSZR": { n: "St. Gallen", lat: 47.48, lon: 9.56, ctr: true, c: "CH" },
-        "LSZS": { n: "Samedan", lat: 46.53, lon: 9.88, ctr: false, c: "CH" },
-        "LSMN": { n: "Buochs", lat: 46.97, lon: 8.39, ctr: true, c: "CH" },
-        "LSZA": { n: "Lugano", lat: 46.00, lon: 8.91, ctr: true, c: "CH" },
-        "LSGC": { n: "Les Eplatures", lat: 47.08, lon: 6.79, ctr: true, c: "CH" },
-        "LSGK": { n: "Saanen", lat: 46.48, lon: 7.24, ctr: false, c: "CH" },
-        "LSPF": { n: "Schaffhausen", lat: 47.68, lon: 8.51, ctr: false, c: "CH" },
-
-        // --- ÖSTERREICH ---
-        "LOWW": { n: "Wien", lat: 48.11, lon: 16.56, ctr: true, c: "AT" },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
-        "LOWS": { n: "Salzburg", lat: 47.79, lon: 13.00, ctr: true, c: "AT" },
-        "LOWG": { n: "Graz", lat: 46.99, lon: 15.43, ctr: true, c: "AT" },
-        "LOWL": { n: "Linz", lat: 48.23, lon: 14.18, ctr: true, c: "AT" },
-        "LOWZ": { n: "Zell am See", lat: 47.29, lon: 12.78, ctr: false, c: "AT" },
-        "LOAN": { n: "Wr. Neustadt", lat: 47.84, lon: 16.25, ctr: false, c: "AT" },
-        "LOIJ": { n: "St. Johann", lat: 47.52, lon: 12.45, ctr: false, c: "AT" },
-        "LOWK": { n: "Klagenfurt", lat: 46.64, lon: 14.33, ctr: true, c: "AT" }
+        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false },
+        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false },
+        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true },
+        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true },
+        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true },
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true }
     };
 
-    const missions = [
-        { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein lokaler Geschäftsmann muss zu einem wichtigen Meeting. Er zahlt einen Bonus für Pünktlichkeit." },
-        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs, keine Zeit verlieren!" },
-        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Skiausrüstung in der hinteren Ablage." },
-        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil. Schnellste Route wählen." },
-        { t: "Uhren-Logistik", i: "⌚", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine absolut sanfte Landung am Zielort." },
-        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Sie sind in Boxen, sorge für gute Belüftung." },
-        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv, Verzögerungen vermeiden." },
-        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast möchte diskret reisen. Erwarte viel schweres Gepäck und Champagner-Wünsche." },
-        { t: "Foto-Mission", i: "📸", s: "Ein Immobilienmakler möchte Luftaufnahmen vom Zielgebiet machen. Halte die Maschine beim Anflug stabil." },
-        { t: "Eiliger Postflug", i: "🗞️", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden. Wetterradar im Auge behalten!" },
-        { t: "Gourmet-Ausflug", i: "🍽️", s: "Zwei Weinkenner fliegen zu einem berühmten Restaurant am Platz. Der Rückflug wird wohl schwerer..." },
-        { t: "Medizin-Notfall", i: "💊", s: "Spezialmedikamente für eine Klinik. Zeit ist der entscheidende Faktor bei dieser Mission." },
-        { t: "Technik-Check", i: "⚙️", s: "Überführungsflug zur Werft. Ein kleiner Fehler in der Elektrik soll dort behoben werden." }
-    ];
+    let map;
+    let polyline;
+    let markers = [];
 
-    let currentDest = "";
+    // Karte initialisieren
+    function initMap(lat1, lon1, lat2, lon2, icao1, icao2) {
+        const mapDiv = document.getElementById('map');
+        mapDiv.style.display = 'block';
 
-    function applyPreset(tas, gph, seats) {
-        document.getElementById('tasSlider').value = tas; document.getElementById('tasVal').innerText = tas;
-        document.getElementById('gphSlider').value = gph; document.getElementById('gphVal').innerText = gph;
-        document.getElementById('maxSeats').value = seats;
+        if (!map) {
+            map = L.map('map', { attributionControl: false });
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        }
+
+        // Alte Marker entfernen
+        markers.forEach(m => map.removeLayer(m));
+        if (polyline) map.removeLayer(polyline);
+        markers = [];
+
+        const p1 = [lat1, lon1];
+        const p2 = [lat2, lon2];
+
+        const m1 = L.marker(p1).addTo(map).bindPopup(icao1);
+        const m2 = L.marker(p2).addTo(map).bindPopup(icao2);
+        markers.push(m1, m2);
+
+        polyline = L.polyline([p1, p2], { color: '#4da6ff', weight: 3, dashArray: '5, 10' }).addTo(map);
+
+        map.fitBounds(L.latLngBounds(p1, p2), { padding: [30, 30] });
+    }
+
+    async function getAirportData(icao) {
+        if (coreDB[icao]) return coreDB[icao];
+        document.getElementById('searchIndicator').innerText = `Suche ${icao}...`;
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
+            const data = await response.json();
+            if (data && data.length > 0) {
+                return { n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: data[0].display_name.includes('Airport') };
+            }
+        } catch (e) {}
+        return null;
     }
 
     function calcNav(lat1, lon1, lat2, lon2) {
@@ -185,58 +164,49 @@
         return { dist, brng };
     }
 
-    function generateMission() {
+    async function generateMission() {
+        const btn = document.getElementById('generateBtn');
+        btn.disabled = true;
         const startICAO = document.getElementById("startLoc").value.toUpperCase();
-        const start = coreDB[startICAO];
-        if (!start) { alert("Start-ICAO unbekannt!"); return; }
+        const destICAO = document.getElementById("destLoc").value.toUpperCase() || "EDNY"; // Fallback
 
-        let destICAO = document.getElementById("destLoc").value.toUpperCase();
-        const range = document.getElementById("distRange").value;
-        let dest = null;
+        const start = await getAirportData(startICAO);
+        const dest = await getAirportData(destICAO);
 
-        if (!destICAO) {
-            let possible = Object.keys(coreDB).filter(i => i !== startICAO);
-            let filtered = [];
-            for (let i of possible) {
-                let dData = calcNav(start.lat, start.lon, coreDB[i].lat, coreDB[i].lon);
-                if (range === "short" && dData.dist < 50) filtered.push({i, d:dData});
-                else if (range === "medium" && dData.dist >= 50 && dData.dist <= 150) filtered.push({i, d:dData});
-                else if (range === "long" && dData.dist > 150) filtered.push({i, d:dData});
-                else if (range === "any") filtered.push({i, d:dData});
-            }
-            if (filtered.length === 0) { alert("Kein passendes Ziel gefunden!"); return; }
-            let res = filtered[Math.floor(Math.random() * filtered.length)];
-            destICAO = res.i; dest = coreDB[destICAO];
-        } else {
-            dest = coreDB[destICAO];
-            if (!dest) { alert("Ziel-ICAO nicht in Core-Datenbank!"); return; }
-        }
+        document.getElementById('searchIndicator').innerText = "";
+        if (!start || !dest) { alert("ICAO nicht gefunden!"); btn.disabled = false; return; }
 
-        currentDest = destICAO;
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const gph = document.getElementById("gphSlider").value;
         const tas = document.getElementById("tasSlider").value;
         const fuel = Math.ceil((nav.dist / tas * gph) + (0.75 * gph));
-        const m = missions[Math.floor(Math.random() * missions.length)];
-        const seats = parseInt(document.getElementById("maxSeats").value);
 
-        document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
-        document.getElementById("mRoute").innerText = `${startICAO} ➔ ${destICAO} (${dest.n})`;
+        document.getElementById("mTitle").innerText = "Flugauftrag";
+        document.getElementById("mRoute").innerText = `${startICAO} ➔ ${destICAO}`;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = `${Math.floor(Math.random()*seats)} PAX`;
-        document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*350)+10} lbs`;
-        document.getElementById("mStory").innerText = m.s;
+        document.getElementById("mPay").innerText = `${Math.floor(Math.random()*4)} PAX`;
+        document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)} lbs`;
+        document.getElementById("mStory").innerText = "Briefing abgeschlossen. Die Karte zeigt die direkte Route.";
 
-        let tags = dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>';
-        if (start.c !== dest.c) tags += '<span class="tag border-warn" style="background:#443311; color:#ffcc66; border:1px solid #ff8800;">🌐 GRENZE</span>';
-        document.getElementById("mTags").innerHTML = tags;
+        document.getElementById("btnAIPDep").style.display = startICAO.startsWith("ED") ? "block" : "none";
+        document.getElementById("btnAIPDest").style.display = destICAO.startsWith("ED") ? "block" : "none";
         document.getElementById("briefingBox").style.display = "block";
+
+        initMap(start.lat, start.lon, dest.lat, dest.lon, startICAO, destICAO);
+        btn.disabled = false;
     }
 
-    function openWeather() { if(currentDest) window.open(`https://metar-taf.com/de/${currentDest}`, '_blank'); }
-    function openAIP() { if(currentDest) window.open(`https://aip.aero/de/vfr/?${currentDest}`, '_blank'); }
+    function applyPreset(tas, gph, seats) {
+        document.getElementById('tasSlider').value = tas; document.getElementById('tasVal').innerText = tas;
+        document.getElementById('gphSlider').value = gph; document.getElementById('gphVal').innerText = gph;
+    }
+    
+    function openWeather() { let dest = document.getElementById("destLoc").value.toUpperCase() || "EDNY"; window.open(`https://metar-taf.com/de/${dest}`, '_blank'); }
+    function openAIP(type) { 
+        let icao = (type === 'dep') ? document.getElementById("startLoc").value.toUpperCase() : document.getElementById("destLoc").value.toUpperCase();
+        window.open(`https://aip.aero/de/vfr/?${icao}`, '_blank'); 
+    }
 </script>
-
 </body>
 </html>
