@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V26</title>
+    <title>GA Dispatcher V27</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -40,8 +40,8 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V26</h1>
-    <div id="searchIndicator">Bereit für den nächsten Flug.</div>
+    <h1>GA Dispatcher V27</h1>
+    <div id="searchIndicator">Bereit für den Check-In.</div>
     
     <div class="row">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
@@ -109,18 +109,16 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const coreDB = { 
-        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false, c: "DE" },
-        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false, c: "DE" },
-        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true, c: "DE" },
-        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true, c: "DE" },
-        "EDTD": { n: "Donaueschingen", lat: 47.97, lon: 8.52, ctr: false, c: "DE" },
-        "EDMA": { n: "Augsburg", lat: 48.42, lon: 10.93, ctr: true, c: "DE" },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
-        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" }
+        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false },
+        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false },
+        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true },
+        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true },
+        "EDTD": { n: "Donaueschingen", lat: 47.97, lon: 8.52, ctr: false },
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true },
+        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true }
     };
     
     const missions = [
-        // STANDARD MISSIONEN
         { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein Unternehmer muss zu einem Meeting. Er zahlt gut für Pünktlichkeit." },
         { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
         { t: "Ski-Express", i: "⛷️", cat: "std", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Ausrüstung." },
@@ -141,8 +139,6 @@
         { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
         { t: "Flower Delivery", i: "🌹", cat: "std", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit." },
         { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
-        
-        // TRAINING (nur < 50 NM)
         { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe während des Fluges Power-Off und Power-On Stalls inklusive Recovery." },
         { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe zwei Vollkreise mit 45° Bankwinkel durch. Halte die Höhe exakt." },
         { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall. Wähle ein Notlandefeld und leite den Gleitflug ein." },
@@ -171,6 +167,15 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
+    function checkCTR(icao, name) {
+        if (!icao) return false;
+        const ctrPrefixes = ["EDD", "EDF", "EDL", "EDS", "EDO", "EDP"];
+        const isCtr = ctrPrefixes.some(p => icao.startsWith(p)) || 
+                      name.toLowerCase().includes("airport") || 
+                      name.toLowerCase().includes("flughafen");
+        return isCtr;
+    }
+
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
@@ -178,7 +183,10 @@
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
-            if (data && data.length > 0) return { n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: data[0].display_name.includes('Airport') };
+            if (data && data.length > 0) {
+                const n = data[0].display_name.split(',')[0];
+                return { n: n, lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: checkCTR(icao, n) };
+            }
         } catch (e) {} return null;
     }
 
@@ -192,7 +200,9 @@
             const data = await res.json();
             if (data && data.elements.length > 0) {
                 const c = data.elements[Math.floor(Math.random()*data.elements.length)];
-                return { icao: c.tags.icao, n: c.tags.name || "Unknown", lat: c.lat, lon: c.lon, ctr: c.tags.icao.startsWith("ED") };
+                const icao = c.tags.icao;
+                const name = c.tags.name || "Unknown";
+                return { icao: icao, n: name, lat: c.lat, lon: c.lon, ctr: checkCTR(icao, name) };
             }
         } catch (e) {} return null;
     }
@@ -225,7 +235,6 @@
         if(!dest) { alert("Ziel nicht gefunden!"); btn.disabled=false; return; }
         currentDestICAO = targetDest || dest.icao;
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
-        
         const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
         const m = availM[Math.floor(Math.random()*availM.length)];
         const fuel = Math.ceil((nav.dist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
@@ -241,7 +250,7 @@
         document.getElementById("mTags").innerHTML = dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>';
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
-        indicator.innerText = "Flug bereit.";
+        indicator.innerText = "Briefing abgeschlossen.";
         btn.disabled = false;
     }
 
@@ -262,9 +271,14 @@
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
-        localStorage.setItem('last_icao_dest', currentDestICAO);
+        
+        // --- DIREKTES UPDATE ---
+        localStorage.setItem('last_icao_dest', currentDestICAO); 
+        document.getElementById('startLoc').value = currentDestICAO; // Input sofort aktualisieren
+        document.getElementById('destLoc').value = ""; // Ziel leeren
+        
         renderLog();
-        alert(`Log erfolgreich! ${currentDestICAO} ist neuer Startpunkt.`);
+        alert(`Flug geloggt! ${currentDestICAO} wurde als neuer Startpunkt gesetzt.`);
     }
 
     function renderLog() {
