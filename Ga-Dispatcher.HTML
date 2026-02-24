@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GA Dispatcher</title>
+    <style>
+        :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .container { background-color: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); max-width: 480px; width: 100%; border: 1px solid #333; }
+        h1 { font-size: 22px; text-align: center; color: var(--blue); margin: 0 0 20px 0; letter-spacing: 1px; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
+        .input-group { margin-bottom: 12px; }
+        label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
+        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; }
+        
+        /* Preset Buttons */
+        .preset-row { display: flex; gap: 8px; margin-bottom: 15px; }
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 11px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .btn-preset:hover { background: #444; border-color: var(--blue); }
+
+        /* Slider Styling */
+        .slider-container { margin-bottom: 15px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .slider-val { color: var(--blue); font-weight: bold; }
+        input[type=range] { width: 100%; cursor: pointer; height: 8px; background: #444; border-radius: 5px; appearance: none; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
+
+        .row { display: flex; gap: 10px; }
+        .row div { flex: 1; }
+        .btn-main { width: 100%; padding: 16px; margin-top: 10px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 16px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .btn-secondary { background-color: #333; color: var(--blue); border: 1px solid var(--blue); margin-top: 15px; padding: 10px; font-size: 13px; width: 100%; border-radius: 8px; cursor: pointer; }
+        
+        .briefing { margin-top: 20px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #333; display: none; }
+        .briefing h2 { margin-top: 0; font-size: 17px; color: var(--blue); border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+        .stat-item { font-size: 13px; }
+        .stat-label { color: #888; display: block; font-size: 10px; text-transform: uppercase; }
+        .ctr-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-top: 4px; }
+        .ctr-yes { background-color: #661111; color: #ff9999; border: 1px solid #ff4444; }
+        .ctr-no { background-color: #114411; color: #99ff99; border: 1px solid #44ff44; }
+        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.4; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }
+        .highlight { color: #fff; font-weight: bold; font-size: 15px; }
+        .fuel-box { background: #1a2a3a; padding: 8px; border-radius: 6px; border-left: 4px solid var(--blue); grid-column: span 2; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>GA Dispatcher</h1>
+    
+    <div class="row">
+        <div class="input-group">
+            <label>Start (ICAO)</label>
+            <input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value = this.value.toUpperCase()">
+        </div>
+        <div class="input-group">
+            <label>Ziel (Optional)</label>
+            <input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value = this.value.toUpperCase()">
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="input-group">
+            <label>Sitze</label>
+            <select id="maxSeats">
+                <option value="2">2</option>
+                <option value="4" selected>4</option>
+                <option value="6">6</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Distanz</label>
+            <select id="distanceRange">
+                <option value="any">Egal</option>
+                <option value="short">Short</option>
+                <option value="medium">Medium</option>
+                <option value="long">Long</option>
+            </select>
+        </div>
+    </div>
+
+    <label>Flugzeug-Presets (Schnellwahl)</label>
+    <div class="preset-row">
+        <button class="btn-preset" onclick="applyPreset(115, 9, 4)">C172</button>
+        <button class="btn-preset" onclick="applyPreset(160, 14, 4)">Comanche</button>
+        <button class="btn-preset" onclick="applyPreset(220, 25, 6)">Aerostar</button>
+    </div>
+
+    <div class="slider-container">
+        <div class="slider-header">
+            <label>Verbrauch (GPH)</label>
+            <span id="gphVal" class="slider-val">14</span>
+        </div>
+        <input type="range" id="gphSlider" min="5" max="30" value="14" oninput="document.getElementById('gphVal').innerText = this.value">
+    </div>
+
+    <div class="slider-container">
+        <div class="slider-header">
+            <label>Geschwindigkeit (TAS kts)</label>
+            <span id="tasVal" class="slider-val">160</span>
+        </div>
+        <input type="range" id="tasSlider" min="80" max="250" value="160" step="5" oninput="document.getElementById('tasVal').innerText = this.value">
+    </div>
+    
+    <button class="btn-main" onclick="generateMission()">Auftrag generieren</button>
+
+    <div id="briefingBox" class="briefing">
+        <h2 id="mTitle"></h2>
+        <div class="stat-grid">
+            <div class="stat-item">
+                <span class="stat-label">Route & Luftraum</span>
+                <span id="mRoute" class="highlight"></span><br>
+                <span id="mCtr" class="ctr-tag"></span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Distanz</span>
+                <span id="mDist" class="highlight"></span>
+            </div>
+            
+            <div class="fuel-box">
+                <span class="stat-label">Geschätzter Treibstoffbedarf (Gal)</span>
+                <span id="mFuel" class="highlight" style="color: var(--blue);"></span>
+                <span style="font-size: 10px; color: #888; margin-left: 5px;">(Inkl. 45m Reserve)</span>
+            </div>
+
+            <div class="stat-item">
+                <span class="stat-label">Zuladung (PAX)</span>
+                <span id="mPax" class="highlight"></span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Fracht-Gewicht</span>
+                <span id="mWeight" class="highlight"></span>
+            </div>
+        </div>
+        <p id="mStory" class="story"></p>
+        <button class="btn-secondary" onclick="openWeather()">🌦️ METAR für Ziel prüfen</button>
+    </div>
+</div>
+
+<script>
+    const airports = {
+        "EDTW": { n: "Winzeln-Schramberg", lat: 48.279, lon: 8.428, ctr: false },
+        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false },
+        "EDTZ": { n: "Konstanz", lat: 47.681, lon: 9.138, ctr: false },
+        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true },
+        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true },
+        "EDTY": { n: "Schwäbisch Hall", lat: 49.117, lon: 9.777, ctr: false },
+        "EDSB": { n: "Karlsruhe/Baden-Baden", lat: 48.779, lon: 8.080, ctr: true },
+        "EDTD": { n: "Donaueschingen", lat: 47.973, lon: 8.522, ctr: false },
+        "EDDM": { n: "München", lat: 48.353, lon: 11.786, ctr: true },
+        "EDMA": { n: "Augsburg", lat: 48.425, lon: 10.931, ctr: true },
+        "EDJA": { n: "Memmingen", lat: 47.988, lon: 10.239, ctr: true },
+        "EDDN": { n: "Nürnberg", lat: 49.498, lon: 11.078, ctr: true },
+        "EDMO": { n: "Oberpfaffenhofen", lat: 48.081, lon: 11.283, ctr: true },
+        "EDDF": { n: "Frankfurt", lat: 50.033, lon: 8.570, ctr: true },
+        "EDFM": { n: "Mannheim", lat: 49.473, lon: 8.514, ctr: true },
+        "EDDK": { n: "Köln/Bonn", lat: 50.865, lon: 7.142, ctr: true },
+        "EDDL": { n: "Düsseldorf", lat: 51.289, lon: 6.766, ctr: true },
+        "EDLP": { n: "Paderborn", lat: 51.614, lon: 8.616, ctr: true },
+        "EDRK": { n: "Koblenz-Winningen", lat: 50.325, lon: 7.527, ctr: false },
+        "EDDH": { n: "Hamburg", lat: 53.630, lon: 9.988, ctr: true },
+        "EDDW": { n: "Bremen", lat: 53.047, lon: 8.786, ctr: true },
+        "EDXW": { n: "Sylt", lat: 54.913, lon: 8.340, ctr: true },
+        "EDHL": { n: "Lübeck", lat: 53.805, lon: 10.719, ctr: true },
+        "EDDB": { n: "Berlin-Brandenburg", lat: 52.366, lon: 13.503, ctr: true },
+        "EDDP": { n: "Leipzig/Halle", lat: 51.423, lon: 12.236, ctr: true },
+        "EDDC": { n: "Dresden", lat: 51.132, lon: 13.767, ctr: true },
+        "EDVE": { n: "Braunschweig", lat: 52.319, lon: 10.556, ctr: true },
+        "EDHK": { n: "Kiel", lat: 54.379, lon: 10.145, ctr: false },
+        "EDBC": { n: "Magdeburg", lat: 52.073, lon: 11.626, ctr: false }
+    };
+
+    const missions = [
+        { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein Termin wartet. Achte auf Treibstoffplanung bei eventuellen Holdings." },
+        { t: "Organtransport", i: "🚑", s: "Kritische Fracht. Nimm so wenig Sprit wie sicher möglich, um leicht und schnell zu sein." },
+        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere. Sorge für eine ruhige Belüftung während des langen Flugs." },
+        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support. Bringe das Bauteil schnellstmöglich zur gestrandeten Maschine." },
+        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast. Plane genug Reserve ein, falls das Wetter am Ziel umschlägt." }
+    ];
+
+    let currentDestICAO = "";
+
+    function applyPreset(tas, gph, seats) {
+        document.getElementById('tasSlider').value = tas;
+        document.getElementById('tasVal').innerText = tas;
+        document.getElementById('gphSlider').value = gph;
+        document.getElementById('gphVal').innerText = gph;
+        document.getElementById('maxSeats').value = seats;
+    }
+
+    function calcDist(lat1, lon1, lat2, lon2) {
+        const R = 3440; 
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    function generateMission() {
+        const start = document.getElementById("startLoc").value.toUpperCase();
+        let dest = document.getElementById("destLoc").value.toUpperCase();
+        const range = document.getElementById("distanceRange").value;
+        const seats = parseInt(document.getElementById("maxSeats").value);
+        const gph = parseFloat(document.getElementById("gphSlider").value);
+        const tas = parseFloat(document.getElementById("tasSlider").value);
+        const box = document.getElementById("briefingBox");
+
+        let finalDest = dest;
+        let dist = 0;
+
+        if (!dest) {
+            let possible = Object.keys(airports).filter(i => i !== start);
+            let filtered = [];
+            if (airports[start]) {
+                for (let i of possible) {
+                    let d = calcDist(airports[start].lat, airports[start].lon, airports[i].lat, airports[i].lon);
+                    if (range === "short" && d < 50) filtered.push({i, d});
+                    else if (range === "medium" && d >= 50 && d <= 150) filtered.push({i, d});
+                    else if (range === "long" && d > 150) filtered.push({i, d});
+                    else if (range === "any") filtered.push({i, d});
+                }
+            } else { filtered = possible.map(i => ({i, d: 100})); }
+            if (filtered.length === 0) { alert("Kein Ziel gefunden!"); return; }
+            let choice = filtered[Math.floor(Math.random() * filtered.length)];
+            finalDest = choice.i; dist = choice.d;
+        } else {
+            if (airports[start] && airports[dest]) {
+                dist = calcDist(airports[start].lat, airports[start].lon, airports[dest].lat, airports[dest].lon);
+            } else { dist = 100; }
+        }
+
+        const flightTimeH = dist / tas;
+        const totalFuel = Math.ceil((flightTimeH * gph) + (0.75 * gph));
+
+        currentDestICAO = finalDest;
+        const isCtr = airports[finalDest] ? airports[finalDest].ctr : false;
+        const m = missions[Math.floor(Math.random() * missions.length)];
+        const pax = (m.t === "AOG Ersatzteil") ? 0 : Math.floor(Math.random() * (seats));
+        const weight = Math.floor(Math.random() * 300) + 10;
+
+        document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
+        document.getElementById("mRoute").innerText = `${start} ➔ ${finalDest}`;
+        document.getElementById("mDist").innerText = `${dist} NM`;
+        document.getElementById("mFuel").innerText = `${totalFuel} Gal`;
+        document.getElementById("mPax").innerText = pax;
+        document.getElementById("mWeight").innerText = `${weight} lbs`;
+        document.getElementById("mStory").innerText = m.s;
+
+        const ctrEl = document.getElementById("mCtr");
+        ctrEl.innerText = isCtr ? "⚠️ CTR: FREIGABE ERFORDERLICH" : "✅ UNKONTROLLIERT / VFR";
+        ctrEl.className = `ctr-tag ${isCtr ? 'ctr-yes' : 'ctr-no'}`;
+        box.style.display = "block";
+    }
+
+    function openWeather() {
+        if (currentDestICAO) window.open(`https://metar-taf.com/de/${currentDestICAO}`, '_blank');
+    }
+</script>
+
+</body>
+</html>
