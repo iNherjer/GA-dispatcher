@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V28 - Final Design</title>
+    <title>GA Dispatcher V29 - Final</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -23,26 +23,26 @@
                 /* Feines Gitter */
                 repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 50px),
                 repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 50px),
-                /* Luftraum-Kreise / VOR-Radiale (Blau & Gelb, sehr blass) */
+                /* Stilisierte Lufträume (Polygon-artig, rot/blau blass) */
+                linear-gradient(115deg, transparent 30%, rgba(255, 50, 50, 0.03) 30%, rgba(255, 50, 50, 0.03) 60%, transparent 60%),
+                radial-gradient(ellipse at 90% 10%, transparent 50%, rgba(50, 100, 255, 0.04) 50%, rgba(50, 100, 255, 0.04) 70%, transparent 70%),
+                /* Kreise / VOR-Radiale */
                 radial-gradient(circle at 10% 20%, rgba(77, 166, 255, 0.04) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(255, 204, 0, 0.03) 0%, transparent 40%),
-                linear-gradient(135deg, transparent 45%, rgba(77, 166, 255, 0.03) 50%, transparent 55%),
-                linear-gradient(45deg, transparent 45%, rgba(255, 204, 0, 0.02) 50%, transparent 55%);
-            background-attachment: fixed; /* Hintergrund bleibt beim Scrollen stehen */
-            background-size: 100% 100%, 100% 100%, 800px 800px, 600px 600px, 100% 100%, 100% 100%;
+                linear-gradient(135deg, transparent 45%, rgba(77, 166, 255, 0.03) 50%, transparent 55%);
+            background-attachment: fixed;
+            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 800px 800px, 100% 100%;
         }
 
         .container { 
-            background-color: rgba(30, 30, 30, 0.95); /* Leicht transparent */
+            background-color: rgba(30, 30, 30, 0.95);
             padding: 20px; 
             border-radius: 16px; 
-            /* Stärkerer Schatten + subtiler blauer Glow für "Avionik-Look" */
             box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 15px rgba(77, 166, 255, 0.15); 
             max-width: 480px; 
             width: 100%; 
             border: 1px solid #333; 
             box-sizing: border-box; 
-            backdrop-filter: blur(10px); /* "Frosted Glass" Effekt */
+            backdrop-filter: blur(10px);
         }
 
         h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; letter-spacing: 1px; }
@@ -68,12 +68,8 @@
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
-        .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin: 5px 5px 0 0; }
-        .ctr-yes { background-color: rgba(255, 68, 68, 0.1); color: var(--red); border: 1px solid var(--red); }
-        .ctr-no { background-color: rgba(68, 255, 68, 0.1); color: var(--green); border: 1px solid var(--green); }
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
-        .fuel-box { background: #1a2a3a; padding: 10px; border-radius: 6px; grid-column: span 2; border-left: 4px solid var(--blue); }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: all 0.2s; }
         .btn-action:hover { background: #444; border-color: #777; }
@@ -88,7 +84,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V28</h1>
+    <h1>GA Dispatcher V29</h1>
     <div id="searchIndicator">Bereit für den Check-In.</div>
     
     <div class="row">
@@ -136,14 +132,13 @@
             <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
-        <div id="mTags"></div>
         <p id="mStory" class="story"></p>
         
         <div class="action-row">
             <button class="btn-action" onclick="openWeather('dep')">🌦️ METAR DEP</button>
             <button class="btn-action" onclick="openWeather('dest')">🌦️ METAR DEST</button>
-            <button id="btnAIPDep" class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
-            <button id="btnAIPDest" class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
+            <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
+            <button class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
             <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
         </div>
     </div>
@@ -157,26 +152,25 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const coreDB = { 
-        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false, c: "DE" },
-        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828, ctr: false, c: "DE" },
-        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511, ctr: true, c: "DE" },
-        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221, ctr: true, c: "DE" },
-        "EDTD": { n: "Donaueschingen", lat: 47.97, lon: 8.52, ctr: false, c: "DE" },
-        "EDMA": { n: "Augsburg", lat: 48.42, lon: 10.93, ctr: true, c: "DE" },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
-        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" }
+        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428 },
+        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828 },
+        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511 },
+        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221 },
+        "EDTD": { n: "Donaueschingen", lat: 47.97, lon: 8.52 },
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34 },
+        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54 }
     };
     
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein Unternehmer muss zu einem Meeting. Er zahlt gut für Pünktlichkeit." },
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Er zahlt gut für Pünktlichkeit." },
         { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
         { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil." },
         { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein anspruchsvoller Gast möchte diskret reisen. Komfort ist das Wichtigste." },
         { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine absolut sanfte Landung." },
-        { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen." },
+        { t: "Hunderettung", i: "🐾", cat: "std", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Flieg ruhig." },
         { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
         { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
-        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung. Rückflug wird schwerer." },
         { t: "Foto-Mission", i: "📸", cat: "std", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
         { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
         { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
@@ -215,12 +209,6 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
-    function checkCTR(icao, name) {
-        if (!icao) return false;
-        const ctrPrefixes = ["EDD", "EDF", "EDL", "EDS"];
-        return ctrPrefixes.some(p => icao.startsWith(p)) || name.toLowerCase().includes("airport") || name.toLowerCase().includes("flughafen");
-    }
-
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
@@ -230,7 +218,7 @@
             const data = await res.json();
             if (data && data.length > 0) {
                 const n = data[0].display_name.split(',')[0];
-                return { n: n, lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: checkCTR(icao, n) };
+                return { n: n, lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
             }
         } catch (e) {} return null;
     }
@@ -246,7 +234,7 @@
             if (data && data.elements.length > 0) {
                 const c = data.elements[Math.floor(Math.random()*data.elements.length)];
                 const icao = c.tags.icao; const name = c.tags.name || "Unknown";
-                return { icao: icao, n: name, lat: c.lat, lon: c.lon, ctr: checkCTR(icao, name) };
+                return { icao: icao, n: name, lat: c.lat, lon: c.lon };
             }
         } catch (e) {} return null;
     }
@@ -291,7 +279,6 @@
         document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*parseInt(document.getElementById("maxSeats").value))} PAX`;
         document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+20} lbs`;
         document.getElementById("mStory").innerText = m.s;
-        document.getElementById("mTags").innerHTML = dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>';
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
         indicator.innerText = "Briefing abgeschlossen. Guten Flug!";
