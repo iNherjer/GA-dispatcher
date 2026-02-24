@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V22 - Explorer</title>
+    <title>GA Dispatcher V24.1</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -21,28 +21,27 @@
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
         .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
-        .btn-main:disabled { opacity: 0.5; cursor: wait; }
-        #map { height: 250px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; z-index: 1; }
+        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; z-index: 1; }
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
         .tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin: 5px 5px 0 0; }
-        .ctr-yes { background-color: #441111; color: var(--red); border: 1px solid var(--red); }
-        .ctr-no { background-color: #113311; color: var(--green); border: 1px solid var(--green); }
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
-        .fuel-box { background: #1a2a3a; padding: 10px; border-radius: 6px; grid-column: span 2; border-left: 4px solid var(--blue); }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; display: none; }
-        #searchIndicator { font-size: 10px; color: var(--blue); text-align: center; margin-bottom: 5px; height: 12px; font-style: italic; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; }
+        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
+        .logbook h3 { font-size: 14px; color: var(--blue); text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V22</h1>
-    <div id="searchIndicator"></div>
+    <h1>GA Dispatcher V24.1</h1>
+    <div id="searchIndicator" style="font-size:10px; color:var(--blue); text-align:center; margin-bottom:5px; font-style:italic;"></div>
     
     <div class="row">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
@@ -60,9 +59,9 @@
     </div>
 
     <div class="preset-row">
-        <button class="btn-preset" onclick="applyPreset(115, 9, 4)">C172</button>
-        <button class="btn-preset" onclick="applyPreset(160, 14, 4)">Comanche</button>
-        <button class="btn-preset" onclick="applyPreset(220, 25, 6)">Aerostar</button>
+        <button class="btn-preset" onclick="applyPreset(115, 9, 4, 'C172')">C172</button>
+        <button class="btn-preset" onclick="applyPreset(160, 14, 4, 'PA-24')">Comanche</button>
+        <button class="btn-preset" onclick="applyPreset(220, 25, 6, 'AERO')">Aerostar</button>
     </div>
 
     <div class="slider-container">
@@ -76,7 +75,6 @@
     </div>
     
     <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
-
     <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
@@ -84,7 +82,9 @@
         <div class="stat-grid">
             <div class="stat-item"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
-            <div class="fuel-box"><span class="stat-label">Min. Fuel Load</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span></div>
+            <div class="stat-item" style="grid-column: span 2; background: #1a2a3a; padding: 10px; border-radius: 6px; border-left: 4px solid var(--blue);">
+                <span class="stat-label">Treibstoffbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span>
+            </div>
             <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
@@ -92,11 +92,17 @@
         <p id="mStory" class="story"></p>
         
         <div class="action-row">
-            <button id="btnWeatherDep" class="btn-action" style="display:block" onclick="openWeather('dep')">🌦️ METAR DEP</button>
-            <button id="btnWeatherDest" class="btn-action" style="display:block" onclick="openWeather('dest')">🌦️ METAR DEST</button>
+            <button class="btn-action" style="display:block" onclick="openWeather('dep')">🌦️ METAR DEP</button>
+            <button class="btn-action" style="display:block" onclick="openWeather('dest')">🌦️ METAR DEST</button>
             <button id="btnAIPDep" class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
             <button id="btnAIPDest" class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
+            <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen</button>
         </div>
+    </div>
+
+    <div class="logbook">
+        <h3>Flugbuch <button class="btn-clear" onclick="clearLog()">Log löschen</button></h3>
+        <div id="logContent"></div>
     </div>
 </div>
 
@@ -105,142 +111,139 @@
     const coreDB = { "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428, ctr: false, c: "DE" } };
     
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein lokaler Unternehmer muss zu einem Meeting." },
-        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
-        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe während des kurzen Fluges Power-Off und Power-On Stalls." },
-        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe zwei Vollkreise mit 45° Bankwinkel durch." },
-        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine liefern." },
-        { t: "Hunderettung", i: "🐾", cat: "std", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern." },
-        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein anspruchsvoller Gast möchte diskret reisen." },
-        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden." }
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein Unternehmer muss zu einem Meeting. Pünktlichkeit wird belohnt." },
+        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
+        { t: "Ski-Express", i: "⛷️", cat: "std", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Skiausrüstung." },
+        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil." },
+        { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine absolut sanfte Landung." },
+        { t: "Hunderettung", i: "🐾", cat: "std", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Flieg ruhig." },
+        { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
+        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein anspruchsvoller Gast möchte diskret reisen. Komfort ist das Wichtigste." },
+        { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
+        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        { t: "Foto-Mission", i: "📸", cat: "std", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
+        { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
+        { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
+        { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
+        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser der Region sehen." },
+        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
+        { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
+        { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
+        { t: "Flower Delivery", i: "🌹", cat: "std", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit." },
+        { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
+        // Training (nur < 50 NM)
+        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe während des Fluges Power-Off und Power-On Stalls inklusive Recovery." },
+        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe zwei Vollkreise mit 45° Bankwinkel durch. Halte die Höhe exakt." },
+        { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall. Wähle ein Notlandefeld und leite den Gleitflug ein." },
+        { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich der minimalen Steuerbarkeit für 5 Minuten." },
+        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden." },
+        { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Lande am Zielort ohne Einsatz von Flaps. Achte auf die Speed!" },
+        { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den 'Wing-Low' Anflug, um genau auf der Centerline aufzusetzen." },
+        { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Schalte das GPS aus. Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
+        { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere einen Kabinenbrand. Leite einen kontrollierten Notabstieg ein." },
+        { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit einer Serie von Lazy Eights." }
     ];
 
-    let map, polyline, markers = [], currentStartICAO, currentDestICAO;
+    let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
 
-    function applyPreset(tas, gph, seats) {
-        document.getElementById('tasSlider').value = tas; document.getElementById('tasVal').innerText = tas;
-        document.getElementById('gphSlider').value = gph; document.getElementById('gphVal').innerText = gph;
-        document.getElementById('maxSeats').value = seats;
+    function applyPreset(t, g, s, n) { 
+        document.getElementById('tasSlider').value=t; document.getElementById('tasVal').innerText=t;
+        document.getElementById('gphSlider').value=g; document.getElementById('gphVal').innerText=g;
+        document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
-        document.getElementById('searchIndicator').innerText = `Suche ${icao}...`;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
-            if (data && data.length > 0) {
-                return { n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: data[0].display_name.includes('Airport') };
-            }
-        } catch (e) {}
-        return null;
+            if (data && data.length > 0) return { n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), ctr: data[0].display_name.includes('Airport') };
+        } catch (e) {} return null;
     }
 
-    // --- NEU: Live-Suche nach Zufallszielen via Overpass API ---
-    async function findRandomOnlineDest(startLat, startLon, rangePref) {
-        document.getElementById('searchIndicator').innerText = "Scanne Luftraum nach Zielen...";
-        let minMeters = 18520, maxMeters = 92600; // Default Short
-        if (rangePref === "medium") { minMeters = 92600; maxMeters = 277800; }
-        if (rangePref === "long") { minMeters = 277800; maxMeters = 740800; }
-        if (rangePref === "any") { minMeters = 18520; maxMeters = 500000; }
-
-        // Overpass Query: Suche Flugplätze im Umkreis mit ICAO-Code
-        const query = `[out:json];node(around:${maxMeters},${startLat},${startLon})["aeroway"="aerodrome"]["icao"];out;`;
+    async function findRandomOnlineDest(lat, lon, range) {
+        let maxM = 92600; if(range==="medium") maxM=277800; if(range==="long") maxM=740800;
+        const query = `[out:json];node(around:${maxM},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
-                // Filtere nach Distanz (da die API nur einen Vollkreis sucht)
-                const filtered = data.elements.filter(el => {
-                    const d = calcNav(startLat, startLon, el.lat, el.lon).dist;
-                    return d >= (minMeters/1852) && d <= (maxMeters/1852);
-                });
-                const finalChoice = filtered.length > 0 ? filtered[Math.floor(Math.random()*filtered.length)] : data.elements[Math.floor(Math.random()*data.elements.length)];
-                return { icao: finalChoice.tags.icao, n: finalChoice.tags.name || "Unknown Strip", lat: finalChoice.lat, lon: finalChoice.lon, ctr: (finalChoice.tags.icao.length === 4 && ["EDD","EDF","EDL"].some(pre => finalChoice.tags.icao.startsWith(pre))) };
+                const c = data.elements[Math.floor(Math.random()*data.elements.length)];
+                return { icao: c.tags.icao, n: c.tags.name || "Unknown", lat: c.lat, lon: c.lon, ctr: c.tags.icao.startsWith("ED") };
             }
-        } catch (e) { console.error("Overpass failed", e); }
-        return null;
+        } catch (e) {} return null;
     }
 
     function calcNav(lat1, lon1, lat2, lon2) {
-        const R = 3440;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        const dist = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-        const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
-        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) - Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
-        const brng = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
-        return { dist, brng };
+        const R = 3440, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        const dist = Math.round(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
+        return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
     }
 
     async function generateMission() {
-        const btn = document.getElementById('generateBtn');
-        btn.disabled = true;
+        const btn = document.getElementById('generateBtn'); btn.disabled = true;
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
-        let targetDest = document.getElementById("destLoc").value.toUpperCase();
-        const range = document.getElementById("distRange").value;
-        const seats = parseInt(document.getElementById("maxSeats").value);
-
         const start = await getAirportData(currentStartICAO);
-        if (!start) { alert("Startplatz unbekannt!"); btn.disabled = false; return; }
-
-        let dest = null;
-        if (!targetDest) {
-            dest = await findRandomOnlineDest(start.lat, start.lon, range);
-            if (dest) currentDestICAO = dest.icao;
-            else { alert("Kein Online-Ziel gefunden, prüfe Internet!"); btn.disabled = false; return; }
-        } else {
-            dest = await getAirportData(targetDest);
-            currentDestICAO = targetDest;
-        }
-
-        document.getElementById('searchIndicator').innerText = "";
-        if (!dest) { alert("Ziel nicht gefunden!"); btn.disabled = false; return; }
-
+        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
+        let targetDest = document.getElementById("destLoc").value.toUpperCase();
+        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, document.getElementById("distRange").value);
+        if(!dest) { alert("Kein Ziel gefunden!"); btn.disabled=false; return; }
+        currentDestICAO = targetDest || dest.icao;
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
-        let availMissions = missions.filter(m => nav.dist < 50 ? true : m.cat === "std");
-        const m = availMissions[Math.floor(Math.random() * availMissions.length)];
+        const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
+        const m = availM[Math.floor(Math.random()*availM.length)];
         const fuel = Math.ceil((nav.dist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
-
+        
+        currentMissionData = { start: currentStartICAO, dest: currentDestICAO, mission: m.t, dist: nav.dist, ac: selectedAC };
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*seats)} PAX`;
+        document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*parseInt(document.getElementById("maxSeats").value))} PAX`;
         document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+20} lbs`;
         document.getElementById("mStory").innerText = m.s;
-
-        document.getElementById("mTags").innerHTML = (dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>');
+        document.getElementById("mTags").innerHTML = dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>';
         document.getElementById("btnAIPDep").style.display = currentStartICAO.startsWith("ED") ? "block" : "none";
         document.getElementById("btnAIPDest").style.display = currentDestICAO.startsWith("ED") ? "block" : "none";
         document.getElementById("briefingBox").style.display = "block";
-
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
         btn.disabled = false;
     }
 
     function updateMap(lat1, lon1, lat2, lon2, s, d) {
         document.getElementById('map').style.display = 'block';
-        if (!map) {
-            map = L.map('map', { attributionControl: false });
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        }
-        markers.forEach(m => map.removeLayer(m));
-        if (polyline) map.removeLayer(polyline);
+        if (!map) { map = L.map('map', { attributionControl: false }); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map); }
+        markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         markers = [L.marker([lat1, lon1]).addTo(map).bindPopup(s), L.marker([lat2, lon2]).addTo(map).bindPopup(d)];
-        polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#4da6ff', weight: 3, dashArray: '5, 10' }).addTo(map);
+        polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#4da6ff', weight: 3, dashArray: '5,10' }).addTo(map);
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [30, 30] });
     }
 
-    function openWeather(type) { 
-        let icao = (type === 'dep') ? currentStartICAO : currentDestICAO;
-        window.open(`https://metar-taf.com/de/${icao}`, '_blank'); 
+    function openWeather(t) { window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
+    function openAIP(t) { window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
+
+    function logCurrentFlight() {
+        if(!currentMissionData) return;
+        const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
+        log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) });
+        localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50))); renderLog(); alert("Log erfolgreich!");
     }
-    function openAIP(type) { 
-        let icao = (type === 'dep') ? currentStartICAO : currentDestICAO;
-        window.open(`https://aip.aero/de/vfr/?${icao}`, '_blank'); 
+
+    function renderLog() {
+        const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
+        const container = document.getElementById('logContent');
+        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge.</div>';
+        log.forEach(e => {
+            const div = document.createElement('div'); div.className = 'log-entry';
+            div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br><b>${e.start} ➔ ${e.dest}</b><br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
+            container.appendChild(div);
+        });
     }
+
+    function clearLog() { if(confirm("Log löschen?")) { localStorage.removeItem('ga_logbook'); renderLog(); } }
+    renderLog();
 </script>
 </body>
 </html>
