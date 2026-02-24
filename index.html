@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V20 - Training Edition</title>
+    <title>GA Dispatcher V21 - Professional</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -40,7 +40,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V20</h1>
+    <h1>GA Dispatcher V21</h1>
     <div id="searchIndicator"></div>
     
     <div class="row">
@@ -91,7 +91,8 @@
         <p id="mStory" class="story"></p>
         
         <div class="action-row">
-            <button id="btnWeather" class="btn-action" style="display:block" onclick="openWeather()">🌦️ METAR</button>
+            <button id="btnWeatherDep" class="btn-action" style="display:block" onclick="openWeather('dep')">🌦️ METAR DEP</button>
+            <button id="btnWeatherDest" class="btn-action" style="display:block" onclick="openWeather('dest')">🌦️ METAR DEST</button>
             <button id="btnAIPDep" class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
             <button id="btnAIPDest" class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
         </div>
@@ -112,58 +113,40 @@
         "EDMA": { n: "Augsburg", lat: 48.42, lon: 10.93, ctr: true, c: "DE" },
         "EDDM": { n: "München", lat: 48.35, lon: 11.78, ctr: true, c: "DE" },
         "EDDF": { n: "Frankfurt", lat: 50.03, lon: 8.57, ctr: true, c: "DE" },
+        "EDDH": { n: "Hamburg", lat: 53.63, lon: 9.98, ctr: true, c: "DE" },
+        "EDXW": { n: "Sylt", lat: 54.91, lon: 8.34, ctr: true, c: "DE" },
         "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54, ctr: true, c: "CH" },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" }
+        "LSZR": { n: "St. Gallen", lat: 47.48, lon: 9.56, ctr: true, c: "CH" },
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34, ctr: true, c: "AT" },
+        "LOWS": { n: "Salzburg", lat: 47.79, lon: 13.00, ctr: true, c: "AT" }
     };
 
     const missions = [
-        // --- KLASSISCHE MISSIONEN ---
-        { t: "Business Charter", i: "🧑‍💼", s: "Eilig! Ein lokaler Unternehmer muss zu einem wichtigen Meeting. Pünktlichkeit wird belohnt." },
-        { t: "Organtransport", i: "🚑", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
-        { t: "Ski-Express", i: "⛷️", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht der Ausrüstung." },
-        { t: "AOG Ersatzteil", i: "🔧", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein Bauteil." },
-        { t: "Hunderettung", i: "🐾", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern." },
-        { t: "VIP Transfer", i: "🍾", s: "Ein anspruchsvoller Gast möchte diskret reisen. Komfort ist das Wichtigste." },
-        { t: "Uhren-Logistik", i: "⌚", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine Butterlandung." },
-        { t: "Labor-Kurier", i: "🧪", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
-        { t: "Foto-Mission", i: "📸", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
-        { t: "Gourmet-Trip", i: "🍽️", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein lokaler Unternehmer muss zu einem Meeting." },
+        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
+        { t: "Ski-Express", i: "⛷️", cat: "std", s: "Urlauber wollen in die Berge. Achte auf das Zusatzgewicht." },
+        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Ziel." },
+        { t: "Hunderettung", i: "🐾", cat: "std", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern." },
+        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein anspruchsvoller Gast möchte diskret reisen." },
+        { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht aus der Schweiz. Die Versicherung verlangt eine Butterlandung." },
+        { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
+        { t: "Foto-Mission", i: "📸", cat: "std", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
+        { t: "Gourmet-Trip", i: "🍷", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
+        { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
+        { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
         
-        // --- NEUE TRAININGS-MISSIONEN ---
-        { t: "Training: Stall Practice", i: "🎓", s: "Übe während des Fluges zum Ziel verschiedene Stalls: Power-Off (Landing Config) und Power-On (Take-Off Config). Achte auf saubere Recovery!" },
-        { t: "Training: Steep Turns", i: "🔄", s: "Such dir ein markantes Bodenmerkmal auf halber Strecke. Führe zwei Vollkreise (360°) mit 45° Bankwinkel durch. Halte die Höhe exakt (+/- 100ft)." },
-        { t: "Training: Engine Out", i: "🔥", s: "Simuliere im Reiseflug einen Triebwerksausfall. Führe die Checkliste durch, wähle ein Notlandefeld und leite den Gleitflug ein. Starte das Triebwerk bei 1000ft AGL wieder." },
-        { t: "Training: Slow Flight", i: "🐢", s: "Bringe die Comanche in den Bereich der minimalen Steuerbarkeit (Slow Flight). Fliege 5 Minuten lang knapp über Stall-Speed mit ausgefahrenen Klappen." },
-        { t: "Training: Pattern Work", i: "🛫", s: "Der Auftrag ist kurz, aber die Landung muss sitzen. Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden, bevor du final landest." },
-        { t: "Training: Lazy Eights", i: "♾️", s: "Perfektioniere deine Koordination. Führe auf Reiseflughöhe eine Serie von Lazy Eights durch. Achte auf weiche Übergänge und Symmetrie." },
-        { t: "Training: Emergency Descent", i: "📉", s: "Simuliere einen Kabinenbrand oder Druckverlust. Leite einen Notabstieg mit maximal zulässiger Sinkrate ein, ohne das Flugzeug strukturell zu überlasten." },
-        { t: "Training: No-Flap Landing", i: "🚫", s: "Simuliere einen Ausfall der Klappensteuerung. Lande am Zielort ohne Einsatz von Flaps. Achte auf die deutlich höhere Anfluggeschwindigkeit!" },
-        { t: "Training: Crosswind Mastery", i: "💨", s: "Wenn möglich, wähle am Ziel eine Bahn mit Seitenwindkomponente. Übe den 'Wing-Low' Anflug (Sideslip), um genau auf der Centerline aufzusetzen." },
-        { t: "Training: Dead Reckoning", i: "🧭", s: "Schalte das GPS/GNS im Cockpit aus. Navigiere nur mit Stoppuhr, Kompass und markanten Bodenmerkmalen (Flüsse, Autobahnen) zum Ziel." },
-
-        // --- WEITERE MISSIONEN ---
-        { t: "Horse-Vet", i: "🐎", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
-        { t: "Urgent Mail", i: "📂", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
-        { t: "Tech-Check", i: "⚙️", s: "Überführungsflug zur Werft. Ein kleiner Avionik-Fehler soll behoben werden." },
-        { t: "Organ-Concert", i: "🎻", s: "Ein Musiker transportiert wertvolle Instrumente." },
-        { t: "Student Visit", i: "🏠", s: "Ein Student möchte seine Großeltern überraschen." },
-        { t: "Medicine Emergency", i: "💊", s: "Spezialmedikamente für eine abgelegene Klinik." },
-        { t: "Real Estate Tour", i: "🏰", s: "Investoren wollen ein großes Anwesen aus der Luft besichtigen." },
-        { t: "Wildlife Research", i: "🦌", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
-        { t: "Castle Tour", i: "🏰", s: "Touristen wollen die berühmten Schlösser sehen." },
-        { t: "Flower Delivery", i: "🌹", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit." },
-        { t: "Archive Transport", i: "📜", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
-        { t: "Music Producer", i: "🎧", s: "Ein bekannter Produzent muss mitsamt Equipment zum nächsten Studio." },
-        { t: "Unexpected Guest", i: "🙋", s: "Ein Überraschungsbesuch bei alten Freunden." },
-        { t: "Relocation Flight", i: "📦", s: "Jemand zieht um und hat das wichtigste Hab und Gut in Kisten verpackt." },
-        { t: "Avionics Upgrade", i: "📟", s: "Du bringst ein neues Navigationsgerät zur Einbau-Werkstatt." }
+        // --- TRAINING (Nur Short Distanz) ---
+        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe während des kurzen Fluges Power-Off und Power-On Stalls. Achte auf saubere Recovery!" },
+        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe zwei Vollkreise mit 45° Bankwinkel durch. Halte die Höhe exakt." },
+        { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall. Wähle ein Notlandefeld und leite den Gleitflug ein." },
+        { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich der minimalen Steuerbarkeit für 5 Minuten." },
+        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden." },
+        { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere einen Ausfall der Klappen. Lande am Zielort ohne Einsatz von Flaps." },
+        { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den 'Wing-Low' Anflug (Sideslip), um genau auf der Centerline aufzusetzen." },
+        { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Schalte das GPS aus. Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
+        { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere einen Kabinenbrand. Leite einen kontrollierten Notabstieg ein." }
     ];
-
-    /* TIPP FÜR DICH:
-       Eigene Missionen hinzufügen: 
-       Einfach eine Zeile oben in der Liste "missions" ergänzen nach dem Schema:
-       { t: "Dein Titel", i: "Emoji", s: "Deine Beschreibungstext" },
-    */
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO;
 
@@ -229,22 +212,33 @@
         currentDestICAO = targetDest;
 
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
-        const m = missions[Math.floor(Math.random() * missions.length)];
+        
+        // Missions-Filterung basierend auf Distanz
+        let availableMissions = missions.filter(m => m.cat === "std");
+        if (nav.dist < 50) {
+            availableMissions = missions; // Training nur bei < 50 NM
+        }
+        
+        const m = availableMissions[Math.floor(Math.random() * availableMissions.length)];
         const fuel = Math.ceil((nav.dist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
 
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = (m.t.includes("Training") || m.t.includes("AOG")) ? "0 PAX" : `${Math.floor(Math.random()*seats)} PAX`;
+        document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*seats)} PAX`;
         document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+20} lbs`;
         document.getElementById("mStory").innerText = m.s;
 
         document.getElementById("mTags").innerHTML = (dest.ctr ? '<span class="tag ctr-yes">⚠️ CTR FREIGABE</span>' : '<span class="tag ctr-no">✅ VFR PLR</span>');
+        
+        // AIP & Weather Buttons
         document.getElementById("btnAIPDep").style.display = currentStartICAO.startsWith("ED") ? "block" : "none";
         document.getElementById("btnAIPDest").style.display = currentDestICAO.startsWith("ED") ? "block" : "none";
-        document.getElementById("briefingBox").style.display = "block";
+        document.getElementById("btnWeatherDep").style.display = "block";
+        document.getElementById("btnWeatherDest").style.display = "block";
 
+        document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
         btn.disabled = false;
     }
@@ -262,8 +256,14 @@
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [30, 30] });
     }
 
-    function openWeather() { window.open(`https://metar-taf.com/de/${currentDestICAO}`, '_blank'); }
-    function openAIP(type) { window.open(`https://aip.aero/de/vfr/?${type === 'dep' ? currentStartICAO : currentDestICAO}`, '_blank'); }
+    function openWeather(type) { 
+        let icao = (type === 'dep') ? currentStartICAO : currentDestICAO;
+        window.open(`https://metar-taf.com/de/${icao}`, '_blank'); 
+    }
+    function openAIP(type) { 
+        let icao = (type === 'dep') ? currentStartICAO : currentDestICAO;
+        window.open(`https://aip.aero/de/vfr/?${icao}`, '_blank'); 
+    }
 </script>
 </body>
 </html>
