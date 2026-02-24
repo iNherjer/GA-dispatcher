@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V38 - Border Control</title>
+    <title>GA Dispatcher V39 - Bounding Box Turbo</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -16,7 +16,7 @@
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
             /* DEIN NEUER HINTERGRUND */
-            background-image: url('bg.jpg'); 
+            background-image: url('bg.jpg'); /* ODER bg.png, falls dein Bild so heißt */
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -61,7 +61,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V38</h1>
+    <h1>GA Dispatcher V39</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="row">
@@ -72,7 +72,7 @@
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
         <div><label>Distanz</label><select id="distRange">
-            <option value="any">Egal</option>
+            <option value="any">Egal (Zufall)</option>
             <option value="short">Short (10-50)</option>
             <option value="medium">Medium (50-100)</option>
             <option value="long">Long (100-250)</option>
@@ -216,6 +216,7 @@
         } catch (e) {} return null;
     }
 
+    // TURBO-SUCHE mit Bounding Box (Kasten) statt Kreis
     async function findRandomOnlineDest(lat, lon, rangePref, regionPref) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM, finalRange;
@@ -233,18 +234,42 @@
         }
 
         let regionText = regionPref === "de" ? "DE" : (regionPref === "int" ? "Ausland" : "Europa");
-        indicator.innerText = `Online-Scan: ${finalRange} (${minNM}-${maxNM} NM) in ${regionText}...`;
+        indicator.innerText = `Highspeed-Scan: ${finalRange} (${minNM}-${maxNM} NM) in ${regionText}...`;
 
-        const query = `[out:json][timeout:30];nwr(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"];out center;`;
+        // Umrechnung von Seemeilen in Koordinaten-Kasten (Bounding Box)
+        // 1 Grad Latitude = ca. 60 NM
+        const latDiff = maxNM / 60.0;
+        // 1 Grad Longitude variiert je nach Latitude (Kosinus-Korrektur)
+        const lonDiff = maxNM / (60.0 * Math.cos(lat * Math.PI / 180));
+        
+        const s = (lat - latDiff).toFixed(4);
+        const n = (lat + latDiff).toFixed(4);
+        const w = (lon - lonDiff).toFixed(4);
+        const e = (lon + lonDiff).toFixed(4);
+
+        // Die Anfrage an Overpass ist jetzt simpler und pfeilschnell, da sie nur den Kasten lädt
+        const query = `[out:json][timeout:25];(node["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e});way["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e}););out center;`;
+        
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
                 const filtered = data.elements.map(el => {
                     const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
-                    return { icao: el.tags.icao, n: el.tags.name || "Unknown", lat: coords.lat, lon: coords.lon };
+                    return { 
+                        icao: el.tags.icao.toUpperCase(), 
+                        n: el.tags.name || el.tags.icao, 
+                        lat: coords.lat, 
+                        lon: coords.lon,
+                        usage: el.tags.usage || "",
+                        gliding: el.tags.gliding || "",
+                        sport: el.tags.sport || ""
+                    };
                 }).filter(el => {
-                    // Filter nach Distanz
+                    // Filter "Schmutz" lokal aus statt auf dem Server
+                    if (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding") return false;
+
+                    // Den Suchkasten (Quadrat) wieder zu einem perfekten Kreis zuschneiden
                     const d = calcNav(lat, lon, el.lat, el.lon).dist;
                     if (d < minNM || d > maxNM) return false;
                     
@@ -255,9 +280,13 @@
                     
                     return true;
                 });
+                
                 if (filtered.length > 0) return filtered[Math.floor(Math.random()*filtered.length)];
             }
-        } catch (e) {} return null;
+        } catch (err) {
+            console.log("Online API Timeout oder Fehler", err);
+        } 
+        return null;
     }
 
     function calcNav(lat1, lon1, lat2, lon2) {
@@ -286,11 +315,9 @@
             dataSource = "Core DB (Fallback)";
             let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
             
-            // Regionen-Filter auch auf Fallback anwenden
             if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
             if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
             
-            // Letztes Sicherheitsnetz falls Filter alles leer macht
             if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
             
             const fallbackKey = keys[Math.floor(Math.random()*keys.length)];
