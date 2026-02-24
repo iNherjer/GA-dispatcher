@@ -3,67 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V29 - Final</title>
+    <title>GA Dispatcher V31</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
-        
         body { 
-            font-family: 'Segoe UI', Roboto, sans-serif; 
-            background-color: var(--bg-dark); 
-            color: var(--text); 
-            margin: 0; 
-            padding: 20px 10px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh;
-            /* Synthetischer VFR-Karten-Hintergrund */
+            font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-dark); color: var(--text); 
+            margin: 0; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             background-image: 
-                /* Feines Gitter */
                 repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 50px),
                 repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 50px),
-                /* Stilisierte Lufträume (Polygon-artig, rot/blau blass) */
                 linear-gradient(115deg, transparent 30%, rgba(255, 50, 50, 0.03) 30%, rgba(255, 50, 50, 0.03) 60%, transparent 60%),
                 radial-gradient(ellipse at 90% 10%, transparent 50%, rgba(50, 100, 255, 0.04) 50%, rgba(50, 100, 255, 0.04) 70%, transparent 70%),
-                /* Kreise / VOR-Radiale */
                 radial-gradient(circle at 10% 20%, rgba(77, 166, 255, 0.04) 0%, transparent 50%),
                 linear-gradient(135deg, transparent 45%, rgba(77, 166, 255, 0.03) 50%, transparent 55%);
-            background-attachment: fixed;
-            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 800px 800px, 100% 100%;
+            background-attachment: fixed; background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 800px 800px, 100% 100%;
         }
-
         .container { 
-            background-color: rgba(30, 30, 30, 0.95);
-            padding: 20px; 
-            border-radius: 16px; 
+            background-color: rgba(30, 30, 30, 0.95); padding: 20px; border-radius: 16px; 
             box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 15px rgba(77, 166, 255, 0.15); 
-            max-width: 480px; 
-            width: 100%; 
-            border: 1px solid #333; 
-            box-sizing: border-box; 
-            backdrop-filter: blur(10px);
+            max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; backdrop-filter: blur(10px);
         }
-
-        h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; letter-spacing: 1px; }
-        #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; opacity: 0.8; }
-        label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
-        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; transition: border-color 0.3s; }
-        input:focus, select:focus { border-color: var(--blue); outline: none; }
-        .row { display: flex; gap: 8px; }
-        .row div { flex: 1; }
+        h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
+        #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; }
+        label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
+        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; }
-        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: all 0.2s; }
-        .btn-preset:hover { background: #444; border-color: var(--blue); }
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
-        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: transform 0.1s, background-color 0.2s; }
-        .btn-main:hover { background-color: #66b3ff; }
-        .btn-main:active { transform: scale(0.98); }
-        .btn-main:disabled { opacity: 0.5; cursor: wait; transform: none; }
-        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; z-index: 1; }
+        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; }
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
@@ -71,21 +43,17 @@
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: all 0.2s; }
-        .btn-action:hover { background: #444; border-color: #777; }
-        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: background-color 0.2s; }
-        .btn-log:hover { background: #55ff55; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; }
+        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
-        .logbook h3 { font-size: 14px; color: var(--blue); text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px; }
-        .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; transition: transform 0.1s; }
-        .log-entry:hover { transform: translateX(2px); }
+        .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V29</h1>
-    <div id="searchIndicator">Bereit für den Check-In.</div>
+    <h1>GA Dispatcher V31</h1>
+    <div id="searchIndicator">Ready for Briefing.</div>
     
     <div class="row">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
@@ -98,7 +66,7 @@
             <option value="any">Egal</option>
             <option value="short">Short (10-50 NM)</option>
             <option value="medium">Medium (50-150)</option>
-            <option value="long">Long (150-400)</option>
+            <option value="long">Long (150-450)</option>
         </select></div>
     </div>
 
@@ -152,47 +120,46 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const coreDB = { 
-        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428 },
-        "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828 },
-        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511 },
-        "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221 },
-        "EDTD": { n: "Donaueschingen", lat: 47.97, lon: 8.52 },
-        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34 },
-        "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54 }
+        "EDTW": { n: "Winzeln", lat: 48.279, lon: 8.428 }, "EDTF": { n: "Freiburg", lat: 48.023, lon: 7.828 },
+        "EDNY": { n: "Friedrichshafen", lat: 47.671, lon: 9.511 }, "EDDS": { n: "Stuttgart", lat: 48.689, lon: 9.221 },
+        "LOWI": { n: "Innsbruck", lat: 47.26, lon: 11.34 }, "LSZH": { n: "Zürich", lat: 47.46, lon: 8.54 }
     };
     
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Er zahlt gut für Pünktlichkeit." },
-        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden. Direkter Kurs!" },
-        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Eine gestrandete Maschine wartet auf ein kritisches Bauteil." },
-        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein anspruchsvoller Gast möchte diskret reisen. Komfort ist das Wichtigste." },
-        { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine absolut sanfte Landung." },
-        { t: "Hunderettung", i: "🐾", cat: "std", s: "Du fliegst Tiere aus dem Tierschutz zu neuen Besitzern. Flieg ruhig." },
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
+        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
+        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
+        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
+        { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine sanfte Landung." },
+        { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen." },
         { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
         { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
-        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung. Rückflug wird schwerer." },
-        { t: "Foto-Mission", i: "📸", cat: "std", s: "Ein Immobilienmakler braucht Luftaufnahmen vom Zielgebiet." },
-        { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Vertragsdokumente müssen vor Geschäftsschluss zugestellt werden." },
-        { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen. Fliege niedrig und langsam." },
+        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
+        { t: "Foto-Mission", i: "📸", cat: "std", s: "Luftaufnahmen vom Zielgebiet werden benötigt." },
+        { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
+        { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
         { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
-        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser der Region sehen." },
+        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
         { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
-        { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden mit Gastgeschenk." },
+        { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
         { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
-        { t: "Flower Delivery", i: "🌹", cat: "std", s: "Eine riesige Ladung frischer Blumen für eine Hochzeit." },
+        { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische Blumen für eine Hochzeit." },
         { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
-        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe während des Fluges Power-Off und Power-On Stalls inklusive Recovery." },
-        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe zwei Vollkreise mit 45° Bankwinkel durch. Halte die Höhe exakt." },
-        { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall. Wähle ein Notlandefeld und leite den Gleitflug ein." },
-        { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich der minimalen Steuerbarkeit für 5 Minuten." },
-        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort mindestens drei Touch-and-Go Platzrunden." },
-        { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere Ausfall der Klappen. Lande am Zielort ohne Einsatz von Flaps." },
-        { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den 'Wing-Low' Anflug, um genau auf der Centerline aufzusetzen." },
-        { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Schalte das GPS aus. Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
-        { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere einen Kabinenbrand. Leite einen kontrollierten Notabstieg ein." },
-        { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit einer Serie von Lazy Eights." },
-        { t: "Training: Radio Check", i: "📻", cat: "trn", s: "Übe heute besonders die perfekte Phraseologie beim Einflug in die Kontrollzone." },
-        { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe eine Short-Field-Landing Technik. Setze so früh wie möglich sicher auf." }
+        { t: "High Priority Courier", i: "📦", cat: "std", s: "Ein extrem wichtiges Paket muss noch heute zugestellt werden." },
+        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery." },
+        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch." },
+        { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und Notlandung." },
+        { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit." },
+        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei Touch-and-Go Platzrunden." },
+        { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
+        { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit Lazy Eights." },
+        { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere Ausfall der Klappen. Lande ohne Flaps." },
+        { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." },
+        { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere Kabinenbrand. Leite Notabstieg ein." },
+        { t: "Training: Radio Check", i: "📻", cat: "trn", s: "Fokus auf perfekte Phraseologie beim Anflug." },
+        { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
+        { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
+        { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." }
     ];
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -212,29 +179,33 @@
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
-        indicator.innerText = `Suche Standortdaten für ${icao}...`;
+        indicator.innerText = `Searching coordinates for ${icao}...`;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
-            if (data && data.length > 0) {
-                const n = data[0].display_name.split(',')[0];
-                return { n: n, lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-            }
+            if (data && data.length > 0) return { n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
         } catch (e) {} return null;
     }
 
     async function findRandomOnlineDest(lat, lon, range) {
         const indicator = document.getElementById('searchIndicator');
-        indicator.innerText = `Scanne Umgebung nach Zielen...`;
-        let maxM = 92600; if(range==="medium") maxM=277800; if(range==="long") maxM=740800;
-        const query = `[out:json][timeout:5];node(around:${maxM},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
+        let minNM = 10, maxNM = 50; 
+        if(range==="medium") { minNM = 50; maxNM = 150; }
+        if(range==="long") { minNM = 150; maxNM = 450; }
+        indicator.innerText = `Scanning for ${range} range (${minNM}-${maxNM} NM)...`;
+
+        const query = `[out:json][timeout:15];node(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
-                const c = data.elements[Math.floor(Math.random()*data.elements.length)];
-                const icao = c.tags.icao; const name = c.tags.name || "Unknown";
-                return { icao: icao, n: name, lat: c.lat, lon: c.lon };
+                const filtered = data.elements.filter(el => {
+                    const d = calcNav(lat, lon, el.lat, el.lon).dist;
+                    return d >= minNM && d <= maxNM;
+                });
+                const source = filtered.length > 0 ? filtered : data.elements;
+                const c = source[Math.floor(Math.random()*source.length)];
+                return { icao: c.tags.icao, n: c.tags.name || "Unknown", lat: c.lat, lon: c.lon };
             }
         } catch (e) {} return null;
     }
@@ -252,20 +223,19 @@
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; indicator.innerText="Fehler."; return; }
+        if(!start) { alert("Start Unknown!"); btn.disabled=false; return; }
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, document.getElementById("distRange").value);
         
         if(!dest && !targetDest) {
-            indicator.innerText = "Online-Suche erfolglos. Nutze CoreDB...";
+            indicator.innerText = "Online scan failed. Using internal DB...";
             const keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-            const fb = keys[Math.floor(Math.random()*keys.length)];
-            dest = coreDB[fb]; targetDest = fb;
+            dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
         }
 
-        if(!dest) { alert("Ziel nicht gefunden!"); btn.disabled=false; indicator.innerText="Fehler."; return; }
-        currentDestICAO = targetDest || dest.icao;
+        if(!dest) { alert("No target found!"); btn.disabled=false; return; }
+        currentDestICAO = dest.icao || targetDest;
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
         const m = availM[Math.floor(Math.random()*availM.length)];
@@ -281,7 +251,7 @@
         document.getElementById("mStory").innerText = m.s;
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
-        indicator.innerText = "Briefing abgeschlossen. Guten Flug!";
+        indicator.innerText = `Route to ${currentDestICAO} ready.`;
         btn.disabled = false;
     }
 
@@ -302,18 +272,16 @@
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
-        localStorage.setItem('last_icao_dest', currentDestICAO); 
+        localStorage.setItem('last_icao_dest', currentDestICAO);
         document.getElementById('startLoc').value = currentDestICAO;
         document.getElementById('destLoc').value = "";
-        document.getElementById('searchIndicator').innerText = `Bereit für den nächsten Leg ab ${currentDestICAO}.`;
-        renderLog();
-        alert(`Flug geloggt!`);
+        renderLog(); alert(`Flight logged! Start set to ${currentDestICAO}.`);
     }
 
     function renderLog() {
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         const container = document.getElementById('logContent');
-        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge.</div>';
+        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">No entries.</div>';
         log.forEach(e => {
             const div = document.createElement('div'); div.className = 'log-entry';
             div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br><b>${e.start} ➔ ${e.dest}</b><br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
@@ -321,7 +289,7 @@
         });
     }
 
-    function clearLog() { if(confirm("Log löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
+    function clearLog() { if(confirm("Clear Logbook?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
 </script>
 </body>
 </html>
