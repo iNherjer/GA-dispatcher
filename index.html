@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V31</title>
+    <title>GA Dispatcher V32</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -52,8 +52,8 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V31</h1>
-    <div id="searchIndicator">Ready for Briefing.</div>
+    <h1>GA Dispatcher V32</h1>
+    <div id="searchIndicator">Bereit für die Flugplanung.</div>
     
     <div class="row">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
@@ -112,7 +112,7 @@
     </div>
 
     <div class="logbook">
-        <h3>Flugbuch <button style="font-size:9px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
+        <h3>Flugbuch <button style="font-size:9px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Log löschen</button></h3>
         <div id="logContent"></div>
     </div>
 </div>
@@ -126,7 +126,7 @@
     };
     
     const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
+        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Eilig! Ein Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
         { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
         { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
         { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
@@ -140,7 +140,7 @@
         { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
         { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
         { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
-        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
+        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine Klinik." },
         { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
         { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
         { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische Blumen für eine Hochzeit." },
@@ -159,7 +159,8 @@
         { t: "Training: Radio Check", i: "📻", cat: "trn", s: "Fokus auf perfekte Phraseologie beim Anflug." },
         { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
         { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
-        { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." }
+        { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." },
+        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." }
     ];
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -179,7 +180,7 @@
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
-        indicator.innerText = `Searching coordinates for ${icao}...`;
+        indicator.innerText = `Suche Koordinaten für ${icao}...`;
         try {
             const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
             const data = await res.json();
@@ -192,7 +193,7 @@
         let minNM = 10, maxNM = 50; 
         if(range==="medium") { minNM = 50; maxNM = 150; }
         if(range==="long") { minNM = 150; maxNM = 450; }
-        indicator.innerText = `Scanning for ${range} range (${minNM}-${maxNM} NM)...`;
+        indicator.innerText = `Online-Scan im Bereich ${range} (${minNM}-${maxNM} NM)...`;
 
         const query = `[out:json][timeout:15];node(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
         try {
@@ -223,19 +224,21 @@
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Start Unknown!"); btn.disabled=false; return; }
+        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
+        let dataSource = targetDest ? "Manuell" : "Online";
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, document.getElementById("distRange").value);
         
         if(!dest && !targetDest) {
-            indicator.innerText = "Online scan failed. Using internal DB...";
+            dataSource = "Lokal (Fallback)";
             const keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
             dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
         }
 
-        if(!dest) { alert("No target found!"); btn.disabled=false; return; }
-        currentDestICAO = dest.icao || targetDest;
+        if(!dest) { alert("Kein Ziel gefunden!"); btn.disabled=false; return; }
+        currentDestICAO = dest.icao || targetDest || document.getElementById("destLoc").value.toUpperCase();
+        
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
         const m = availM[Math.floor(Math.random()*availM.length)];
@@ -251,7 +254,7 @@
         document.getElementById("mStory").innerText = m.s;
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
-        indicator.innerText = `Route to ${currentDestICAO} ready.`;
+        indicator.innerText = `Flug bereit (Quelle: ${dataSource}).`;
         btn.disabled = false;
     }
 
@@ -272,16 +275,21 @@
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
-        localStorage.setItem('last_icao_dest', currentDestICAO);
-        document.getElementById('startLoc').value = currentDestICAO;
+        
+        // FIX: Sicherer Übertrag
+        const nextStart = currentDestICAO;
+        localStorage.setItem('last_icao_dest', nextStart);
+        document.getElementById('startLoc').value = nextStart;
         document.getElementById('destLoc').value = "";
-        renderLog(); alert(`Flight logged! Start set to ${currentDestICAO}.`);
+        
+        renderLog(); 
+        alert(`Flug geloggt! Nächster Start von: ${nextStart}`);
     }
 
     function renderLog() {
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         const container = document.getElementById('logContent');
-        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">No entries.</div>';
+        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge.</div>';
         log.forEach(e => {
             const div = document.createElement('div'); div.className = 'log-entry';
             div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br><b>${e.start} ➔ ${e.dest}</b><br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
@@ -289,7 +297,7 @@
         });
     }
 
-    function clearLog() { if(confirm("Clear Logbook?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
+    function clearLog() { if(confirm("Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
 </script>
 </body>
 </html>
