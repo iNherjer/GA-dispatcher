@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V34 - Final Stability</title>
+    <title>GA Dispatcher V35 - Robust Explorer</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -52,7 +52,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V34</h1>
+    <h1>GA Dispatcher V35</h1>
     <div id="searchIndicator">Ready for mission planning.</div>
     
     <div class="row">
@@ -63,10 +63,10 @@
     <div class="row">
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
         <div><label>Distanz</label><select id="distRange">
-            <option value="any">Egal (Vollzufall)</option>
+            <option value="any">Egal (Zufällig)</option>
             <option value="short">Short (10-50 NM)</option>
-            <option value="medium">Medium (50-150)</option>
-            <option value="long">Long (150-450)</option>
+            <option value="medium">Medium (50-100 NM)</option>
+            <option value="long">Long (100-200 NM)</option>
         </select></div>
     </div>
 
@@ -112,14 +112,13 @@
     </div>
 
     <div class="logbook">
-        <h3>Flugbuch <button style="font-size:9px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Log löschen</button></h3>
+        <h3>Flugbuch <button style="font-size:9px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
         <div id="logContent"></div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // CORE DB mit integrierten ICAO Keys
     const coreDB = { 
         "EDTW": { icao: "EDTW", n: "Winzeln", lat: 48.279, lon: 8.428 }, 
         "EDTF": { icao: "EDTF", n: "Freiburg", lat: 48.023, lon: 7.828 },
@@ -144,7 +143,7 @@
         { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
         { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
         { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
-        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die Schlösser sehen." },
+        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
         { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
         { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
         { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
@@ -164,8 +163,7 @@
         { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
         { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
         { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." },
-        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." },
-        { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Du überführst ein Schleppflugzeug zu einem Segelflugplatz." }
+        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." }
     ];
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -200,29 +198,29 @@
         if(rangePref === "any") {
             const roll = Math.random();
             if (roll < 0.33) { minNM=10; maxNM=50; finalRange="SHORT"; }
-            else if (roll < 0.66) { minNM=50; maxNM=150; finalRange="MEDIUM"; }
-            else { minNM=150; maxNM=450; finalRange="LONG"; }
+            else if (roll < 0.66) { minNM=50; maxNM=100; finalRange="MEDIUM"; }
+            else { minNM=100; maxNM=200; finalRange="LONG"; }
         } else {
-            finalRange = rangePref.toUpperCase();
-            if(rangePref === "short") { minNM=10; maxNM=50; }
-            if(rangePref === "medium") { minNM=50; maxNM=150; }
-            if(rangePref === "long") { minNM=150; maxNM=450; }
+            if(rangePref === "short") { minNM=10; maxNM=50; finalRange="SHORT"; }
+            if(rangePref === "medium") { minNM=50; maxNM=100; finalRange="MEDIUM"; }
+            if(rangePref === "long") { minNM=100; maxNM=200; finalRange="LONG"; }
         }
 
-        indicator.innerText = `Scanning Online DB for ${finalRange} range (${minNM}-${maxNM} NM)...`;
+        indicator.innerText = `Online-Scan: ${finalRange} (${minNM}-${maxNM} NM)...`;
 
-        const query = `[out:json][timeout:30];node(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out;`;
+        const query = `[out:json][timeout:30];nwr(around:${maxNM*1852},${lat},${lon})["aeroway"="aerodrome"]["icao"];out center;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
-                const filtered = data.elements.filter(el => {
+                const filtered = data.elements.map(el => {
+                    const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
+                    return { icao: el.tags.icao, n: el.tags.name || "Unknown", lat: coords.lat, lon: coords.lon };
+                }).filter(el => {
                     const d = calcNav(lat, lon, el.lat, el.lon).dist;
                     return d >= minNM && d <= maxNM;
                 });
-                const source = filtered.length > 0 ? filtered : data.elements;
-                const c = source[Math.floor(Math.random()*source.length)];
-                return { icao: c.tags.icao, n: c.tags.name || "Unknown", lat: c.lat, lon: c.lon };
+                if (filtered.length > 0) return filtered[Math.floor(Math.random()*filtered.length)];
             }
         } catch (e) {} return null;
     }
@@ -240,7 +238,7 @@
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Start unknown!"); btn.disabled=false; return; }
+        if(!start) { alert("Start Unknown!"); btn.disabled=false; return; }
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manual" : "Online";
@@ -249,13 +247,11 @@
         if(!dest && !targetDest) {
             dataSource = "Local DB (Fallback)";
             const keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-            const fallbackKey = keys[Math.floor(Math.random()*keys.length)];
-            dest = coreDB[fallbackKey];
+            dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
         }
 
-        if(!dest) { alert("No target found!"); btn.disabled=false; return; }
+        if(!dest) { indicator.innerText = "Error: No destination found."; btn.disabled=false; return; }
         
-        // ICAO FIX: Sicherstellen, dass ICAO aus dem Objekt kommt
         currentDestICAO = dest.icao; 
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
@@ -293,15 +289,11 @@
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
-        
-        // --- SICHERER ÜBERTRAG ---
-        const nextStart = currentMissionData.dest;
-        localStorage.setItem('last_icao_dest', nextStart);
-        document.getElementById('startLoc').value = nextStart;
+        localStorage.setItem('last_icao_dest', currentMissionData.dest);
+        document.getElementById('startLoc').value = currentMissionData.dest;
         document.getElementById('destLoc').value = "";
-        
         renderLog(); 
-        alert(`Flight logged! Start set to ${nextStart}.`);
+        alert(`Flight logged! Start set to ${currentMissionData.dest}.`);
     }
 
     function renderLog() {
