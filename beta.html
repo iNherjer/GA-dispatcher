@@ -15,7 +15,6 @@
     <meta name="theme-color" content="#080808">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -71,13 +70,21 @@
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label><span id="gphVal" class="theme-color-text" style="font-weight:bold;">14</span></div>
-        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
+        <div class="slider-header">
+            <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label>
+            <div id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">
+                </div>
+        </div>
+        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="setDrumCounter('gphDrum', this.value)">
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label><span id="tasVal" class="theme-color-text" style="font-weight:bold;">160</span></div>
-        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
+        <div class="slider-header">
+            <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label>
+            <div id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">
+                </div>
+        </div>
+        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="setDrumCounter('tasDrum', this.value)">
     </div>
     
     <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
@@ -101,10 +108,18 @@
             <div class="aero-info-box" id="boxRoute">
                 <div class="route-label" style="background:transparent; border:none; box-shadow:none; padding:0;">✈️ Flugplan & Performance</div>
                 <div class="route-data">
-                    <div>Kurs: <span id="mNavHeading"></span></div>
-                    <div>Distanz: <span id="mNavDist"></span></div>
-                    <div>Zeit: <span id="mNavTime"></span></div>
-                    <div>Fuel: <span id="mFuelReq"></span></div>
+                    <div class="drum-readout-container">
+                        Kurs: <div id="headingDrum"></div> <span id="headingArrow"></span>
+                    </div>
+                    <div class="drum-readout-container">
+                        Dist: <div id="distDrum"></div> <span>NM</span>
+                    </div>
+                    <div class="drum-readout-container">
+                        Zeit: <div id="timeDrum"></div> <span>Min</span>
+                    </div>
+                    <div class="drum-readout-container">
+                        Fuel: <div id="fuelDrum"></div> <span>Gal</span>
+                    </div>
                 </div>
             </div>
 
@@ -155,7 +170,7 @@
 
 </div>
 
-<div class="version-info">Version 86.1 (Modular & Clean)</div>
+<div class="version-info">Version 87.0 (Mechanical Drum Counters)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
