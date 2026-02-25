@@ -107,7 +107,7 @@
         }
         
         .rwy-info { font-size: 11px; color: #aaa; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; }
-        .poi-info { font-size: 11px; color: #ccc; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; font-style: italic; line-height: 1.4; display: none; }
+        .wiki-info { font-size: 11px; color: #ccc; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; font-style: italic; line-height: 1.4; display: none; }
 
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
@@ -218,14 +218,17 @@
             <!-- ZIEL BOX -->
             <div class="aero-info-box" style="border-left-color: var(--red);">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
+                    <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">
+                        <span id="destIcon">🛬</span> <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span>
+                    </span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
                 
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
                 
-                <div class="poi-info" id="poiDescContainer">
-                    📖 <span id="poiDescText">Lade Wikipedia-Info...</span>
+                <!-- Kombinierte Wiki Info -->
+                <div class="wiki-info" id="wikiDescContainer">
+                    📖 <span id="wikiDescText">Lade Region/Wikipedia-Info...</span>
                 </div>
             </div>
 
@@ -252,7 +255,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 78.0 (Beta: Deep Story Generator)</div>
+<div class="version-info">Version 79.0 (Beta: Deep Story & Global Wiki)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -425,22 +428,38 @@
         return null;
     }
 
-    async function fetchWikipediaDescription(title, elementId) {
-        const url = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=3&titles=${encodeURIComponent(title)}&format=json&origin=*`;
+    // --- NEU: Zieht Wikipedia für POIs UND umliegende Flughäfen ---
+    async function fetchAreaDescription(lat, lon, elementId, exactTitle = null) {
         try {
-            const res = await fetch(url);
-            const data = await res.json();
-            const pages = data.query.pages;
-            const pageId = Object.keys(pages)[0];
-            
-            if (pageId !== "-1" && pages[pageId].extract) {
-                document.getElementById(elementId).innerText = pages[pageId].extract;
-            } else {
-                document.getElementById(elementId).innerText = "Keine weitere Beschreibung auf Wikipedia verfügbar.";
+            let titleToFetch = exactTitle;
+
+            // Wenn kein exakter Titel da ist (Flughafen), suchen wir den nächsten Ort in 5km
+            if (!titleToFetch) {
+                const geoUrl = `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=5000&gslimit=1&format=json&origin=*`;
+                const geoRes = await fetch(geoUrl);
+                const geoData = await geoRes.json();
+                if (geoData.query && geoData.query.geosearch && geoData.query.geosearch.length > 0) {
+                    titleToFetch = geoData.query.geosearch[0].title;
+                }
             }
+
+            if (titleToFetch) {
+                const extractUrl = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=3&titles=${encodeURIComponent(titleToFetch)}&format=json&origin=*`;
+                const extRes = await fetch(extractUrl);
+                const extData = await extRes.json();
+                const pages = extData.query.pages;
+                const pageId = Object.keys(pages)[0];
+                
+                if (pageId !== "-1" && pages[pageId].extract) {
+                    let prefix = exactTitle ? "" : `<b style="color:var(--blue)">Region (${titleToFetch}):</b> `;
+                    document.getElementById(elementId).innerHTML = prefix + pages[pageId].extract;
+                    return;
+                }
+            }
+            document.getElementById(elementId).innerText = "Keine regionalen Wikipedia-Infos verfügbar.";
         } catch(e) {
-            console.error("Wiki Desc Fetch Fehler:", e);
-            document.getElementById(elementId).innerText = "Fehler beim Laden der Infos.";
+            console.error("Wiki Fetch Fehler:", e);
+            document.getElementById(elementId).innerText = "Fehler beim Laden der Regional-Infos.";
         }
     }
 
@@ -482,15 +501,11 @@
         return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
     }
 
-    // --- NEU: MASSIV ERWEITERTER STORY-BAUKASTEN ---
     function generateDynamicPOIMission(poiName, maxSeats) {
         const nameLower = poiName.toLowerCase();
-        const maxPax = Math.max(1, maxSeats - 1); // Einer ist der Pilot
-        
-        // Helper-Funktion für zufällige Elemente aus Listen
+        const maxPax = Math.max(1, maxSeats - 1); 
         const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-        // Cargo & PAX Pools
         const paxVIP = `${maxPax} PAX (VIPs)`;
         const paxMedia = `1-2 PAX (Filmcrew)`;
         const paxGov = `1 PAX (Beobachter)`;
@@ -502,8 +517,16 @@
 
         let templates = [];
 
-        // 1. KATEGORIE: HISTORISCH (Burgen, Monumente, etc.)
-        if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom") || nameLower.includes("monument") || nameLower.includes("denkmal")) {
+        // NEU: BRÜCKEN & VIADUKTE
+        if (nameLower.includes("brücke") || nameLower.includes("viadukt") || nameLower.includes("aquädukt") || nameLower.includes("steg")) {
+            templates = [
+                { i: "🌉", t: `Struktur-Prüfung: ${poiName}`, s: `Das Verkehrsministerium beauftragt dich mit einer Riss- und Statikprüfung der Pfeiler von ${poiName}. Fliege mehrere langsame Pässe.`, p: paxGov, w: cargoUtility },
+                { i: "🚄", t: `Verkehrs-Studie: ${poiName}`, s: `Ein Ingenieurbüro plant eine Erweiterung der Verkehrswege bei ${poiName}. Dokumentiere den Verkehrsfluss zur Hauptverkehrszeit aus der Luft.`, p: paxGov, w: "Kamera-Gimbal (120 lbs)" },
+                { i: "🎬", t: `Action-Dreh: ${poiName}`, s: `Eine Filmcrew dreht eine Verfolgungsjagd über ${poiName}. Du lieferst die dynamischen Luftaufnahmen für den Blockbuster.`, p: paxMedia, w: cargoMedia },
+                { i: "🚁", t: `Instandhaltung: ${poiName}`, s: `Wartungstrupps benötigen einen Überblick über die schwer zugänglichen Stahlseile und Bögen von ${poiName}.`, p: "1 PAX (Ingenieur)", w: cargoUtility }
+            ];
+        }
+        else if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom") || nameLower.includes("monument") || nameLower.includes("denkmal")) {
             templates = [
                 { i: "🏰", t: `Historik-Flug: ${poiName}`, s: `Ein Historiker benötigt hochauflösende Luftaufnahmen von ${poiName}, um alte Mauerstrukturen im Umland zu erkennen. Kreise mehrmals in ruhiger Höhe.`, p: paxGov, w: cargoMedia },
                 { i: "🥂", t: `Hochzeits-Tour: ${poiName}`, s: `Ein frisch vermähltes Paar hat einen exklusiven Rundflug gebucht. Zeige ihnen ${poiName} von seiner romantischsten Seite.`, p: paxVIP, w: cargoVIP },
@@ -512,17 +535,16 @@
                 { i: "👻", t: `Mystery-Flug: ${poiName}`, s: `Ein reicher Fan von Mythen und Legenden hat dich gebucht. Er glaubt fest daran, dass es bei ${poiName} spukt und will den Ort aus der Luft beobachten.`, p: paxVIP, w: "Ferngläser & EMF-Meter (10 lbs)" }
             ];
         } 
-        // 2. KATEGORIE: WASSER (Seen, Küsten, Talsperren)
-        else if (nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher") || nameLower.includes("küste") || nameLower.includes("fluss") || nameLower.includes("hafen")) {
+        // ERWEITERT: WASSER & FLÜSSE
+        else if (nameLower.includes("fluss") || nameLower.includes("strom") || nameLower.includes("kanal") || nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher") || nameLower.includes("küste") || nameLower.includes("hafen")) {
             templates = [
                 { i: "💧", t: `Pegel-Messung: ${poiName}`, s: `Die Wasserbehörde muss den aktuellen Wasserstand und mögliche Ufer-Erosionen bei ${poiName} dokumentieren.`, p: paxNone, w: cargoUtility },
-                { i: "🛥️", t: `Regatta-Sicherung: ${poiName}`, s: `Heute findet bei ${poiName} ein großes Bootsevent statt. Du wurdest als fliegende Relais-Station für den Funkverkehr gebucht.`, p: paxGov, w: "Funk-Relais & Antennen (150 lbs)" },
-                { i: "🦆", t: `Natur-Beobachtung: ${poiName}`, s: `Ein Biologe möchte Zugvögel zählen, die momentan im Gebiet rund um ${poiName} rasten. Halte genug Abstand, um die Tiere nicht zu erschrecken!`, p: paxGov, w: "Teleobjektive (40 lbs)" },
-                { i: "🛶", t: `Werbedreh: ${poiName}`, s: `Der Tourismusverband will neue, dynamische Aufnahmen von Wassersportlern bei ${poiName}. Fliege tief und ruhig für die Kameracrew.`, p: paxMedia, w: cargoMedia },
-                { i: "🚁", t: `Search & Rescue Übung`, s: `Die lokale Wasserrettung übt heute. Du mimst den Suchflieger und sollst ein verstecktes Signal-Rettungsfloß bei ${poiName} ausfindig machen.`, p: "2 PAX (Spotter)", w: "Notfall-Kits (30 lbs)" }
+                { i: "🚢", t: `Schifffahrts-Kontrolle: ${poiName}`, s: `Die Flusswacht benötigt ein Update über die aktuelle Schiffsdichte und mögliche Blockaden bei ${poiName}.`, p: paxGov, w: cargoUtility },
+                { i: "🌊", t: `Hochwasser-Schutz: ${poiName}`, s: `Nach starken Regenfällen müssen Dämme und Uferbefestigungen entlang ${poiName} dringend auf Schwachstellen geprüft werden.`, p: paxGov, w: "Infrarot-Scanner (80 lbs)" },
+                { i: "🦆", t: `Natur-Beobachtung: ${poiName}`, s: `Ein Biologe möchte Wasservögel zählen, die momentan im Gebiet rund um ${poiName} rasten. Halte genug Abstand, um die Tiere nicht zu erschrecken!`, p: paxGov, w: "Teleobjektive (40 lbs)" },
+                { i: "🛶", t: `Werbedreh: ${poiName}`, s: `Der Tourismusverband will neue, dynamische Aufnahmen von Wassersportlern bei ${poiName}. Fliege tief und ruhig für die Kameracrew.`, p: paxMedia, w: cargoMedia }
             ];
         } 
-        // 3. KATEGORIE: NATUR / GEBIRGE (Berge, Täler, Wälder)
         else if (nameLower.includes("berg") || nameLower.includes("spitze") || nameLower.includes("horn") || nameLower.includes("gipfel") || nameLower.includes("kogel") || nameLower.includes("wald") || nameLower.includes("tal") || nameLower.includes("schlucht")) {
             templates = [
                 { i: "⛰️", t: `Topo-Scan: ${poiName}`, s: `Das Landesvermessungsamt aktualisiert die 3D-Karten der Region. Fliege ein präzises Raster über ${poiName} ab, damit der Laser scannen kann.`, p: paxNone, w: cargoUtility },
@@ -532,8 +554,7 @@
                 { i: "📸", t: `Kalender-Shooting: ${poiName}`, s: `Ein bekannter Naturfotograf braucht das perfekte Bild von ${poiName} für das Cover seines neuen Alpen-Kalenders.`, p: paxMedia, w: cargoMedia }
             ];
         } 
-        // 4. KATEGORIE: URBAN / INFRASTRUKTUR (Städte, Türme, Brücken)
-        else if (nameLower.includes("stadt") || nameLower.includes("turm") || nameLower.includes("brücke") || nameLower.includes("park") || nameLower.includes("stadion") || nameLower.includes("arena") || nameLower.includes("zentrum")) {
+        else if (nameLower.includes("stadt") || nameLower.includes("turm") || nameLower.includes("park") || nameLower.includes("stadion") || nameLower.includes("arena") || nameLower.includes("zentrum")) {
             templates = [
                 { i: "🏙️", t: `City-Panorama: ${poiName}`, s: `Eine Reisegruppe aus Übersee hat eine VIP-Städtetour gebucht. Das Highlight der Route ist ganz klar ${poiName}.`, p: `${maxPax} PAX (Touristen)`, w: cargoVIP },
                 { i: "🏗️", t: `Bauaufsicht: ${poiName}`, s: `Das Ingenieurbüro verlangt hochauflösende Aufnahmen von der Statik und dem Zustand der Anlagen bei ${poiName}.`, p: paxGov, w: cargoUtility },
@@ -542,17 +563,18 @@
                 { i: "🏢", t: `Immobilien-Flug: ${poiName}`, s: `Ein Großinvestor überlegt, Ländereien nahe ${poiName} zu kaufen. Zeige ihm, wie sich die Infrastruktur von oben präsentiert.`, p: paxVIP, w: cargoVIP }
             ];
         } 
-        // 5. KATEGORIE: GENERISCH (Falls nichts Spezielles zutrifft)
         else {
+            // AUSGEDÜNNTER FALLBACK (Weniger Foto-Touren)
             templates = [
                 { i: "✈️", t: `Panoramaflug: ${poiName}`, s: `Ein klassischer Ausflugsflug zum Zielort: ${poiName}. Die Fluggäste freuen sich auf einen ruhigen Flug und tolle Ausblicke!`, p: `${maxPax} PAX`, w: "Reisegepäck (30 lbs)" },
                 { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Du wurdest gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: paxMedia, w: cargoMedia },
                 { i: "🎁", t: `Überraschungsflug: ${poiName}`, s: `Jemand hat diesen Flug nach ${poiName} zum Geburtstag geschenkt bekommen. Mache es zu einem unvergesslichen Erlebnis!`, p: `${maxPax} PAX`, w: cargoVIP },
-                { i: "🎓", t: `Flugschule: Nav-Übung`, s: `Heute kein Charter-Kunde! Du zeigst einem Flugschüler, wie er sauber nach VFR nach ${poiName} navigiert.`, p: "1 PAX (Flugschüler)", w: "Flugtaschen (20 lbs)" }
+                { i: "🎓", t: `Nav-Übung: ${poiName}`, s: `Heute kein Charter-Kunde! Du zeigst einem Flugschüler, wie er sauber nach VFR nach ${poiName} navigiert.`, p: "1 PAX (Flugschüler)", w: "Flugtaschen (20 lbs)" },
+                { i: "📡", t: `Funk-Relais: ${poiName}`, s: `Kreise über ${poiName}, um als fliegendes Kommunikationsrelais für ein lokales Boden-Event zu fungieren.`, p: paxNone, w: "Zusatz-Antennen (80 lbs)" },
+                { i: "🛩️", t: `Luftraum-Check: ${poiName}`, s: `ATC hat unidentifizierte VFR-Aktivitäten bei ${poiName} gemeldet. Fliege hin und überprüfe die Lage visuell.`, p: "0 PAX", w: "Standard-Ausrüstung" }
             ];
         }
 
-        // Einen zufälligen Auftrag aus der gewählten Liste zurückgeben
         const selected = rnd(templates);
         return { i: selected.i, t: selected.t, s: selected.s, cat: "poi", payloadText: selected.p, cargoText: selected.w };
     }
@@ -567,7 +589,7 @@
         document.getElementById("mDepRwy").style.color = "#fff";
         document.getElementById("mDestRwy").innerText = "Sucht Pisten-Infos...";
         document.getElementById("mDestRwy").style.color = "#fff";
-        document.getElementById("poiDescText").innerText = "Lade Wikipedia-Info...";
+        document.getElementById("wikiDescText").innerText = "Lade Region-Info...";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -702,6 +724,8 @@
         document.getElementById("mNavTime").innerText = timeString;
         document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
 
+        // NEU: Ziel-Icon anpassen (Landung vs. Target)
+        document.getElementById("destIcon").innerText = isPOI ? "🎯" : "🛬";
         document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
         document.getElementById("mDestName").innerText = dest.n;
         document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
@@ -710,7 +734,7 @@
         document.getElementById("mWeight").innerText = cargoText;
         
         document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
-        document.getElementById("poiDescContainer").style.display = isPOI ? "block" : "none";
+        document.getElementById("wikiDescContainer").style.display = "block"; // Immer anzeigen!
         document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
         document.getElementById("btnMetarDest").style.display = isPOI ? "none" : "block";
 
@@ -722,9 +746,10 @@
         fetchRunwayDetails(start.lat, start.lon, 'mDepRwy');
         if (!isPOI) {
             fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy');
-        } else {
-            fetchWikipediaDescription(dest.n, 'poiDescText');
         }
+        
+        // NEU: Zieht Info für POI (exakter Titel) oder Airport (Umkreissuche)
+        fetchAreaDescription(dest.lat, dest.lon, 'wikiDescText', isPOI ? dest.n : null);
 
         setTimeout(() => {
             indicator.innerText = `Briefing komplett.`;
