@@ -1,16 +1,17 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V54</title>
+    <title>GA Dispatcher</title>
     
-    <link rel="icon" type="image/png" href="Icon.PNG">
+    <link rel="icon" type="image/png" href="IconDRK.PNG">
     
     <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="32x32" href="IconDRK.PNG" media="(prefers-color-scheme: dark)">
     
-    <link rel="apple-touch-icon" href="Icon.PNG">
+    <link rel="apple-touch-icon" href="IconDRK.PNG">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#080808">
@@ -105,12 +106,15 @@
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
         
         .leaflet-control-layers-list { color: #000; font-size: 12px; }
+
+        /* NEU: Versionsinfo unter dem Fenster */
+        .version-info { text-align: center; font-size: 10px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V54</h1>
+    <h1>GA Dispatcher</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -196,6 +200,8 @@
         <div id="logContent"></div>
     </div>
 </div>
+
+<div class="version-info">Version 55.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
