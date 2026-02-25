@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V41 - Modular Edition</title>
+    <title>GA Dispatcher V42 - Precision Sightseeing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -62,7 +62,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V41</h1>
+    <h1>GA Dispatcher V42</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -75,11 +75,11 @@
             <option value="apt">Flugplatz (A ➔ B)</option>
             <option value="poi">POI (Rundflug)</option>
         </select></div>
-        <div><label>Distanz</label><select id="distRange">
+        <div><label>Distanz (Total)</label><select id="distRange">
             <option value="any">Egal (Zufall)</option>
-            <option value="short">Short (10-50)</option>
-            <option value="medium">Medium (50-100)</option>
-            <option value="long">Long (100-250)</option>
+            <option value="short">Short (10-50 NM)</option>
+            <option value="medium">Medium (50-100 NM)</option>
+            <option value="long">Long (100-250 NM)</option>
         </select></div>
     </div>
     
@@ -185,21 +185,35 @@
             if(rangePref === "long") { minNM=100; maxNM=250; }
         }
 
-        const latDiff = maxNM / 60.0;
-        const lonDiff = maxNM / (60.0 * Math.cos(lat * Math.PI / 180));
+        let searchMin = minNM;
+        let searchMax = maxNM;
+        if (targetType === "poi") {
+            searchMin = minNM / 2;
+            searchMax = maxNM / 2;
+        }
+
+        const latDiff = searchMax / 60.0;
+        const lonDiff = searchMax / (60.0 * Math.cos(lat * Math.PI / 180));
         const s = (lat - latDiff).toFixed(4), n = (lat + latDiff).toFixed(4);
         const w = (lon - lonDiff).toFixed(4), e = (lon + lonDiff).toFixed(4);
 
         let query, typeName;
         if (targetType === "poi") {
-            typeName = "Landmarks & Natur";
-            query = `[out:json][timeout:25];(node["historic"="castle"]["name"](${s},${w},${n},${e});way["historic"="castle"]["name"](${s},${w},${n},${e});node["natural"="peak"]["name"](${s},${w},${n},${e});node["waterway"="waterfall"]["name"](${s},${w},${n},${e});node["tourism"="attraction"]["name"](${s},${w},${n},${e});way["tourism"="attraction"]["name"](${s},${w},${n},${e});node["historic"="monument"]["name"](${s},${w},${n},${e});way["historic"="monument"]["name"](${s},${w},${n},${e}););out center;`;
+            const poiCategories = [
+                { q: 'nwr["historic"="castle"]["name"]', name: "Burgen & Schlösser" },
+                { q: 'nwr["natural"="peak"]["name"]', name: "Berggipfel" },
+                { q: 'nwr["tourism"="attraction"]["name"]', name: "Sehenswürdigkeiten" },
+                { q: 'nwr["historic"="monument"]["name"]', name: "Monumente" }
+            ];
+            const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
+            typeName = selectedCat.name;
+            query = `[out:json][timeout:25];(${selectedCat.q}(${s},${w},${n},${e}););out center;`;
         } else {
             typeName = "Flugplätze";
-            query = `[out:json][timeout:25];(node["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e});way["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e}););out center;`;
+            query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
-        indicator.innerText = `Scan nach ${typeName}: ${finalRange} (${minNM}-${maxNM} NM)...`;
+        indicator.innerText = `Scan nach ${typeName} (Suchradius ${searchMin}-${searchMax} NM)...`;
 
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
@@ -222,7 +236,7 @@
                     if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
 
                     const d = calcNav(lat, lon, el.lat, el.lon).dist;
-                    if (d < minNM || d > maxNM) return false;
+                    if (d < searchMin || d > searchMax) return false;
                     
                     if (targetType === "apt") {
                         const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
@@ -260,14 +274,21 @@
         
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType);
         
-        // Fallback zur CoreDB nur bei Flugplätzen, nicht bei POIs
-        if(!dest && !targetDest && targetType === "apt") {
-            dataSource = "Core DB (Fallback)";
-            let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-            if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
-            if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
-            if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
-            dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
+        // Fallback Logik
+        if(!dest && !targetDest) {
+            if (targetType === "apt") {
+                dataSource = "Core DB (Fallback)";
+                let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
+                if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
+                if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+                dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
+            } else if (targetType === "poi") {
+                dataSource = "Fallback POIs";
+                // Lade zufälligen POI aus der neuen datenbank.js
+                dest = fallbackPOIs[Math.floor(Math.random() * fallbackPOIs.length)];
+                dest.icao = "POI";
+            }
         }
 
         if(!dest) { indicator.innerText = "Fehler: Kein Ziel gefunden."; btn.disabled=false; return; }
@@ -279,8 +300,8 @@
         
         if (isPOI) {
             m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
-            totalDist = nav.dist * 2; 
-            currentDestICAO = currentStartICAO; 
+            totalDist = nav.dist * 2; // Rundflug hin und zurück
+            currentDestICAO = currentStartICAO; // Wir landen wieder am Start!
             routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
         } else {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
