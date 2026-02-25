@@ -107,7 +107,6 @@
         }
         
         .rwy-info { font-size: 11px; color: #aaa; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; }
-        /* Style für die Wikipedia POI-Info */
         .poi-info { font-size: 11px; color: #ccc; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; font-style: italic; line-height: 1.4; display: none; }
 
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
@@ -223,10 +222,8 @@
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
                 
-                <!-- RWY Info (für Flughäfen) -->
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
                 
-                <!-- NEU: Wikipedia Info (für POIs) -->
                 <div class="poi-info" id="poiDescContainer">
                     📖 <span id="poiDescText">Lade Wikipedia-Info...</span>
                 </div>
@@ -255,7 +252,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 76.0 (Beta: Wikipedia Insights)</div>
+<div class="version-info">Version 77.0 (Beta: Dynamic POI Missions)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -428,11 +425,8 @@
         return null;
     }
 
-    // --- NEU: Zieht die ersten 3 Sätze der Wikipedia-Einleitung als reinen Text ---
     async function fetchWikipediaDescription(title, elementId) {
-        // prop=extracts, exintro=true (nur Einleitung), explaintext=true (kein HTML), exsentences=3 (max 3 Sätze)
         const url = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=3&titles=${encodeURIComponent(title)}&format=json&origin=*`;
-        
         try {
             const res = await fetch(url);
             const data = await res.json();
@@ -452,7 +446,6 @@
 
     async function fetchRunwayDetails(lat, lon, elementId) {
         const query = `[out:json][timeout:5];way["aeroway"="runway"](around:1500,${lat},${lon});out tags;`;
-        
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
@@ -475,9 +468,7 @@
                 document.getElementById(elementId).style.color = "var(--warn)";
                 return;
             }
-        } catch (e) {
-            console.error("Runway fetch Fehler:", e);
-        }
+        } catch (e) {}
         
         document.getElementById(elementId).innerText = "Keine Daten gefunden";
         document.getElementById(elementId).style.color = "#888";
@@ -491,6 +482,44 @@
         return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
     }
 
+    // --- NEU: Dynamische POI Mission Generierung ---
+    function generateDynamicPOIMission(poiName, maxSeats) {
+        const nameLower = poiName.toLowerCase();
+        let templates = [];
+        const maxPax = Math.max(1, maxSeats - 1); // Einer ist der Pilot
+
+        if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom")) {
+            templates = [
+                { i: "🏰", t: `Historik-Flug: ${poiName}`, s: `Ein Historiker benötigt aktuelle Luftaufnahmen von ${poiName} für ein neues Buchprojekt. Fliege das Zielgebiet in konstanter Höhe ab.`, p: "1 PAX (Historiker)", w: "Kameras & Objektive (40 lbs)" },
+                { i: "🥂", t: `VIP-Tour: ${poiName}`, s: `Ein exklusiver Sightseeing-Flug wurde gebucht. Zeige deinen zahlungskräftigen Fluggästen ${poiName} von seiner besten Seite.`, p: `${maxPax} PAX (VIPs)`, w: "Champagner & Snacks (15 lbs)" }
+            ];
+        } else if (nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher")) {
+            templates = [
+                { i: "💧", t: `Umwelt-Monitoring: ${poiName}`, s: `Die Umweltbehörde beauftragt dich mit der visuellen Überwachung der Wasserqualität und Uferzonen rund um ${poiName}.`, p: "1 PAX (Beobachter)", w: "Wassersensoren (50 lbs)" },
+                { i: "🛶", t: `Werbedreh: ${poiName}`, s: `Eine Filmcrew dreht einen Werbespot über die Idylle am Wasser. Sie benötigen beeindruckende Luftaufnahmen von ${poiName}.`, p: "2 PAX (Filmcrew)", w: "Kamera-Gimbal (120 lbs)" }
+            ];
+        } else if (nameLower.includes("berg") || nameLower.includes("spitze") || nameLower.includes("horn") || nameLower.includes("gipfel") || nameLower.includes("kogel") || nameLower.includes("wald")) {
+            templates = [
+                { i: "⛰️", t: `Vermessungsflug: ${poiName}`, s: `Für aktualisierte Topografie- und Wanderkarten sollst du das unwegsame Gelände bei ${poiName} mit einem Scanner abfliegen.`, p: "0 PAX", w: "Lidar-Scanner (180 lbs)" },
+                { i: "🚁", t: `Aufklärung: ${poiName}`, s: `Die örtliche Bergwacht bittet um einen Erkundungsflug, um mögliche Hangrutsche oder blockierte Wege rund um ${poiName} zu dokumentieren.`, p: "1 PAX (Bergwacht)", w: "Funk & Fernglas (20 lbs)" }
+            ];
+        } else if (nameLower.includes("stadt") || nameLower.includes("turm") || nameLower.includes("brücke") || nameLower.includes("park") || nameLower.includes("stadion")) {
+            templates = [
+                { i: "🏙️", t: `City-Tour: ${poiName}`, s: `Touristen haben einen urbanen Rundflug gebucht und möchten unbedingt ${poiName} aus der Vogelperspektive sehen.`, p: `${maxPax} PAX (Touristen)`, w: "Kameras (10 lbs)" },
+                { i: "📡", t: `Infrastruktur-Prüfung`, s: `Die Stadtverwaltung benötigt hochauflösende Bilder vom Zustand des Gebiets rund um ${poiName}.`, p: "1 PAX (Inspektor)", w: "Messgeräte (80 lbs)" }
+            ];
+        } else {
+            // Generischer Fallback
+            templates = [
+                { i: "✈️", t: `Rundflug: ${poiName}`, s: `Ein klassischer Panoramaflug zum Zielort: ${poiName}. Sorge für einen ruhigen Flug und tolle Ausblicke!`, p: `${maxPax} PAX`, w: "Reisegepäck (30 lbs)" },
+                { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Ein lokaler Fotograf hat dich gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: "1 PAX (Fotograf)", w: "Kamera-Equipment (60 lbs)" }
+            ];
+        }
+
+        const selected = templates[Math.floor(Math.random() * templates.length)];
+        return { i: selected.i, t: selected.t, s: selected.s, cat: "poi", payloadText: selected.p, cargoText: selected.w };
+    }
+
     async function generateMission() {
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
@@ -501,8 +530,6 @@
         document.getElementById("mDepRwy").style.color = "#fff";
         document.getElementById("mDestRwy").innerText = "Sucht Pisten-Infos...";
         document.getElementById("mDestRwy").style.color = "#fff";
-        
-        // Reset Wiki Text
         document.getElementById("poiDescText").innerText = "Lade Wikipedia-Info...";
 
         const indicator = document.getElementById('searchIndicator');
@@ -589,13 +616,17 @@
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         
         let m, totalDist, distStr;
+        let payloadText = "", cargoText = "";
         
-        if (isPOI && typeof poiMissions !== 'undefined') {
-            m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
+        if (isPOI) {
+            // NEU: Dynamischer POI Generator wird aufgerufen
+            m = generateDynamicPOIMission(dest.n, maxSeats);
             totalDist = nav.dist * 2; 
             distStr = `${totalDist} NM (Roundtrip)`;
             currentDestICAO = currentStartICAO; 
             dataSource = "Wikipedia GeoSearch";
+            payloadText = m.payloadText;
+            cargoText = m.cargoText;
         } else if (typeof missions !== 'undefined') {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
             m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
@@ -603,6 +634,9 @@
             distStr = `${totalDist} NM (Oneway)`;
             currentDestICAO = dest.icao;
             if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
+            
+            payloadText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*maxSeats)} PAX`;
+            cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
         }
         
         const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
@@ -636,21 +670,9 @@
         document.getElementById("mDestName").innerText = dest.n;
         document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
         
-        let payloadText = "", cargoText = "";
-        if (isPOI) {
-            if (m.t === "VIP-Sightseeing") { payloadText = `${Math.max(1, Math.floor(Math.random()*maxSeats))} PAX (VIP)`; cargoText = "Champagner & Snacks"; } 
-            else if (m.t === "Foto-Tour") { payloadText = "1-2 PAX (Fotograf)"; cargoText = "Kamera / Equipment"; } 
-            else if (m.t === "Luftvermessung") { payloadText = "0 PAX"; cargoText = "Lidar-Scanner (180 lbs)"; } 
-            else { payloadText = "1-2 PAX (Beobachter)"; cargoText = "Ferngläser & Funk (50 lbs)"; }
-        } else {
-            payloadText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*maxSeats)} PAX`;
-            cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
-        }
-
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
         
-        // UI Elemente umschalten je nach Typ
         document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
         document.getElementById("poiDescContainer").style.display = isPOI ? "block" : "none";
         document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
@@ -661,12 +683,10 @@
 
         indicator.innerText = `Flugplan erstellt via ${dataSource}. Lade Infos...`;
         
-        // Paralleles Abfragen von Zusatzinfos
         fetchRunwayDetails(start.lat, start.lon, 'mDepRwy');
         if (!isPOI) {
             fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy');
         } else {
-            // Wikipedia Beschreibung laden
             fetchWikipediaDescription(dest.n, 'poiDescText');
         }
 
@@ -791,4 +811,5 @@
 </script>
 </body>
 </html>
+
 
