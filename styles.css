@@ -205,21 +205,33 @@
             letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
         }
 
-        /* Schreibmaschinen-Schrift für die Inputs (Papier-Streifen) */
+        /* Schreibmaschinen-Schrift für die Inputs (Papier-Streifen mit Abreißkante) */
 body.theme-retro input, body.theme-retro select { 
     background-color: #f0eada; 
-    border: 1px solid #c2bba8; 
+    border: 1px solid #c2bba8;
+    /* NEU: Rechter Rand wird durch das Zick-Zack-Muster ersetzt */
+    border-right: none; 
     color: #111; 
     text-shadow: none;
     font-family: 'Courier New', Courier, monospace;
     font-weight: bold;
-    font-size: 14px;     /* UPDATE: Kleiner (war 16px) */
+    font-size: 14px;
     border-radius: 2px;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.3); 
-    letter-spacing: -0.5px; /* UPDATE: Enger zusammen (war 1px) */
+    letter-spacing: -0.5px;
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative;
+    /* NEU: Platz für die Abreißkante schaffen */
+    padding-right: 15px; 
+    /* NEU: Das Zick-Zack-Muster am rechten Rand (Perforation) */
+    background-image: 
+        linear-gradient(45deg, transparent 75%, #c2bba8 75%),
+        linear-gradient(135deg, transparent 75%, #c2bba8 75%);
+    background-size: 10px 10px;
+    background-repeat: repeat-y;
+    background-position: right center;
 }
+
 
 
         /* Individuelle Schräglagen und Farbmarkierungen an den Rändern der Lotsen-Streifen */
@@ -387,9 +399,14 @@ body.theme-retro .drum-strip {
     flex-direction: column;
     transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); 
     will-change: transform;
-    /* UPDATE: Feine Schattierung an den Seiten für 3D-Separation */
-    box-shadow: inset 1px 0 1px rgba(255,255,255,0.15), inset -1px 0 1px rgba(0,0,0,0.6);
+    background-color: #1a1a1a; /* Dunkle Basis für den Streifen */
+    /* NEU: Harte Trennlinie rechts und starker 3D-Effekt (Fase) */
+    border-right: 1px solid #000; 
+    border-left: 1px solid rgba(255,255,255,0.05);
+    box-shadow: inset 1px 0 1px rgba(255,255,255,0.2), /* Helles Licht links */
+                inset -2px 0 3px rgba(0,0,0,0.8);     /* Tiefer Schatten rechts */
 }
+
 
 
 /* Die einzelne Ziffer auf dem Streifen */
