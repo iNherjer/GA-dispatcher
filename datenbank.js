@@ -78,6 +78,7 @@ const missions = [
     { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." }
 ];
 
+
 // 3. POI MISSIONEN (Rundflüge)
 const poiMissions = [
     { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
