@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V39 - Bounding Box Turbo</title>
+    <title>GA Dispatcher V40 - The Scenic Update</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -16,7 +16,7 @@
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
             /* DEIN NEUER HINTERGRUND */
-            background-image: url('bg.jpg'); /* ODER bg.png, falls dein Bild so heißt */
+            background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -35,9 +35,10 @@
         #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; }
         label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
         input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
-        .row { display: flex; gap: 8px; }
-        .row div { flex: 1; }
-        .preset-row { display: flex; gap: 5px; margin-bottom: 12px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        
+        .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
         .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
@@ -61,27 +62,34 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V39</h1>
+    <h1>GA Dispatcher V40</h1>
     <div id="searchIndicator">System bereit.</div>
     
-    <div class="row">
+    <div class="grid-2">
         <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
         <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     
-    <div class="row">
-        <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
+    <div class="grid-2">
+        <div><label>Typ</label><select id="targetType">
+            <option value="apt">Flugplatz (A ➔ B)</option>
+            <option value="poi">POI (Rundflug)</option>
+        </select></div>
         <div><label>Distanz</label><select id="distRange">
             <option value="any">Egal (Zufall)</option>
             <option value="short">Short (10-50)</option>
             <option value="medium">Medium (50-100)</option>
             <option value="long">Long (100-250)</option>
         </select></div>
+    </div>
+    
+    <div class="grid-2">
         <div><label>Region</label><select id="regionFilter">
             <option value="any">Europaweit</option>
             <option value="de" selected>Nur DE</option>
             <option value="int">Nur Ausland</option>
         </select></div>
+        <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
     </div>
 
     <div class="preset-row">
@@ -139,56 +147,27 @@
         "EDMA": {icao:"EDMA", n:"Augsburg", lat:48.42, lon:10.93}, "EDJA": {icao:"EDJA", n:"Memmingen", lat:47.98, lon:10.23},
         "EDTD": {icao:"EDTD", n:"Donaueschingen", lat:47.97, lon:8.52}, "EDTY": {icao:"EDTY", n:"Schwäbisch Hall", lat:49.11, lon:9.77},
         "EDRK": {icao:"EDRK", n:"Koblenz", lat:50.32, lon:7.52}, "EDKB": {icao:"EDKB", n:"Bonn-Hangelar", lat:50.76, lon:7.16},
-        "EDLN": {icao:"EDLN", n:"Mönchengladbach", lat:51.23, lon:6.50}, "EDLP": {icao:"EDLP", n:"Paderborn", lat:51.61, lon:8.61},
-        "EDVE": {icao:"EDVE", n:"Braunschweig", lat:52.31, lon:10.55}, "EDDB": {icao:"EDDB", n:"Berlin-Brand.", lat:52.36, lon:13.50},
-        "EDDH": {icao:"EDDH", n:"Hamburg", lat:53.63, lon:9.98}, "EDDW": {icao:"EDDW", n:"Bremen", lat:53.04, lon:8.78},
-        "EDXW": {icao:"EDXW", n:"Sylt", lat:54.91, lon:8.34}, "EDHL": {icao:"EDHL", n:"Lübeck", lat:53.80, lon:10.71},
         "LOWI": {icao:"LOWI", n:"Innsbruck", lat:47.26, lon:11.34}, "LOWS": {icao:"LOWS", n:"Salzburg", lat:47.79, lon:13.00},
-        "LOWK": {icao:"LOWK", n:"Klagenfurt", lat:46.64, lon:14.33}, "LOWG": {icao:"LOWG", n:"Graz", lat:46.99, lon:15.43},
-        "LSZH": {icao:"LSZH", n:"Zürich", lat:47.46, lon:8.54}, "LSGG": {icao:"LSGG", n:"Genf", lat:46.23, lon:6.10},
-        "LFSB": {icao:"LFSB", n:"Basel", lat:47.59, lon:7.52}, "LFMN": {icao:"LFMN", n:"Nizza", lat:43.66, lon:7.21},
-        "LFML": {icao:"LFML", n:"Marseille", lat:43.43, lon:5.21}, "LFPB": {icao:"LFPB", n:"Paris-Le Bourget", lat:48.96, lon:2.44},
-        "LIML": {icao:"LIML", n:"Mailand-Linate", lat:45.44, lon:9.27}, "LIPZ": {icao:"LIPZ", n:"Venedig", lat:45.50, lon:12.35},
-        "EDMO": {icao:"EDMO", n:"Oberpfaffenhofen", lat:48.08, lon:11.28}, "EDDM": {icao:"EDDM", n:"München", lat:48.35, lon:11.78}
+        "LSZH": {icao:"LSZH", n:"Zürich", lat:47.46, lon:8.54}, "LFSB": {icao:"LFSB", n:"Basel", lat:47.59, lon:7.52}
     };
     
     const missions = [
         { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
         { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
-        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
+        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine liefern." },
         { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
         { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine sanfte Landung." },
-        { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen." },
-        { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
-        { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
         { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
-        { t: "Foto-Mission", i: "📸", cat: "std", s: "Luftaufnahmen vom Zielgebiet werden benötigt." },
         { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
-        { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
-        { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
-        { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
-        { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
-        { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
-        { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
-        { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische Blumen für eine Hochzeit." },
-        { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
-        { t: "High Priority Courier", i: "📦", cat: "std", s: "Ein extrem wichtiges Paket muss noch heute zugestellt werden." },
-        { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery." },
-        { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch." },
-        { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und Notlandung." },
-        { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit." },
         { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei Touch-and-Go Platzrunden." },
-        { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
-        { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit Lazy Eights." },
-        { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere Ausfall der Klappen. Lande ohne Flaps." },
-        { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." },
-        { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere Kabinenbrand. Leite Notabstieg ein." },
-        { t: "Training: Radio Check", i: "📻", cat: "trn", s: "Fokus auf perfekte Phraseologie beim Anflug." },
-        { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
-        { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
-        { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." },
-        { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." },
-        { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz." }
+        { t: "Training: Crosswind", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." }
+    ];
+
+    const poiMissions = [
+        { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
+        { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
+        { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
+        { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." }
     ];
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -216,8 +195,7 @@
         } catch (e) {} return null;
     }
 
-    // TURBO-SUCHE mit Bounding Box (Kasten) statt Kreis
-    async function findRandomOnlineDest(lat, lon, rangePref, regionPref) {
+    async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM, finalRange;
         
@@ -233,32 +211,34 @@
             if(rangePref === "long") { minNM=100; maxNM=250; }
         }
 
-        let regionText = regionPref === "de" ? "DE" : (regionPref === "int" ? "Ausland" : "Europa");
-        indicator.innerText = `Highspeed-Scan: ${finalRange} (${minNM}-${maxNM} NM) in ${regionText}...`;
-
-        // Umrechnung von Seemeilen in Koordinaten-Kasten (Bounding Box)
-        // 1 Grad Latitude = ca. 60 NM
         const latDiff = maxNM / 60.0;
-        // 1 Grad Longitude variiert je nach Latitude (Kosinus-Korrektur)
         const lonDiff = maxNM / (60.0 * Math.cos(lat * Math.PI / 180));
-        
-        const s = (lat - latDiff).toFixed(4);
-        const n = (lat + latDiff).toFixed(4);
-        const w = (lon - lonDiff).toFixed(4);
-        const e = (lon + lonDiff).toFixed(4);
+        const s = (lat - latDiff).toFixed(4), n = (lat + latDiff).toFixed(4);
+        const w = (lon - lonDiff).toFixed(4), e = (lon + lonDiff).toFixed(4);
 
-        // Die Anfrage an Overpass ist jetzt simpler und pfeilschnell, da sie nur den Kasten lädt
-        const query = `[out:json][timeout:25];(node["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e});way["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e}););out center;`;
-        
+        let query, typeName;
+        if (targetType === "poi") {
+            typeName = "Landmarks & Natur";
+            // Sucht nach Schlössern, Bergen, Monumenten, Sehenswürdigkeiten
+            query = `[out:json][timeout:25];(node["historic"="castle"]["name"](${s},${w},${n},${e});way["historic"="castle"]["name"](${s},${w},${n},${e});node["natural"="peak"]["name"](${s},${w},${n},${e});node["waterway"="waterfall"]["name"](${s},${w},${n},${e});node["tourism"="attraction"]["name"](${s},${w},${n},${e});way["tourism"="attraction"]["name"](${s},${w},${n},${e});node["historic"="monument"]["name"](${s},${w},${n},${e});way["historic"="monument"]["name"](${s},${w},${n},${e}););out center;`;
+        } else {
+            typeName = "Flugplätze";
+            query = `[out:json][timeout:25];(node["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e});way["aeroway"="aerodrome"]["icao"](${s},${w},${n},${e}););out center;`;
+        }
+
+        indicator.innerText = `Scan nach ${typeName}: ${finalRange} (${minNM}-${maxNM} NM)...`;
+
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
                 const filtered = data.elements.map(el => {
                     const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
+                    let name = el.tags.name || "Unbekannt";
+                    if (el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
                     return { 
-                        icao: el.tags.icao.toUpperCase(), 
-                        n: el.tags.name || el.tags.icao, 
+                        icao: targetType === 'poi' ? 'POI' : (el.tags.icao ? el.tags.icao.toUpperCase() : ''), 
+                        n: name, 
                         lat: coords.lat, 
                         lon: coords.lon,
                         usage: el.tags.usage || "",
@@ -266,27 +246,21 @@
                         sport: el.tags.sport || ""
                     };
                 }).filter(el => {
-                    // Filter "Schmutz" lokal aus statt auf dem Server
-                    if (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding") return false;
+                    if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
 
-                    // Den Suchkasten (Quadrat) wieder zu einem perfekten Kreis zuschneiden
                     const d = calcNav(lat, lon, el.lat, el.lon).dist;
                     if (d < minNM || d > maxNM) return false;
                     
-                    // Filter nach Region (DE = ED.. oder ET..)
-                    const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
-                    if (regionPref === "de" && !isDE) return false;
-                    if (regionPref === "int" && isDE) return false;
-                    
+                    if (targetType === "apt") {
+                        const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
+                        if (regionPref === "de" && !isDE) return false;
+                        if (regionPref === "int" && isDE) return false;
+                    }
                     return true;
                 });
-                
                 if (filtered.length > 0) return filtered[Math.floor(Math.random()*filtered.length)];
             }
-        } catch (err) {
-            console.log("Online API Timeout oder Fehler", err);
-        } 
-        return null;
+        } catch (err) {} return null;
     }
 
     function calcNav(lat1, lon1, lat2, lon2) {
@@ -306,43 +280,65 @@
         
         const distPref = document.getElementById("distRange").value;
         const regionPref = document.getElementById("regionFilter").value;
+        const targetType = document.getElementById("targetType").value;
+        
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
         
-        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref);
+        // Wenn Manuell eingegeben wurde, überschreibt das den POI Modus
+        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType);
         
         if(!dest && !targetDest) {
             dataSource = "Core DB (Fallback)";
             let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-            
             if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
             if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
-            
             if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
-            
-            const fallbackKey = keys[Math.floor(Math.random()*keys.length)];
-            dest = coreDB[fallbackKey];
+            dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
         }
 
         if(!dest) { indicator.innerText = "Fehler: Kein Ziel gefunden."; btn.disabled=false; return; }
         
-        currentDestICAO = dest.icao; 
+        const isPOI = (targetType === 'poi' && !targetDest);
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
-        const availM = missions.filter(m => (nav.dist < 50 || m.cat === "std"));
-        const m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
-        const fuel = Math.ceil((nav.dist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
         
-        currentMissionData = { start: currentStartICAO, dest: currentDestICAO, mission: m.t, dist: nav.dist, ac: selectedAC };
+        let m, totalDist, routeText;
+        
+        if (isPOI) {
+            m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
+            totalDist = nav.dist * 2; // Rundflug hin und zurück
+            currentDestICAO = currentStartICAO; // Wir landen wieder am Start!
+            routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
+        } else {
+            const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
+            m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
+            totalDist = nav.dist;
+            currentDestICAO = dest.icao;
+            routeText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
+        }
+        
+        const fuel = Math.ceil((totalDist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
+        
+        currentMissionData = { 
+            start: currentStartICAO, 
+            dest: currentDestICAO, 
+            poiName: isPOI ? dest.n : null,
+            mission: m.t, 
+            dist: totalDist, 
+            ac: selectedAC 
+        };
+        
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
-        document.getElementById("mRoute").innerText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
-        document.getElementById("mNav").innerText = `${nav.brng}° / ${nav.dist} NM`;
+        document.getElementById("mRoute").innerText = routeText;
+        document.getElementById("mNav").innerText = `${nav.brng}° / ${totalDist} NM (Total)`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
         document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*parseInt(document.getElementById("maxSeats").value))} PAX`;
-        document.getElementById("mWeight").innerText = `${Math.floor(Math.random()*300)+20} lbs`;
+        document.getElementById("mWeight").innerText = isPOI ? "Kamera / Equipment" : `${Math.floor(Math.random()*300)+20} lbs`;
         document.getElementById("mStory").innerText = m.s;
+        
         document.getElementById("briefingBox").style.display = "block";
-        updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, currentDestICAO);
-        indicator.innerText = `Route bereit (Quelle: ${dataSource}).`;
+        updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
+        indicator.innerText = `Routenplanung abgeschlossen (${dataSource}).`;
         btn.disabled = false;
     }
 
@@ -351,6 +347,8 @@
         if (!map) { map = L.map('map', { attributionControl: false }); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map); }
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         markers = [L.marker([lat1, lon1]).addTo(map).bindPopup(s), L.marker([lat2, lon2]).addTo(map).bindPopup(d)];
+        
+        // Gestrichelte Linie für VFR
         polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#4da6ff', weight: 3, dashArray: '5,10' }).addTo(map);
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [30, 30] });
     }
@@ -364,10 +362,11 @@
         log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
         localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
         localStorage.setItem('last_icao_dest', currentMissionData.dest);
+        
         document.getElementById('startLoc').value = currentMissionData.dest;
         document.getElementById('destLoc').value = "";
         renderLog(); 
-        alert(`Flug geloggt! Startpunkt auf ${currentMissionData.dest} gesetzt.`);
+        alert(`Flug geloggt! Du bist in ${currentMissionData.dest}.`);
     }
 
     function renderLog() {
@@ -376,7 +375,8 @@
         container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge vorhanden.</div>';
         log.forEach(e => {
             const div = document.createElement('div'); div.className = 'log-entry';
-            div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br><b>${e.start} ➔ ${e.dest}</b><br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
+            const routeStr = e.poiName ? `<b>${e.start} ➔ ${e.poiName} ➔ ${e.dest}</b>` : `<b>${e.start} ➔ ${e.dest}</b>`;
+            div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br>${routeStr}<br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
             container.appendChild(div);
         });
     }
