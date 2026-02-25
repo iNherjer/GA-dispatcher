@@ -1,10 +1,10 @@
 // ==========================================
-// GA DISPATCHER - DATENBANK V43
+// GA DISPATCHER - DATENBANK V46 (MASSIVE EXPANSION)
 // ==========================================
 
-// 1. CORE AIRPORTS
+// 1. CORE AIRPORTS (Fallback & Europa-Fokus)
 const coreDB = { 
-    "EDTW": { icao: "EDTW", n: "Winzeln", lat: 48.279, lon: 8.428 }, 
+    "EDTW": { icao: "EDTW", n: "Winzeln-Schramberg", lat: 48.279, lon: 8.428 }, 
     "EDTF": { icao: "EDTF", n: "Freiburg", lat: 48.023, lon: 7.828 },
     "EDNY": { icao: "EDNY", n: "Friedrichshafen", lat: 47.671, lon: 9.511 }, 
     "EDDS": { icao: "EDDS", n: "Stuttgart", lat: 48.689, lon: 9.221 },
@@ -38,82 +38,118 @@ const coreDB = {
     "EDDM": { icao: "EDDM", n: "München", lat: 48.35, lon: 11.78 }
 };
 
-// 2. STANDARD MISSIONEN (A nach B)
+// 2. STANDARD MISSIONEN (A nach B - Flugplätze)
 const missions = [
     { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
     { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
     { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
-    { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
+    { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein VIP möchte diskret reisen. Achte auf sanfte Manöver und Komfort." },
     { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine sanfte Landung." },
-    { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen." },
-    { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
+    { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen. Vermeide starke Turbulenzen." },
+    { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv, beeil dich." },
     { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
-    { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
-    { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
-    { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
-    { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
-    { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
-    { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden." },
-    { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle Dokumente müssen in ein neues Archiv." },
-    { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische Blumen für eine Hochzeit." },
+    { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer exklusiven Verkostung." },
+    { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige vertrauliche Dokumente müssen vor Geschäftsschluss zugestellt werden." },
+    { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt empfindlichem Equipment dringend zum Studio." },
+    { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik. Jede Minute zählt." },
+    { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden. Ein entspannter VFR-Hüpfer." },
+    { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle historische Dokumente müssen in ein neues Archiv." },
+    { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische exotische Blumen für eine große Hochzeit. Heizung im Cockpit anpassen!" },
     { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
     { t: "High Priority Courier", i: "📦", cat: "std", s: "Ein extrem wichtiges Paket muss noch heute zugestellt werden." },
-    { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein." },
+    { t: "Skydiver Drop", i: "🪂", cat: "std", s: "Bringe ein Team von Fallschirmspringern zum Zielplatz für ein Event." },
+    { t: "Art Transfer", i: "🖼️", cat: "std", s: "Ein wertvolles Gemälde wird zu einer Galerie geflogen. Vermeide G-Kräfte." },
+    { t: "Ferry Flight", i: "🛠️", cat: "std", s: "Die Maschine muss zur großen Jahresnachprüfung (JNP) in die Werft." },
+    { t: "Casino Run", i: "🎰", cat: "std", s: "High-Roller wollen einen Abend im Casino verbringen. Geld spielt keine Rolle." },
+    { t: "Bank Transfer", i: "💰", cat: "std", s: "Sicherer Transport von Wertpapieren. Diskretion ist oberstes Gebot." },
+    { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein (NVFR)." },
     { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz." },
-    { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery." },
-    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch." },
-    { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und Notlandung." },
-    { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit." },
-    { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei Touch-and-Go Platzrunden." },
-    { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
-    { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit Lazy Eights." },
-    { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere Ausfall der Klappen. Lande ohne Flaps." },
-    { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." },
-    { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere Kabinenbrand. Leite Notabstieg ein." },
-    { t: "Training: Radio Check", i: "📻", cat: "trn", s: "Fokus auf perfekte Phraseologie beim Anflug." },
-    { t: "Training: Short Field", i: "🏁", cat: "trn", s: "Übe Short-Field-Technik beim Aufsetzen." },
-    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
-    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." }
+    // Trainings-Missionen (nur < 50 NM)
+    { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery auf dem Weg." },
+    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch, halte die Höhe!" },
+    { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und eine Notlandung im Feld." },
+    { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit (MCA)." },
+    { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei saubere Touch-and-Go Platzrunden." },
+    { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Navigiere nur mit Stoppuhr, Karte und Kompass zum Ziel. GPS aus!" },
+    { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Ruder-Koordination mit Lazy Eights." },
+    { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere einen Ausfall der Klappen. Lande am Zielort ohne Flaps." },
+    { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für ein sauberes Aufsetzen auf einem Rad." },
+    { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere einen Kabinenbrand. Leite sofort einen Notabstieg ein." },
+    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere schlechtes Wetter am Ziel. Plane im Flug spontan um." },
+    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Decke das GPS ab. Fliege den Anflug nur nach Sicht und Karte." },
+    { t: "Flight Review (BFR)", i: "📝", cat: "trn", s: "Ein Fluglehrer ist an Bord. Fliege sauber, halte deine Höhen und Kurse exakt." }
 ];
 
-// 3. POI MISSIONEN (Rundflüge) - Jetzt mit Wildlife Research!
+// 3. POI MISSIONEN (Rundflüge & Landmarks)
 const poiMissions = [
-    { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
-    { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
-    { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
-    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." },
-    { t: "Wildlife Research", i: "🦌", cat: "poi", s: "Biologen müssen Wildbestände zählen. Überfliege das Zielgebiet in konstanter Höhe." }
+    { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel. Fliege ruhige Kreise." },
+    { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen exklusiven Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
+    { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Waldschäden für das Forstamt." },
+    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser, konstanter Höhe über das Objekt für topografische Lidar-Scans." },
+    { t: "Wildlife Research", i: "🦌", cat: "poi", s: "Biologen müssen Wildbestände zählen. Überfliege das Zielgebiet in 1000ft AGL." },
+    { t: "Castle Tour", i: "🏰", cat: "poi", s: "Touristen wollen die historische Anlage von oben bewundern. Bereite eine schöne Ansicht vor." },
+    { t: "Pipeline Patrol", i: "🛢️", cat: "poi", s: "Überprüfe die Trasse nahe des Ziels auf Lecks oder illegale Bauarbeiten." },
+    { t: "Traffic Reporting", i: "📻", cat: "poi", s: "Ein Radiosender braucht einen Verkehrsbericht von den Straßen rund um das Zielgebiet." },
+    { t: "Real Estate Survey", i: "🏡", cat: "poi", s: "Ein Immobilienmakler möchte Luftaufnahmen vom Gebiet für ein großes Portfolio." },
+    { t: "Police Support", i: "🚓", cat: "poi", s: "Die Polizei sucht eine vermisste Person in der Nähe des POIs. Unterstütze aus der Luft." }
 ];
 
-// 4. FALLBACK POIs
+// 4. FALLBACK POIs (Massiv erweitert - Fokus D-A-CH & Schwarzwald)
 const fallbackPOIs = [
+    // === LOKAL: Schwarzwald & BaWü ===
+    { n: "Triberger Wasserfälle", lat: 48.127, lon: 8.227 },
+    { n: "Feldberg (Gipfel)", lat: 47.873, lon: 8.004 },
+    { n: "Titisee", lat: 47.896, lon: 8.148 },
+    { n: "Schluchsee", lat: 47.818, lon: 8.181 },
+    { n: "Burg Hohengeroldseck", lat: 48.338, lon: 7.979 },
+    { n: "Vogtsbauernhof (Gutach)", lat: 48.270, lon: 8.199 },
+    { n: "Europapark Rust", lat: 48.266, lon: 7.721 },
+    { n: "Burg Hohenzollern", lat: 48.323, lon: 8.967 },
+    { n: "Schloss Sigmaringen", lat: 48.087, lon: 9.216 },
+    { n: "Insel Mainau (Bodensee)", lat: 47.705, lon: 9.195 },
+    { n: "Burg Meersburg", lat: 47.693, lon: 9.271 },
+    { n: "Mummelsee (Schwarzwald)", lat: 48.597, lon: 8.200 },
+    { n: "Schloss Heidelberg", lat: 49.410, lon: 8.715 },
+    { n: "Burg Teck", lat: 48.588, lon: 9.470 },
+    
+    // === DEUTSCHLAND NATIONAL ===
     { n: "Schloss Neuschwanstein", lat: 47.557, lon: 10.750 },
+    { n: "Zugspitze (Gipfel)", lat: 47.421, lon: 10.985 },
+    { n: "Watzmann (Gipfel)", lat: 47.554, lon: 12.924 },
     { n: "Kölner Dom", lat: 50.941, lon: 6.958 },
     { n: "Berliner Fernsehturm", lat: 52.520, lon: 13.409 },
-    { n: "Zugspitze (Gipfel)", lat: 47.421, lon: 10.985 },
-    { n: "Burg Hohenzollern", lat: 48.323, lon: 8.967 },
+    { n: "Brandenburger Tor", lat: 52.516, lon: 13.377 },
     { n: "Brocken (Harz)", lat: 51.799, lon: 10.615 },
     { n: "Loreley (Rhein)", lat: 50.139, lon: 7.728 },
+    { n: "Burg Eltz", lat: 50.205, lon: 7.336 },
     { n: "Basteibrücke (Elbsandstein)", lat: 50.961, lon: 14.073 },
+    { n: "Frauenkirche Dresden", lat: 51.052, lon: 13.741 },
     { n: "Hermannsdenkmal", lat: 51.911, lon: 8.839 },
-    { n: "Schloss Heidelberg", lat: 49.410, lon: 8.715 },
     { n: "Schweriner Schloss", lat: 53.624, lon: 11.419 },
-    { n: "Watzmann (Gipfel)", lat: 47.554, lon: 12.924 },
     { n: "Externsteine", lat: 51.868, lon: 8.917 },
     { n: "Völkerschlachtdenkmal", lat: 51.312, lon: 12.413 },
-    { n: "Mummelsee (Schwarzwald)", lat: 48.597, lon: 8.200 },
-    { n: "Insel Mainau (Bodensee)", lat: 47.705, lon: 9.195 },
     { n: "Kreidefelsen Rügen", lat: 54.573, lon: 13.664 },
+    { n: "Elbphilharmonie Hamburg", lat: 53.541, lon: 9.984 },
+    { n: "Walhalla (Regensburg)", lat: 49.031, lon: 12.212 },
+    { n: "Zeche Zollverein", lat: 51.486, lon: 7.046 },
+
+    // === SCHWEIZ & ÖSTERREICH (D-A-CH) ===
     { n: "Matterhorn (CH)", lat: 45.976, lon: 7.658 },
-    { n: "Mont Blanc (FR)", lat: 45.832, lon: 6.865 },
+    { n: "Jungfraujoch (CH)", lat: 46.547, lon: 7.982 },
+    { n: "Rheinfall (CH)", lat: 47.677, lon: 8.615 },
+    { n: "Aletschgletscher (CH)", lat: 46.463, lon: 8.037 },
     { n: "Großglockner (AT)", lat: 47.074, lon: 12.693 },
+    { n: "Schloss Schönbrunn (AT)", lat: 48.184, lon: 16.312 },
+    { n: "Festung Hohensalzburg (AT)", lat: 47.795, lon: 13.047 },
+    
+    // === EUROPA ===
+    { n: "Mont Blanc (FR)", lat: 45.832, lon: 6.865 },
     { n: "Eiffelturm (FR)", lat: 48.858, lon: 2.294 },
     { n: "Mont Saint-Michel (FR)", lat: 48.636, lon: -1.511 },
-    { n: "Colosseum Rom (IT)", lat: 41.890, lon: 12.492 },
-    { n: "Jungfraujoch (CH)", lat: 46.547, lon: 7.982 },
-    { n: "Schloss Schönbrunn (AT)", lat: 48.184, lon: 16.312 },
-    { n: "Kreuzbergpass (IT/AT)", lat: 46.656, lon: 12.419 },
     { n: "Viaduc de Millau (FR)", lat: 44.077, lon: 3.022 },
+    { n: "Colosseum Rom (IT)", lat: 41.890, lon: 12.492 },
+    { n: "Vesuv (IT)", lat: 40.822, lon: 14.426 },
+    { n: "Ätna (IT)", lat: 37.751, lon: 14.993 },
     { n: "Sagrada Familia (ES)", lat: 41.403, lon: 2.174 },
     { n: "Stonehenge (UK)", lat: 51.178, lon: -1.826 },
     { n: "Akropolis Athen (GR)", lat: 37.971, lon: 23.725 }
