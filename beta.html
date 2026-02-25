@@ -106,19 +106,17 @@
             margin-bottom: 10px;
         }
         
-        .rwy-info {
-            font-size: 11px; color: #aaa; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444;
-        }
+        .rwy-info { font-size: 11px; color: #aaa; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; }
+        /* Style für die Wikipedia POI-Info */
+        .poi-info { font-size: 11px; color: #ccc; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; font-style: italic; line-height: 1.4; display: none; }
 
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         
-        /* Action Buttons Grid Update */
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
         .btn-action:hover { background: #555; }
         
-        /* Style für die METAR Buttons */
         .btn-metar { background: #2a3a4a; border: 1px solid #4da6ff; color: #4da6ff; }
         .btn-metar:hover { background: #3a4a5a; }
         
@@ -224,7 +222,14 @@
                     <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
+                
+                <!-- RWY Info (für Flughäfen) -->
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
+                
+                <!-- NEU: Wikipedia Info (für POIs) -->
+                <div class="poi-info" id="poiDescContainer">
+                    📖 <span id="poiDescText">Lade Wikipedia-Info...</span>
+                </div>
             </div>
 
             <!-- PAYLOAD -->
@@ -235,7 +240,6 @@
 
         </div>
         
-        <!-- Action Buttons inkl. METAR -->
         <div class="action-row">
             <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
             <button class="btn-action" onclick="openAIP('dest')" id="btnAipDest">📄 AIP DEST</button>
@@ -251,7 +255,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 75.0 (Beta: METAR & RWY Fetching)</div>
+<div class="version-info">Version 76.0 (Beta: Wikipedia Insights)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -424,6 +428,28 @@
         return null;
     }
 
+    // --- NEU: Zieht die ersten 3 Sätze der Wikipedia-Einleitung als reinen Text ---
+    async function fetchWikipediaDescription(title, elementId) {
+        // prop=extracts, exintro=true (nur Einleitung), explaintext=true (kein HTML), exsentences=3 (max 3 Sätze)
+        const url = `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=3&titles=${encodeURIComponent(title)}&format=json&origin=*`;
+        
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const pages = data.query.pages;
+            const pageId = Object.keys(pages)[0];
+            
+            if (pageId !== "-1" && pages[pageId].extract) {
+                document.getElementById(elementId).innerText = pages[pageId].extract;
+            } else {
+                document.getElementById(elementId).innerText = "Keine weitere Beschreibung auf Wikipedia verfügbar.";
+            }
+        } catch(e) {
+            console.error("Wiki Desc Fetch Fehler:", e);
+            document.getElementById(elementId).innerText = "Fehler beim Laden der Infos.";
+        }
+    }
+
     async function fetchRunwayDetails(lat, lon, elementId) {
         const query = `[out:json][timeout:5];way["aeroway"="runway"](around:1500,${lat},${lon});out tags;`;
         
@@ -475,6 +501,9 @@
         document.getElementById("mDepRwy").style.color = "#fff";
         document.getElementById("mDestRwy").innerText = "Sucht Pisten-Infos...";
         document.getElementById("mDestRwy").style.color = "#fff";
+        
+        // Reset Wiki Text
+        document.getElementById("poiDescText").innerText = "Lade Wikipedia-Info...";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -621,19 +650,24 @@
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
         
-        // Hide Dest RWY, AIP and METAR if it's a POI
+        // UI Elemente umschalten je nach Typ
         document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
+        document.getElementById("poiDescContainer").style.display = isPOI ? "block" : "none";
         document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
         document.getElementById("btnMetarDest").style.display = isPOI ? "none" : "block";
 
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
-        indicator.innerText = `Flugplan erstellt via ${dataSource}. Lade Pisten...`;
+        indicator.innerText = `Flugplan erstellt via ${dataSource}. Lade Infos...`;
         
+        // Paralleles Abfragen von Zusatzinfos
         fetchRunwayDetails(start.lat, start.lon, 'mDepRwy');
         if (!isPOI) {
             fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy');
+        } else {
+            // Wikipedia Beschreibung laden
+            fetchWikipediaDescription(dest.n, 'poiDescText');
         }
 
         setTimeout(() => {
@@ -725,14 +759,8 @@
         }, 50);
     }
 
-    // --- Action Button Functions ---
-    function openAIP(t) { 
-        window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); 
-    }
-    
-    function openMetar(t) {
-        window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank');
-    }
+    function openAIP(t) { window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
+    function openMetar(t) { window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
 
     function logCurrentFlight() {
         if(!currentMissionData) return;
