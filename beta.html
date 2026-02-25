@@ -79,8 +79,8 @@
         .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 16px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .btn-main:disabled { background-color: #333 !important; color: #888 !important; cursor: wait !important; border: 1px solid #555; }
         
-        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
-        .map-fullscreen { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; margin: 0 !important; border-radius: 0 !important; }
+        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; transition: filter 0.3s; }
+        .map-fullscreen { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; margin: 0 !important; border-radius: 0 !important; filter: none !important; }
 
         .custom-pin { display: flex; justify-content: center; align-items: center; }
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
@@ -124,37 +124,33 @@
         .screw { display: none; }
 
         /* ==========================================================================
-           2. MECHANISCHER KIPPSCHALTER (TOGGLE) FÜR DAS THEME
+           2. MECHANISCHER KIPPSCHALTER (TOGGLE)
            ========================================================================== */
         .theme-switch-wrapper {
-            position: absolute;
-            top: 15px;
-            right: 15px;
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 8px;
-            z-index: 10;
+            gap: 15px;
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 1px dashed #444;
         }
-        .switch-label { font-size: 9px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .switch-label { font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
         
-        /* Der Schalter-Container */
         .switch { position: relative; display: inline-block; width: 26px; height: 40px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         
-        /* Der schwarze Schlitz */
         .slider { 
             position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
             background-color: #111; border-radius: 4px; border: 2px solid #333; 
             box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); transition: .3s; 
         }
-        /* Der Metall-Hebel */
         .slider:before { 
             position: absolute; content: ""; height: 20px; width: 12px; left: 5px; bottom: 2px; 
             background: linear-gradient(to right, #777, #fff, #777); 
             border-radius: 3px; border-bottom: 2px solid #333; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.8); transition: .3s; 
         }
-        /* Wenn umgelegt */
         input:checked + .slider:before { 
             transform: translateY(-14px); 
             border-bottom: none; border-top: 2px solid #333; 
@@ -170,11 +166,9 @@
             --piper-yellow: #f2c12e;
             --piper-red: #d93829;
             --piper-bg: #222428;
-            
-            font-family: 'Arial', sans-serif; /* Clean Sans-Serif wie aufgemalte Instrumenten-Ziffern */
+            font-family: 'Arial', sans-serif; 
         }
 
-        /* Mattes, massives Metall-Panel (Kein Glas mehr!) */
         body.theme-retro .container {
             background: linear-gradient(135deg, #2a2d34, #18191c);
             padding: 35px 25px 25px 25px; 
@@ -187,7 +181,6 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         }
 
-        /* Metallschrauben */
         body.theme-retro .screw {
             display: block;
             position: absolute; width: 14px; height: 14px; 
@@ -200,7 +193,6 @@
         body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20deg); }
         body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
 
-        /* Titelschrift: Wie auflackiert */
         body.theme-retro h1 { 
             font-size: 24px; color: var(--piper-white); text-shadow: none; font-weight: 900;
             letter-spacing: 2px; border-bottom: 2px solid #444; padding-bottom: 10px; 
@@ -208,7 +200,6 @@
         
         body.theme-retro #searchIndicator { color: var(--piper-yellow); font-weight: bold; }
         
-        /* DYMO-TAPE LABELS! 60er Jahre Plastik-Prägeband */
         body.theme-retro label { 
             background: #111; color: #ddd; border: 1px solid #000; 
             padding: 3px 6px; border-radius: 2px; margin-bottom: 5px;
@@ -216,16 +207,17 @@
             letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
         }
 
-        /* Mechanische Zählwerke (Inputs) */
+        /* Schreibmaschinen-Schrift für die Inputs */
         body.theme-retro input, body.theme-retro select { 
             background-color: #0a0a0c; border: 3px inset #333; 
             color: var(--piper-white); text-shadow: none;
-            font-family: 'Arial', sans-serif; font-weight: bold; border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace; /* <-- NEU */
+            font-weight: bold; border-radius: 4px;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.9);
+            letter-spacing: 1px;
         }
         body.theme-retro input:focus, body.theme-retro select:focus { outline: none; border-color: var(--piper-yellow); }
 
-        /* Klobige Radio-Stack Buttons */
         body.theme-retro .btn-preset { 
             background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
             border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
@@ -241,7 +233,6 @@
             border: 1px solid #000; box-shadow: 0 3px 5px rgba(0,0,0,0.8); 
         }
 
-        /* Master Switch (Roter Knopf) */
         body.theme-retro .btn-main { 
             background: linear-gradient(to bottom, #d93829, #8a1a12); color: #fff; 
             border: 2px solid #222; border-bottom: 5px solid #111; border-right: 4px solid #111;
@@ -250,21 +241,46 @@
         }
         body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
-        body.theme-retro #map { border: 4px solid #333; border-radius: 4px; background: #111; }
+        /* Vintage Map Filter (verschwindet im Fullscreen!) */
+        body.theme-retro #map { 
+            border: 4px solid #333; border-radius: 4px; background: #111; 
+            filter: sepia(0.4) contrast(1.1) brightness(0.95); /* <-- NEU */
+        }
 
         body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
         body.theme-retro .story { color: #ccc; border-bottom: 2px solid #444; font-family: 'Georgia', serif; }
 
-        /* DIE INSTRUMENTE (Sixpack Vibe) */
+        /* Der verwitterte weiße Balken hinter den Instrumenten */
+        body.theme-retro .flightplan-container {
+            position: relative;
+            z-index: 1;
+        }
+        body.theme-retro .flightplan-container::before {
+            content: '';
+            position: absolute;
+            top: 25px; bottom: 25px; left: 50%; transform: translateX(-50%);
+            width: 14px;
+            background-color: #e4e4e4;
+            /* Simulation von abgeplatzter Farbe durch Unterbrechungen im Streifen */
+            background-image: 
+                linear-gradient(transparent 15%, #2a2d34 16%, transparent 18%),
+                linear-gradient(transparent 42%, #2a2d34 44%, #2a2d34 46%, transparent 48%),
+                linear-gradient(transparent 78%, #2a2d34 79%, transparent 81%);
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4);
+            border-radius: 2px;
+            z-index: 0;
+        }
+
+        /* Die Instrumente selbst */
         body.theme-retro .aero-info-box { 
             background: #0a0a0c; 
-            border-radius: 12px; /* Runde Ecken für Instrumenten-Look */
-            border: 5px solid #4a4e59; /* Dicker grauer Instrumenten-Bezel */
-            box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 5px 10px rgba(0,0,0,0.5); 
+            border-radius: 12px; 
+            border: 5px solid #4a4e59; 
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 5px 10px rgba(0,0,0,0.8); 
             margin-bottom: 15px;
             position: relative;
+            z-index: 2; /* Instrumente liegen ÜBER dem weißen Streifen */
         }
-        /* Schrauben im Instrument */
         body.theme-retro .aero-info-box::before, body.theme-retro .aero-info-box::after {
             content: ''; position: absolute; width: 6px; height: 6px; 
             background: #777; border-radius: 50%; box-shadow: inset 0 0 2px #000;
@@ -277,7 +293,6 @@
         body.theme-retro .copy-box { background: #222; border: 2px inset #444; color: #fff; }
         body.theme-retro .copy-box:hover { color: var(--piper-yellow); }
 
-        /* Klobige Sekundär-Buttons */
         body.theme-retro .btn-action { 
             background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
             border: 2px solid #222; border-bottom: 3px solid #111; border-right: 2px solid #111;
@@ -292,23 +307,16 @@
         }
         body.theme-retro .btn-log:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; }
 
+        body.theme-retro .theme-switch-wrapper { border-top: 2px dashed #444; }
+
         body.theme-retro .logbook { border-top: 3px solid #444; }
-        body.theme-retro .log-entry { background: #111; border-left: 4px solid var(--piper-yellow); border-radius: 2px; }
+        body.theme-retro .log-entry { background: #111; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
 
     </style>
 </head>
 <body>
 
 <div class="container">
-    
-    <div class="theme-switch-wrapper">
-        <span class="switch-label">Modern</span>
-        <label class="switch">
-            <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
-            <span class="slider"></span>
-        </label>
-        <span class="switch-label" style="color: #d93829;">Analog</span>
-    </div>
 
     <div class="screw top-left"></div>
     <div class="screw top-right"></div>
@@ -376,7 +384,7 @@
         <h2 id="mTitle" style="margin-top:0; font-size:19px;" class="theme-title-text"></h2>
         <p id="mStory" class="story"></p>
         
-        <div style="display:flex; flex-direction:column;">
+        <div class="flightplan-container" style="display:flex; flex-direction:column;">
             
             <div class="aero-info-box" id="boxDep">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
@@ -411,11 +419,9 @@
                 </div>
             </div>
 
-            <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
-                <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Payload</span><span id="mPay" class="highlight"></span></div>
-                <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Fracht</span><span id="mWeight" class="highlight"></span></div>
-            </div>
-
+        </div> <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
+            <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Payload</span><span id="mPay" class="highlight"></span></div>
+            <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
         
         <div class="action-row">
@@ -431,9 +437,19 @@
         <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
         <div id="logContent"></div>
     </div>
+
+    <div class="theme-switch-wrapper">
+        <span class="switch-label">Modern</span>
+        <label class="switch">
+            <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label" style="color: #d93829;">Analog</span>
+    </div>
+
 </div>
 
-<div class="version-info">Version 84.0 (Analog Sixpack Edition)</div>
+<div class="version-info">Version 85.0 (Retro Final Polish)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -486,7 +502,7 @@
     };
 
     /* =========================================================
-       DEIN KOMPLETTER JAVASCRIPT CODE - UNVERÄNDERT
+       JAVASCRIPT FUNKTIONEN (Unverändert)
        ========================================================= */
 
     function applyPreset(t, g, s, n) { 
@@ -799,7 +815,7 @@
             templates = [
                 { i: "🏙️", t: `City-Panorama: ${poiName}`, s: `Eine Reisegruppe aus Übersee hat eine VIP-Städtetour gebucht. Das Highlight der Route ist ganz klar ${poiName}.`, p: `${maxPax} PAX (Touristen)`, w: cargoVIP },
                 { i: "🏗️", t: `Bauaufsicht: ${poiName}`, s: `Das Ingenieurbüro verlangt hochauflösende Aufnahmen von der Statik und dem Zustand der Anlagen bei ${poiName}.`, p: paxGov, w: cargoUtility },
-                { i: "🚗", t: `Verkehrs-Überwachung`, s: `Es ist Rush-Hour. Ein lokaler Radiosender hat dich gemietet, um das Verkehrschaos rund um ${poiName} live von oben zu reportieren.`, p: "1 PAX (Radiomoderator)", w: "Funktechnik (40 lbs)" },
+                { i: "🚗", t: `Verkehrs-Überwachung`, s: `Es ist Rush-Hour. Ein local Radiosender hat dich gemietet, um das Verkehrschaos rund um ${poiName} live von oben zu reportieren.`, p: "1 PAX (Radiomoderator)", w: "Funktechnik (40 lbs)" },
                 { i: "🎆", t: `Event-Vorbereitung: ${poiName}`, s: `Ein Mega-Event steht an. Die Organisatoren wollen das Gelände rund um ${poiName} aus der Luft begutachten, um Fluchtwege zu planen.`, p: "2 PAX (Security)", w: "Pläne & Laptops (30 lbs)" },
                 { i: "🏢", t: `Immobilien-Flug: ${poiName}`, s: `Ein Großinvestor überlegt, Ländereien nahe ${poiName} zu kaufen. Zeige ihm, wie sich die Infrastruktur von oben präsentiert.`, p: paxVIP, w: cargoVIP }
             ];
@@ -810,7 +826,7 @@
                 { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Du wurdest gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: paxMedia, w: cargoMedia },
                 { i: "🎁", t: `Überraschungsflug: ${poiName}`, s: `Jemand hat diesen Flug nach ${poiName} zum Geburtstag geschenkt bekommen. Mache es zu einem unvergesslichen Erlebnis!`, p: `${maxPax} PAX`, w: cargoVIP },
                 { i: "🎓", t: `Nav-Übung: ${poiName}`, s: `Heute kein Charter-Kunde! Du zeigst einem Flugschüler, wie er sauber nach VFR nach ${poiName} navigiert.`, p: "1 PAX (Flugschüler)", w: "Flugtaschen (20 lbs)" },
-                { i: "📡", t: `Funk-Relais: ${poiName}`, s: `Kreise über ${poiName}, um als fliegendes Kommunikationsrelais für ein local Event zu fungieren.`, p: paxNone, w: "Zusatz-Antennen (80 lbs)" },
+                { i: "📡", t: `Funk-Relais: ${poiName}`, s: `Kreise über ${poiName}, um als fliegendes Kommunikationsrelais für ein lokales Event zu fungieren.`, p: paxNone, w: "Zusatz-Antennen (80 lbs)" },
                 { i: "🛩️", t: `Luftraum-Check: ${poiName}`, s: `ATC hat unidentifizierte VFR-Aktivitäten bei ${poiName} gemeldet. Fliege hin und überprüfe die Lage visuell.`, p: "0 PAX", w: "Standard-Ausrüstung" }
             ];
         }
