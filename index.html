@@ -89,7 +89,6 @@
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
         
@@ -97,19 +96,18 @@
         .copy-box:hover { color: var(--green); }
         .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
 
-        /* NEU: Flugplatz Info Box (Runway/Höhe) */
+        /* FLUGPLAN BOXEN STYLING */
         .aero-info-box {
-            grid-column: span 2;
             background: #1e252b;
             padding: 12px;
             border-radius: 8px;
             border-left: 4px solid var(--warn);
             font-size: 12px;
             line-height: 1.6;
-            display: none;
+            margin-bottom: 10px;
         }
 
-        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
+        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
@@ -185,24 +183,43 @@
 
     <div id="briefingBox" class="briefing">
         <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
-        <div class="stat-grid">
-            <div class="stat-item" style="grid-column: span 2;"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Ziel-Koordinaten</span><span id="mCoords" class="highlight copy-box" onclick="copyCoords()" title="Klicken zum Kopieren"></span></div>
+        <p id="mStory" class="story"></p>
+        
+        <div style="display:flex; flex-direction:column;">
             
-            <div class="stat-item" style="grid-column: span 2; background: #1a2a3a; padding: 10px; border-radius: 6px; border-left: 4px solid var(--blue);">
-                <span class="stat-label">Treibstoffbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span>
-            </div>
-            
-            <div id="mDestInfoBox" class="aero-info-box">
-                <span class="stat-label" style="color: var(--warn); margin-bottom: 5px;">📍 Flugplatz-Daten (Ziel)</span>
-                <div id="mDestInfo">Lade reale Daten...</div>
+            <div class="aero-info-box" style="border-left-color: var(--green);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
+                    <span id="mDepWx" style="font-weight:bold; font-size:11px;"></span>
+                </div>
+                <div id="mDepInfo">Lade Daten...</div>
             </div>
 
-            <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+            <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
+                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">✈️ Flugplan & Performance</div>
+                <div class="grid-2" style="font-size:13px; font-weight:bold; color:#fff;">
+                    <div>Kurs: <span id="mNavHeading" style="color:var(--blue)"></span></div>
+                    <div>Distanz: <span id="mNavDist" style="color:var(--blue)"></span></div>
+                    <div>Zeit (ETE): <span id="mNavTime" style="color:var(--blue)"></span></div>
+                    <div>Fuel: <span id="mFuelReq" style="color:var(--blue)"></span></div>
+                </div>
+            </div>
+
+            <div class="aero-info-box" style="border-left-color: var(--red);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
+                    <span id="mDestWx" style="font-weight:bold; font-size:11px;"></span>
+                </div>
+                <div id="mDestInfo">Lade Daten...</div>
+                <div style="margin-top:8px; font-size:10px; color:#888;">Ziel-Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords()"></span></div>
+            </div>
+
+            <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
+                <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
+                <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+            </div>
+
         </div>
-        <p id="mStory" class="story"></p>
         
         <div class="action-row">
             <button class="btn-action" onclick="openWeather('dep')">🌦️ METAR DEP</button>
@@ -219,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 57.0</div>
+<div class="version-info">Version 58.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -240,7 +257,7 @@
     }
 
     function copyCoords() {
-        const txt = document.getElementById("mCoords").innerText;
+        const txt = document.getElementById("mDestCoords").innerText;
         if(txt && txt !== "-") {
             navigator.clipboard.writeText(txt).then(() => {
                 alert("Koordinaten kopiert:\n" + txt + "\n\n(Einfach im MSFS Suchfeld mit STRG+V einfügen)");
@@ -274,7 +291,7 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    // NEU: Berechnung der Distanz zwischen zwei Koordinaten (für die Pistenlänge)
+    // Distanz berechnen
     function calcDistMeters(lat1, lon1, lat2, lon2) {
         const R = 6371e3; 
         const f1 = lat1 * Math.PI/180;
@@ -286,7 +303,24 @@
         return R * c;
     }
 
-    // NEU: Lade exakte Runways & Elevation aus OpenStreetMap
+    // Live METAR API Aufruf
+    async function fetchWeather(icao) {
+        if (icao === "POI") return "";
+        try {
+            const res = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const cat = data[0].fltcat || "VFR";
+                if (cat === "VFR") return "<span title='VFR Bedingungen'>🟢 VFR</span>";
+                if (cat === "MVFR") return "<span title='Marginal VFR (Grenzwertig)'>🟡 MVFR</span>";
+                if (cat === "IFR") return "<span title='IFR Bedingungen'>🔴 IFR</span>";
+                if (cat === "LIFR") return "<span title='Low IFR (Schlechtwetter)'>🟣 LIFR</span>";
+            }
+            return "<span title='Keine lokale Messstation'>⚪ Kein lokales METAR</span>";
+        } catch(e) { return "<span title='Fehler'>⚪ N/A</span>"; }
+    }
+
+    // OSM Flugplatz Details
     async function fetchAirportDetails(lat, lon) {
         try {
             const query = `[out:json][timeout:10];(node["aeroway"="aerodrome"](around:2500,${lat},${lon});way["aeroway"="runway"](around:2500,${lat},${lon}););out geom;`;
@@ -297,23 +331,19 @@
             let rwList = [];
             
             if (data && data.elements) {
-                // 1. Platzhöhe (Elevation) suchen
                 const adNode = data.elements.find(el => el.tags && el.tags.aeroway === "aerodrome" && el.tags.ele);
                 if (adNode) {
                     let eleM = parseFloat(adNode.tags.ele);
                     if (!isNaN(eleM)) {
-                        eleStr = `${Math.round(eleM * 3.28084)} ft`; // Konvertierung Meter in Fuß
+                        eleStr = `${Math.round(eleM * 3.28084)} ft`; 
                     }
                 }
                 
-                // 2. Runways auslesen und übersetzen
                 const runways = data.elements.filter(el => el.tags && el.tags.aeroway === "runway");
-                
                 runways.forEach(rw => {
                     let ref = rw.tags.ref || "??";
                     let sfc = rw.tags.surface || "Unbekannt";
                     
-                    // Oberfläche auf Deutsch übersetzen
                     const sfcL = sfc.toLowerCase();
                     if(sfcL.includes('asphalt')) sfc = 'Asphalt';
                     else if(sfcL.includes('grass')) sfc = 'Gras';
@@ -323,14 +353,12 @@
                     else if(sfcL.includes('gravel')) sfc = 'Schotter';
                     else if(sfcL.includes('dirt') || sfcL.includes('earth')) sfc = 'Erde';
                     
-                    // Länge berechnen (aus der echten Geometrie!)
                     let lenStr = "";
                     if (rw.geometry && rw.geometry.length > 1) {
                         let len = 0;
                         for(let i=0; i<rw.geometry.length-1; i++) {
                             len += calcDistMeters(rw.geometry[i].lat, rw.geometry[i].lon, rw.geometry[i+1].lat, rw.geometry[i+1].lon);
                         }
-                        // Pisten unter 150m sind oft nur Helipads oder falsch getaggte Rollwege
                         if(len > 150) {
                             lenStr = ` (${Math.round(len)}m)`;
                             rwList.push(`<b>RWY ${ref}:</b> ${sfc}${lenStr}`);
@@ -343,7 +371,7 @@
             
             let finalStr = `<div style="margin-bottom: 4px;"><b>Elevation:</b> ${eleStr}</div>`;
             if (rwList.length > 0) {
-                let uniqueRw = [...new Set(rwList)]; // Doppelte Einträge filtern
+                let uniqueRw = [...new Set(rwList)]; 
                 finalStr += `<div>${uniqueRw.join("<br>")}</div>`;
             } else {
                 finalStr += `<div><b>Runway:</b> Keine OSM-Daten (Wetter/AIP prüfen)</div>`;
@@ -475,7 +503,7 @@
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
         btn.innerText = "Sucht Route & Daten...";
-        document.getElementById("mDestInfoBox").style.display = "none";
+        document.getElementById("briefingBox").style.display = "none";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -492,6 +520,8 @@
         const targetType = document.getElementById("targetType").value;
         const dirPref = document.getElementById("dirPref").value;
         const maxSeats = parseInt(document.getElementById("maxSeats").value);
+        const selectedTas = document.getElementById("tasSlider").value;
+        const selectedGph = document.getElementById("gphSlider").value;
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
@@ -533,23 +563,26 @@
         const isPOI = (targetType === 'poi' && !targetDest);
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         
-        let m, totalDist, routeText;
+        let m, totalDist;
         
         if (isPOI) {
             m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
             totalDist = nav.dist * 2; 
             currentDestICAO = currentStartICAO; 
-            routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
         } else {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
             m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
             totalDist = nav.dist;
             currentDestICAO = dest.icao;
-            routeText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
         }
         
-        const fuel = Math.ceil((totalDist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
-        
+        // Berechnungen Performance
+        const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
+        const totalMinutes = Math.round((totalDist / selectedTas) * 60);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`;
+
         currentMissionData = { 
             start: currentStartICAO, 
             dest: currentDestICAO, 
@@ -559,12 +592,28 @@
             ac: selectedAC 
         };
         
+        // Texte setzen
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
-        document.getElementById("mRoute").innerText = routeText;
-        document.getElementById("mNav").innerText = `${nav.brng}° ${getArrow(nav.brng)} / ${totalDist} NM`;
-        document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
-        document.getElementById("mFuel").innerText = `${fuel} Gal`;
+        document.getElementById("mStory").innerText = m.s;
+        
+        // Start Box Setup
+        document.getElementById("mDepICAO").innerText = currentStartICAO;
+        document.getElementById("mDepName").innerText = start.n;
+        document.getElementById("mDepInfo").innerText = "Lade Platzdaten...";
+        
+        // Routen Box Setup
+        document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
+        document.getElementById("mNavDist").innerText = `${totalDist} NM`;
+        document.getElementById("mNavTime").innerText = timeString;
+        document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
 
+        // Ziel Box Setup
+        document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
+        document.getElementById("mDestName").innerText = dest.n;
+        document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
+        document.getElementById("mDestInfo").innerText = "Lade Platzdaten...";
+        
+        // Payload berechnen
         let payloadText = "", cargoText = "";
         if (isPOI) {
             if (m.t === "VIP-Sightseeing") {
@@ -587,24 +636,28 @@
 
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
-        document.getElementById("mStory").innerText = m.s;
         
+        // Anzeigen und Karte zeichnen
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
-        // Lade Pisten-Informationen wenn es ein Flugplatz ist
-        if (!isPOI) {
-            btn.innerText = "Lade Pisten-Daten...";
-            const infoBox = document.getElementById("mDestInfoBox");
-            const infoText = document.getElementById("mDestInfo");
-            infoBox.style.display = "block";
-            infoText.innerText = "Verbinde mit OSM für Flugplatzdaten...";
-            
-            const aeroData = await fetchAirportDetails(dest.lat, dest.lon);
-            infoText.innerHTML = aeroData;
+        // API Abfragen asynchron starten
+        btn.innerText = "Lade Live-Wetter & Platzdaten...";
+        
+        // Departure laden
+        fetchAirportDetails(start.lat, start.lon).then(data => document.getElementById("mDepInfo").innerHTML = data);
+        fetchWeather(currentStartICAO).then(wx => document.getElementById("mDepWx").innerHTML = wx);
+
+        // Destination laden
+        if (isPOI) {
+            document.getElementById("mDestInfo").innerHTML = `<div><b>Typ:</b> Wendepunkt (Rundflug)</div><div>Keine Flugplatzdaten vorhanden.</div>`;
+            document.getElementById("mDestWx").innerHTML = "";
+        } else {
+            fetchAirportDetails(dest.lat, dest.lon).then(data => document.getElementById("mDestInfo").innerHTML = data);
+            fetchWeather(currentDestICAO).then(wx => document.getElementById("mDestWx").innerHTML = wx);
         }
 
-        indicator.innerText = `Routenplanung abgeschlossen (${dataSource}).`;
+        indicator.innerText = `Flugplan erstellt (${dataSource}).`;
         resetBtn(btn);
     }
 
