@@ -192,6 +192,7 @@
                     <span id="mDepWx" style="font-weight:bold; font-size:11px;"></span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
+                <div id="mDepRunways" style="font-size:11px; color:#aaa; margin-top:6px;"></div>
             </div>
 
             <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
@@ -210,6 +211,7 @@
                     <span id="mDestWx" style="font-weight:bold; font-size:11px;"></span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
+                <div id="mDestRunways" style="font-size:11px; color:#aaa; margin-top:6px;"></div>
             </div>
 
             <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
@@ -234,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 59.0</div>
+<div class="version-info">Version 60.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -289,22 +291,22 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    // NEU: Regionale Wetter-Abfrage (Bounding Box ~100km)
+    // NEU: Regionale Wetter-Abfrage (GEFIXT: Bbox Reihenfolge lon,lat,lon,lat)
     async function fetchRegionalWeather(lat, lon) {
         if (!lat || !lon) return "";
         try {
-            // Box von +- 0.5 Grad erzeugen (ca. 100km Kantenlänge)
-            const minLat = (lat - 0.5).toFixed(2);
-            const maxLat = (lat + 0.5).toFixed(2);
-            const minLon = (lon - 0.5).toFixed(2);
-            const maxLon = (lon + 0.5).toFixed(2);
+            // Box von +- 1.0 Grad erzeugen (um sicher eine Station zu finden)
+            const minLon = (lon - 1.0).toFixed(2);
+            const minLat = (lat - 1.0).toFixed(2);
+            const maxLon = (lon + 1.0).toFixed(2);
+            const maxLat = (lat + 1.0).toFixed(2);
             
-            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
+            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLon},${minLat},${maxLon},${maxLat}&format=json`;
             const res = await fetch(url);
             const data = await res.json();
             
             if (data && data.length > 0) {
-                // Suche die nächste Station in der Box (Pythagoras-Annäherung)
+                // Suche die nächste Station in der Box
                 let closest = data[0];
                 let minDist = 9999;
                 
@@ -319,7 +321,7 @@
                 });
 
                 const cat = closest.fltcat || "VFR";
-                const station = closest.icaoId || "Unbekannt";
+                const station = closest.icaoId || "??";
                 
                 let icon = "⚪";
                 if (cat === "VFR") icon = "🟢 VFR";
@@ -329,9 +331,45 @@
                 
                 return `<span title='Regionales Wetter von Station ${station}'>${icon} (${station})</span>`;
             }
-            return "<span title='Keine METAR Station in 50km Umkreis'>⚪ Kein Wetter</span>";
+            return "<span title='Keine METAR Station in Umgebung gefunden'>⚪ Kein lokales METAR</span>";
         } catch(e) { 
-            return "<span title='Wetter-API nicht erreichbar'>⚪ N/A</span>"; 
+            return "<span title='Wetter-API Fehler'>⚪ N/A</span>"; 
+        }
+    }
+
+    // NEU: Nur noch Pisten-Ausrichtung und Belag holen
+    async function fetchRunways(lat, lon) {
+        try {
+            const query = `[out:json][timeout:10];way["aeroway"="runway"](around:2500,${lat},${lon});out tags;`;
+            const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            
+            let rwList = [];
+            if (data && data.elements) {
+                data.elements.forEach(rw => {
+                    if (!rw.tags) return;
+                    let ref = rw.tags.ref || "??";
+                    let sfc = rw.tags.surface || "Unbekannt";
+                    
+                    const sfcL = sfc.toLowerCase();
+                    if(sfcL.includes('asphalt')) sfc = 'Asphalt';
+                    else if(sfcL.includes('grass')) sfc = 'Gras';
+                    else if(sfcL.includes('concrete')) sfc = 'Beton';
+                    else if(sfcL.includes('paved')) sfc = 'Befestigt';
+                    else if(sfcL.includes('unpaved')) sfc = 'Unbefestigt';
+                    else if(sfcL.includes('gravel')) sfc = 'Schotter';
+                    else if(sfcL.includes('dirt') || sfcL.includes('earth')) sfc = 'Erde';
+                    
+                    rwList.push(`RWY ${ref} (${sfc})`);
+                });
+            }
+            if(rwList.length > 0) {
+                let uniqueRw = [...new Set(rwList)];
+                return `<b>Pisten:</b> <span style="color:#fff;">${uniqueRw.join(" | ")}</span>`;
+            }
+            return "<b>Pisten:</b> Keine OSM-Daten (Siehe AIP)";
+        } catch(e) {
+            return "";
         }
     }
 
@@ -456,6 +494,12 @@
         btn.disabled = true;
         btn.innerText = "Sucht Route & Daten...";
         document.getElementById("briefingBox").style.display = "none";
+        
+        // Reset Runway/Weather Text
+        document.getElementById("mDepRunways").innerHTML = "";
+        document.getElementById("mDestRunways").innerHTML = "";
+        document.getElementById("mDepWx").innerText = "Lade Wetter...";
+        document.getElementById("mDestWx").innerText = "Lade Wetter...";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -550,7 +594,6 @@
         document.getElementById("mDepICAO").innerText = currentStartICAO;
         document.getElementById("mDepName").innerText = start.n;
         document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
-        document.getElementById("mDepWx").innerText = "Lade Wetter...";
         
         // Routen Box Setup
         document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
@@ -562,7 +605,6 @@
         document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
         document.getElementById("mDestName").innerText = dest.n;
         document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
-        document.getElementById("mDestWx").innerText = "Lade Wetter...";
         
         // Payload berechnen
         let payloadText = "", cargoText = "";
@@ -591,15 +633,18 @@
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
-        btn.innerText = "Lade Live-Wetter...";
+        btn.innerText = "Lade Live-Wetter & Pisten...";
         
-        // Asynchrones Laden des Regional-Wetters (über die Koordinaten!)
+        // Parallele Abfragen starten (Wetter & Pisten)
         fetchRegionalWeather(start.lat, start.lon).then(wx => document.getElementById("mDepWx").innerHTML = wx);
+        fetchRunways(start.lat, start.lon).then(rw => document.getElementById("mDepRunways").innerHTML = rw);
 
         if (isPOI) {
             document.getElementById("mDestWx").innerHTML = "";
+            document.getElementById("mDestRunways").innerHTML = "<div>Keine Pisten (Wendepunkt)</div>";
         } else {
             fetchRegionalWeather(dest.lat, dest.lon).then(wx => document.getElementById("mDestWx").innerHTML = wx);
+            fetchRunways(dest.lat, dest.lon).then(rw => document.getElementById("mDestRunways").innerHTML = rw);
         }
 
         indicator.innerText = `Flugplan erstellt (${dataSource}).`;
