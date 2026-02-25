@@ -11,7 +11,6 @@ function toggleTheme() {
         localStorage.setItem('ga_theme', 'classic');
     }
     updateDynamicColors();
-    // Nach Theme-Wechsel alle Trommeln einmal neu zeichnen, damit sie korrekt aussehen
     refreshAllDrums();
 }
 
@@ -23,7 +22,6 @@ function updateDynamicColors() {
     const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--green)';
     
     document.getElementById('mainTitle').style.color = titleColor;
-    // Im Retro Mode entfernen wir die Inline-Farben der Spans, da das CSS der Drums das übernimmt
     document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = isRetro ? '' : primColor);
     document.querySelectorAll('.theme-green-text').forEach(el => el.style.color = hlColor);
 }
@@ -47,7 +45,6 @@ window.onload = () => {
     if (lastDest) document.getElementById('startLoc').value = lastDest;
     renderLog();
 
-    // Initialwerte für die Trommeln setzen
     setDrumCounter('tasDrum', 160);
     setDrumCounter('gphDrum', 14);
 };
@@ -55,7 +52,6 @@ window.onload = () => {
 /* =========================================================
    3. HELPER-FUNKTIONEN (UI & Mathe)
    ========================================================= */
-// NEU: Die Magie für die mechanischen Trommeln!
 function setDrumCounter(elementId, valueStr) {
     const container = document.getElementById(elementId);
     if (!container) return;
@@ -63,19 +59,17 @@ function setDrumCounter(elementId, valueStr) {
     // Im Modern Mode: Einfach Text anzeigen
     if (!document.body.classList.contains('theme-retro')) {
         container.innerHTML = `<span class="theme-color-text" style="font-weight:bold;">${valueStr}</span>`;
-        updateDynamicColors(); // Farbe sicherstellen
+        updateDynamicColors(); 
         return;
     }
 
     // Im Retro Mode: Trommel-Mechanik bauen
-    // Versuchen, nur die Zahlen aus dem String zu extrahieren (z.B. aus "125 NM")
     let numericValue = valueStr.toString().replace(/[^0-9]/g, '');
-    if (numericValue === "") numericValue = "0"; // Fallback
+    if (numericValue === "") numericValue = "0"; 
     
     const digits = numericValue.split('');
-    const digitHeight = 22; // Muss exakt zur CSS Höhe .drum-digit passen
+    const digitHeight = 22; 
 
-    // Prüfen, ob wir schon die richtige Anzahl an Streifen haben
     let windowEl = container.querySelector('.drum-window');
     if (!windowEl) {
         container.innerHTML = '<div class="drum-window"></div>';
@@ -85,64 +79,70 @@ function setDrumCounter(elementId, valueStr) {
     const existingStrips = windowEl.querySelectorAll('.drum-strip');
     const neededStrips = digits.length;
 
-    // Streifen hinzufügen, falls nötig
     if (existingStrips.length < neededStrips) {
         for (let i = 0; i < (neededStrips - existingStrips.length); i++) {
             const strip = document.createElement('div');
             strip.className = 'drum-strip';
-            // Zahlen 0-9 plus eine extra 0 für den sauberen Loop-Effekt (optional, hier simpel 0-9)
             strip.innerHTML = [0,1,2,3,4,5,6,7,8,9].map(d => `<div class="drum-digit">${d}</div>`).join('');
             windowEl.appendChild(strip);
         }
     } 
-    // Zu viele Streifen entfernen (z.B. Wechsel von 100 auf 99)
     else if (existingStrips.length > neededStrips) {
         for (let i = neededStrips; i < existingStrips.length; i++) {
             windowEl.removeChild(existingStrips[i]);
         }
     }
 
-    // Jetzt die Positionen animieren
     const finalStrips = windowEl.querySelectorAll('.drum-strip');
     digits.forEach((digit, index) => {
         const targetDigit = parseInt(digit);
-        // Berechnung: Negative Verschiebung basierend auf der Ziffernhöhe
         const translateY = -(targetDigit * digitHeight);
         finalStrips[index].style.transform = `translateY(${translateY}px)`;
     });
 }
 
-// Hilfsfunktion um alle Trommeln beim Theme-Wechsel zu aktualisieren
+// NEU: Reagiert auf Slider-Änderungen live
+function handleSliderChange(type, val) {
+    setDrumCounter(type + 'Drum', val);
+    recalculatePerformance(); // Berechnet live neu!
+}
+
+// NEU: Berechnet Zeit und Sprit neu, falls eine Mission aktiv ist
+function recalculatePerformance() {
+    if (!currentMissionData) return;
+    
+    const tas = parseInt(document.getElementById("tasSlider").value);
+    const gph = parseInt(document.getElementById("gphSlider").value);
+    const dist = currentMissionData.dist;
+    
+    const fuel = Math.ceil((dist / tas * gph) + (0.75 * gph));
+    const totalMinutes = Math.round((dist / tas) * 60);
+    
+    setDrumCounter('timeDrum', totalMinutes);
+    setDrumCounter('fuelDrum', fuel);
+}
+
 function refreshAllDrums() {
-    // Werte auslesen (etwas hacky, aber funktioniert für den Toggle)
     const tas = document.getElementById('tasSlider').value;
     const gph = document.getElementById('gphSlider').value;
     setDrumCounter('tasDrum', tas);
     setDrumCounter('gphDrum', gph);
     
     if(currentMissionData) {
-       // Falls schon eine Mission generiert wurde, diese Werte auch refreshen
-       // Da wir die Rohdaten nicht einfach haben, lesen wir den Textcontainer aus
-       // (Das ist nicht ideal, aber für den reinen visuellen Toggle reicht es)
-       const h = document.getElementById('navHeadingText').innerText;
-       const d = document.getElementById('navDistText').innerText;
-       const t = document.getElementById('navTimeText').innerText;
-       const f = document.getElementById('fuelReqText').innerText;
-       setDrumCounter('headingDrum', h);
-       setDrumCounter('distDrum', d);
-       setDrumCounter('timeDrum', t);
-       setDrumCounter('fuelDrum', f);
+       setDrumCounter('headingDrum', currentMissionData.heading);
+       setDrumCounter('distDrum', currentMissionData.dist);
+       recalculatePerformance();
     }
 }
-
 
 function applyPreset(t, g, s, n) { 
     document.getElementById('tasSlider').value=t; 
     document.getElementById('gphSlider').value=g; 
     document.getElementById('maxSeats').value=s; selectedAC=n;
-    // UPDATED: Nutze die neuen Trommel-Funktionen statt innerText
-    setDrumCounter('tasDrum', t);
-    setDrumCounter('gphDrum', g);
+    
+    // Ruft live die Aktualisierung für Drums UND Berechnungen auf
+    handleSliderChange('tas', t);
+    handleSliderChange('gph', g);
 }
 
 function copyCoords(elementId) {
@@ -184,7 +184,7 @@ function calcNav(lat1, lon1, lat2, lon2) {
     const R = 3440, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
     const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
     const dist = Math.round(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-    const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(dLon);
+    const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
     return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
 }
 
@@ -501,7 +501,6 @@ async function generateMission() {
     if (isPOI) {
         m = generateDynamicPOIMission(dest.n, maxSeats);
         totalDist = nav.dist * 2; 
-        distStr = `${totalDist} NM (Roundtrip)`;
         currentDestICAO = currentStartICAO; 
         dataSource = "Wikipedia GeoSearch";
         payloadText = m.payloadText;
@@ -510,7 +509,6 @@ async function generateMission() {
         const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
         m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
         totalDist = nav.dist;
-        distStr = `${totalDist} NM (Oneway)`;
         currentDestICAO = dest.icao;
         if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
         
@@ -518,19 +516,15 @@ async function generateMission() {
         cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
     }
     
-    const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
-    const totalMinutes = Math.round((totalDist / selectedTas) * 60);
-    const hrs = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`;
-
+    // UPDATE: Mission Data speichert nun auch das Heading für den Theme-Wechsel!
     currentMissionData = { 
         start: currentStartICAO, 
         dest: currentDestICAO, 
         poiName: isPOI ? dest.n : null,
         mission: m.t, 
         dist: totalDist, 
-        ac: selectedAC 
+        ac: selectedAC,
+        heading: nav.brng
     };
     
     document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
@@ -540,18 +534,13 @@ async function generateMission() {
     document.getElementById("mDepName").innerText = start.n;
     document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
     
-    // UPDATED: Trommel-Zählwerke setzen!
-    // Wir müssen die Rohwerte (Zahlen) übergeben. Die Texteinheiten (NM, Gal) stehen jetzt statisch im HTML.
+    // Trommeln drehen (Live Update Berechnung wird danach gerufen)
     setDrumCounter('headingDrum', nav.brng);
-    // Für Distanz nur die Zahl extrahieren
     setDrumCounter('distDrum', totalDist);
-    // Für Zeit: Hier wird es tricky. Trommeln können keine "h" und "m" anzeigen.
-    // Wir zeigen der Einfachheit halber die Gesamtminuten an, das ist realistischer für einfache Zähler.
-    setDrumCounter('timeDrum', totalMinutes);
-    setDrumCounter('fuelDrum', fuel);
-
-    // Arrow Update (separat, da keine Zahl)
     document.getElementById('headingArrow').innerText = getArrow(nav.brng);
+    
+    // Zeit und Sprit berechnen (über die neue Live-Funktion)
+    recalculatePerformance();
 
     document.getElementById("destIcon").innerText = isPOI ? "🎯" : "🛬";
     document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
