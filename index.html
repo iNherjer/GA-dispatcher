@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V43 - The Navigator Update</title>
+    <title>GA Dispatcher V44 - Smart Quadrant</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -63,7 +63,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V43</h1>
+    <h1>GA Dispatcher V44</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -166,7 +166,6 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
-    // Hilfsfunktion: Prüft, ob ein Kurs in der gewünschten Himmelsrichtung liegt
     function checkBearing(b, dirPref) {
         if (dirPref === 'any') return true;
         if (dirPref === 'N' && (b <= 45 || b >= 315)) return true;
@@ -212,15 +211,28 @@
 
         const latDiff = searchMax / 60.0;
         const lonDiff = searchMax / (60.0 * Math.cos(lat * Math.PI / 180));
-        const s = (lat - latDiff).toFixed(4), n = (lat + latDiff).toFixed(4);
-        const w = (lon - lonDiff).toFixed(4), e = (lon + lonDiff).toFixed(4);
+        
+        // HIER KOMMT DIE MAGIE: Der Bounding Box Offset nach Himmelsrichtung
+        let boxS = lat - latDiff;
+        let boxN = lat + latDiff;
+        let boxW = lon - lonDiff;
+        let boxE = lon + lonDiff;
+
+        // Wir halbieren das Suchquadrat, um den Server extrem zu entlasten
+        if (dirPref === 'N') { boxS = lat; } 
+        else if (dirPref === 'S') { boxN = lat; }
+        else if (dirPref === 'E') { boxW = lon; }
+        else if (dirPref === 'W') { boxE = lon; }
+
+        const s = boxS.toFixed(4), n = boxN.toFixed(4);
+        const w = boxW.toFixed(4), e = boxE.toFixed(4);
 
         let query, typeName;
         if (targetType === "poi") {
             const poiCategories = [
-                { q: 'nwr["historic"="castle"]["name"]', name: "Burgen & Schlösser" },
+                { q: 'nwr["historic"="castle"]["name"]', name: "Burgen/Schlösser" },
                 { q: 'nwr["natural"="peak"]["name"]', name: "Berggipfel" },
-                { q: 'nwr["tourism"="attraction"]["name"]', name: "Sehenswürdigkeiten" },
+                { q: 'nwr["tourism"="attraction"]["name"]', name: "Attraktionen" },
                 { q: 'nwr["historic"="monument"]["name"]', name: "Monumente" }
             ];
             const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
@@ -231,8 +243,9 @@
             query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
+        // INFO-TEXT IST ZURÜCK!
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
-        indicator.innerText = `Scan nach ${typeName}${dirText}...`;
+        indicator.innerText = `Scan ${typeName}${dirText} (${searchMin}-${searchMax} NM)...`;
 
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
@@ -256,10 +269,7 @@
 
                     const navCalc = calcNav(lat, lon, el.lat, el.lon);
                     
-                    // Filter nach Distanz
                     if (navCalc.dist < searchMin || navCalc.dist > searchMax) return false;
-                    
-                    // Filter nach Himmelsrichtung
                     if (!checkBearing(navCalc.brng, dirPref)) return false;
                     
                     if (targetType === "apt") {
@@ -299,23 +309,20 @@
         
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType, dirPref);
         
-        // Fallback Logik (berücksichtigt nun auch die gewünschte Richtung!)
+        // Fallback Logik
         if(!dest && !targetDest) {
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
                 
-                // Regionen-Filter
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
                 
-                // Richtungs-Filter für CoreDB
                 let dirFilteredKeys = keys.filter(k => {
                     const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
                     return checkBearing(b, dirPref);
                 });
                 
-                // Wenn die Richtung nichts hergibt, Fallback aufdröseln
                 if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
                 if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
                 
@@ -323,13 +330,12 @@
             } else if (targetType === "poi") {
                 dataSource = "Fallback POIs";
                 
-                // Richtungs-Filter für POIs
                 let validPOIs = fallbackPOIs.filter(p => {
                     const b = calcNav(start.lat, start.lon, p.lat, p.lon).brng;
                     return checkBearing(b, dirPref);
                 });
                 
-                if(validPOIs.length === 0) validPOIs = fallbackPOIs; // Sicherheitsnetz
+                if(validPOIs.length === 0) validPOIs = fallbackPOIs; 
                 
                 dest = validPOIs[Math.floor(Math.random() * validPOIs.length)];
                 dest.icao = "POI";
