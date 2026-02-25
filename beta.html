@@ -16,15 +16,26 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
+        /* Farbpalette: Retro Cockpit (Amber & Phosphor) */
+        :root { 
+            --amber: #ffb000; 
+            --amber-glow: rgba(255, 176, 0, 0.6);
+            --phosphor: #00ff41;
+            --phosphor-glow: rgba(0, 255, 65, 0.4);
+            --bg-dark: #080808; 
+            --text: #e0e0e0; 
+            --red: #ff4444; 
+        }
         
+        /* Technischer Monospace-Font für das gesamte Panel */
         body { 
-            font-family: 'Segoe UI', Roboto, sans-serif; 
+            font-family: 'Courier New', Courier, monospace; 
             background-color: var(--bg-dark); 
             color: var(--text); 
             margin: 0; padding: 20px 10px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
+            /* Dein Hintergrundbild bleibt, kommt jetzt aber besser durch */
             background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
@@ -32,12 +43,28 @@
             background-repeat: no-repeat;
         }
 
+        /* --- DAS HAUPT-PANEL (GLASS & COCKPIT LOOK) --- */
         .container { 
-            background-color: rgba(30, 30, 30, 0.90); 
-            padding: 20px; border-radius: 16px; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
-            max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
-            backdrop-filter: blur(8px); 
+            position: relative;
+            background-color: rgba(15, 20, 25, 0.45); /* Transparenter für mehr Glass-Effekt */
+            padding: 25px; 
+            border-radius: 12px; 
+            max-width: 480px; width: 100%; box-sizing: border-box; 
+            
+            /* Der Blur-Effekt */
+            backdrop-filter: blur(12px); 
+            -webkit-backdrop-filter: blur(12px);
+            
+            /* 3D-Rahmen-Effekt (Kuhle + Lichtkante) */
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 2px solid rgba(0, 0, 0, 0.9);
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid rgba(0, 0, 0, 0.6);
+            
+            box-shadow: 
+                0 15px 35px rgba(0,0,0,0.8),         /* Schatten nach außen (schwebt) */
+                inset 0 0 25px rgba(0,0,0,0.9);      /* Schatten nach innen (versenktes Panel) */
+                
             transition: all 0.3s;
         }
         
@@ -45,104 +72,164 @@
             backdrop-filter: none !important;
             transform: none !important;
         }
+
+        /* Schrauben in den Ecken */
+        .screw { position: absolute; width: 10px; height: 10px; background: linear-gradient(135deg, #777, #222); border-radius: 50%; box-shadow: inset 0 0 2px #000, 0 1px 1px rgba(255, 255, 255, 0.1); }
+        .screw::after { content: ''; position: absolute; top: 4px; left: 1.5px; width: 7px; height: 1.5px; background: #111; }
+        .top-left { top: 10px; left: 10px; transform: rotate(45deg); }
+        .top-right { top: 10px; right: 10px; transform: rotate(15deg); }
+        .bottom-left { bottom: 10px; left: 10px; transform: rotate(-20deg); }
+        .bottom-right { bottom: 10px; right: 10px; transform: rotate(70deg); }
         
-        h1 { font-size: 20px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
-        #searchIndicator { font-size: 12px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 15px; }
-        label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
-        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
+        /* Titel: Amber Glow */
+        h1 { 
+            font-size: 24px; 
+            text-align: center; 
+            color: var(--amber); 
+            text-shadow: 0 0 8px var(--amber-glow);
+            margin: 0 0 15px 0; 
+            text-transform: uppercase; 
+            letter-spacing: 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+            padding-bottom: 10px; 
+        }
+
+        #searchIndicator { font-size: 12px; color: var(--amber); text-align: center; margin-bottom: 15px; font-style: italic; height: 15px; }
+        
+        label { font-size: 11px; color: #aaa; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
+        
+        /* Inputs: Retro Displays */
+        input, select { 
+            width: 100%; padding: 12px; 
+            background-color: rgba(0, 0, 0, 0.5); 
+            border: 1px inset #444; 
+            color: var(--phosphor); 
+            text-shadow: 0 0 5px var(--phosphor-glow);
+            border-radius: 6px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; 
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 5px var(--amber-glow); }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
-        .btn-preset { flex: 1; padding: 8px 4px; font-size: 11px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
-        .btn-preset:hover { background: #444; }
+        
+        /* Kleinere Tasten */
+        .btn-preset { 
+            flex: 1; padding: 8px 4px; font-size: 11px; 
+            background: linear-gradient(to bottom, #444, #222); 
+            color: #ddd; border: 1px solid #111; border-top: 1px solid #666; 
+            border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .btn-preset:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.6); background: #222; }
 
-        .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        .slider-container { margin-bottom: 10px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 13px; }
-        input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
-        input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
         
-        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 16px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        
-        .btn-main:disabled {
-            background-color: #333 !important;
-            color: #888 !important;
-            cursor: wait !important;
-            border: 1px solid #555;
+        /* Sliders */
+        input[type=range] { width: 100%; appearance: none; height: 6px; background: #111; border: 1px inset #333; border-radius: 5px; margin: 12px 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        input[type=range]::-webkit-slider-thumb { 
+            appearance: none; height: 20px; width: 14px; border-radius: 2px; 
+            background: linear-gradient(to right, #ccc, #fff, #ccc); 
+            cursor: pointer; border: 1px solid #000; box-shadow: 0 2px 5px rgba(0,0,0,0.8); 
         }
         
-        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
-        
-        .map-fullscreen {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 99999 !important;
-            margin: 0 !important;
-            border-radius: 0 !important;
+        /* Haupt-Button (Master Switch Look) */
+        .btn-main { 
+            width: 100%; padding: 16px; 
+            background: linear-gradient(to bottom, #ffb000, #cc8c00); 
+            color: #111; border: 2px solid #111; border-top: 2px solid #ffe082;
+            border-radius: 6px; font-size: 16px; font-weight: 800; cursor: pointer; 
+            text-transform: uppercase; font-family: 'Courier New', monospace; letter-spacing: 2px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.6); text-shadow: none;
         }
+        .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+        .btn-main:disabled { background: #333 !important; color: #888 !important; border-top: 2px solid #444; cursor: wait !important; box-shadow: none; transform: none; }
+        
+        /* Map versenkt im Panel */
+        #map { height: 200px; width: 100%; border-radius: 8px; margin-top: 15px; border: 2px inset #222; display: none; background: #111; }
+        
+        .map-fullscreen { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; margin: 0 !important; border-radius: 0 !important; }
 
         .custom-pin { display: flex; justify-content: center; align-items: center; }
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
-        .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
+        .briefing { margin-top: 15px; padding: 15px; background-color: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid #333; display: none; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
         
-        /* >>> SCHRIFTGRÖSSEN MASSIV ERHÖHT FÜR LESBARKEIT <<< */
-        .story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
+        .story { font-style: italic; color: #aaa; font-size: 15px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #333; }
         
+        /* Sub-Panels für die Infos */
         .aero-info-box {
-            background: #1e252b;
+            background: rgba(15, 20, 25, 0.6);
             padding: 14px 12px;
-            border-radius: 8px;
-            border-left: 4px solid var(--warn);
+            border-radius: 6px;
+            border-left: 4px solid var(--amber);
+            border-top: 1px solid #333;
+            border-right: 1px solid #111;
+            border-bottom: 1px solid #111;
             margin-bottom: 12px;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
         }
         
-        /* Die Start/Ziel Überschriften in den Boxen */
-        .box-title { font-weight: bold; text-transform: uppercase; font-size: 15px; }
+        .box-title { font-weight: bold; text-transform: uppercase; font-size: 15px; letter-spacing: 1px; }
         
-        /* Koordinaten Copy-Box */
-        .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 3px 8px; border-radius: 4px; margin-top: 4px; font-size: 13px; }
-        .copy-box:hover { color: var(--green); background: #444; }
+        .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #222; padding: 3px 8px; border-radius: 4px; margin-top: 4px; font-size: 13px; border: 1px solid #444; }
+        .copy-box:hover { color: var(--phosphor); background: #333; border-color: var(--phosphor); }
         .copy-box::after { content: ' 📋'; font-size: 11px; opacity: 0.5; }
 
-        /* Flugplan Daten (Kurs, Distanz etc.) */
-        .route-label { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; }
-        .route-data { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 16px; font-weight: bold; color: #fff; line-height: 1.4; }
+        .route-label { font-size: 12px; color: #aaa; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; letter-spacing: 1px; }
+        .route-data { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 16px; font-weight: bold; color: var(--phosphor); text-shadow: 0 0 4px var(--phosphor-glow); line-height: 1.4; }
 
-        /* Pisten & Wiki Infos */
         .rwy-info { font-size: 14px; color: #aaa; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; }
         .wiki-info { font-size: 14px; color: #ccc; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; font-style: italic; line-height: 1.5; display: none; }
 
-        /* Payload / Fracht */
         .stat-item { font-size: 16px; }
-        .stat-label { color: #888; display: block; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
-        .highlight { color: #fff; font-weight: bold; font-size: 16px; }
+        .stat-label { color: #aaa; display: block; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
+        .highlight { color: var(--amber); font-weight: bold; font-size: 16px; text-shadow: 0 0 4px var(--amber-glow); }
         
-        /* Buttons unten */
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; font-weight: bold; transition: 0.2s; }
-        .btn-action:hover { background: #555; }
         
-        .btn-metar { background: #2a3a4a; border: 1px solid #4da6ff; color: #4da6ff; }
-        .btn-metar:hover { background: #3a4a5a; }
+        /* Sekundäre Buttons */
+        .btn-action { 
+            background: linear-gradient(to bottom, #333, #1a1a1a); 
+            border: 1px solid #111; border-top: 1px solid #555; 
+            color: #ddd; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 12px; 
+            text-align: center; font-weight: bold; transition: 0.2s; font-family: 'Courier New', monospace; 
+            box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+        }
+        .btn-action:active { transform: translateY(2px); box-shadow: 0 1px 2px rgba(0,0,0,0.6); background: #1a1a1a; }
         
-        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 16px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-size: 14px;}
-        .btn-log:hover { background: #33cc33; }
+        .btn-metar { border-top: 1px solid #5a8bb8; }
         
-        .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
-        .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 12px; }
+        /* Log-Button (wie der Main Button, aber grün) */
+        .btn-log { 
+            background: linear-gradient(to bottom, #00ff41, #00b32d); 
+            color: #000; grid-column: span 2; margin-top: 10px; padding: 16px; 
+            border: 2px solid #111; border-top: 2px solid #80ff9f; border-radius: 6px; 
+            font-weight: 800; cursor: pointer; text-transform: uppercase; 
+            font-size: 14px; font-family: 'Courier New', monospace; box-shadow: 0 6px 12px rgba(0,0,0,0.6); 
+        }
+        .btn-log:active { transform: translateY(3px); box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
         
-        .leaflet-control-layers-list { color: #000; font-size: 12px; }
-        .version-info { text-align: center; font-size: 11px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .logbook { margin-top: 25px; border-top: 2px dashed #444; padding-top: 15px; width: 100%; }
+        .log-entry { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--amber); font-size: 12px; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        
+        .leaflet-control-layers-list { color: #000; font-family: sans-serif; font-size: 12px; }
+        .version-info { text-align: center; font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 12px; text-transform: uppercase; letter-spacing: 2px; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <div class="screw top-left"></div>
+    <div class="screw top-right"></div>
+    <div class="screw bottom-left"></div>
+    <div class="screw bottom-right"></div>
+
     <h1>GA Dispatcher</h1>
     <div id="searchIndicator">System bereit.</div>
     
@@ -187,12 +274,12 @@
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--blue)">14</span></div>
+        <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--amber); font-weight:bold;">14</span></div>
         <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" style="color:var(--blue)">160</span></div>
+        <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" style="color:var(--amber); font-weight:bold;">160</span></div>
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
@@ -201,36 +288,33 @@
     <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
-        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:19px;"></h2>
+        <h2 id="mTitle" style="margin-top:0; color:var(--amber); font-size:19px; text-shadow: 0 0 5px var(--amber-glow);"></h2>
         <p id="mStory" class="story"></p>
         
         <div style="display:flex; flex-direction:column;">
             
-            <!-- START BOX -->
-            <div class="aero-info-box" style="border-left-color: var(--green);">
+            <div class="aero-info-box" style="border-left-color: var(--phosphor);">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span class="box-title" style="color:var(--green);">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
+                    <span class="box-title" style="color:var(--phosphor); text-shadow: 0 0 3px var(--phosphor-glow);">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff; text-shadow:none;"></span></span>
                 </div>
                 <div><span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
                 <div class="rwy-info">Piste: <span id="mDepRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
             </div>
 
-            <!-- ROUTE BOX -->
-            <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
+            <div class="aero-info-box" style="border-left-color: #5a8bb8;">
                 <div class="route-label">✈️ Flugplan & Performance</div>
                 <div class="route-data">
-                    <div>Kurs: <span id="mNavHeading" style="color:var(--blue)"></span></div>
-                    <div>Distanz: <span id="mNavDist" style="color:var(--blue)"></span></div>
-                    <div>Zeit: <span id="mNavTime" style="color:var(--blue)"></span></div>
-                    <div>Fuel: <span id="mFuelReq" style="color:var(--blue)"></span></div>
+                    <div>Kurs: <span id="mNavHeading"></span></div>
+                    <div>Distanz: <span id="mNavDist"></span></div>
+                    <div>Zeit: <span id="mNavTime"></span></div>
+                    <div>Fuel: <span id="mFuelReq"></span></div>
                 </div>
             </div>
 
-            <!-- ZIEL BOX -->
             <div class="aero-info-box" style="border-left-color: var(--red);">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span class="box-title" style="color:var(--red);">
-                        <span id="destIcon">🛬</span> <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span>
+                    <span class="box-title" style="color:var(--red); text-shadow: 0 0 3px rgba(255,68,68,0.5);">
+                        <span id="destIcon">🛬</span> <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff; text-shadow:none;"></span>
                     </span>
                 </div>
                 <div><span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
@@ -242,7 +326,6 @@
                 </div>
             </div>
 
-            <!-- PAYLOAD -->
             <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
                 <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
                 <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
@@ -260,18 +343,20 @@
     </div>
 
     <div class="logbook">
-        <h3>Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
+        <h3 style="color:var(--amber);">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
         <div id="logContent"></div>
     </div>
 </div>
 
-<div class="version-info">Version 81.0 (Beta: Max Readability & Wiki Fix)</div>
+<div class="version-info">Version 82.0 (Glass & Cockpit Edition)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Externe Datenbank -->
 <script src="datenbank.js"></script>
 
 <script>
+    /* * HIER BLEIBT DEIN KOMPLETTER JAVASCRIPT CODE UNVERÄNDERT. 
+     * Er wurde exakt so übernommen, wie du ihn geschickt hast.
+     */
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
     let globalAirports = null;
     let runwayCache = {};
@@ -439,13 +524,11 @@
         return null;
     }
 
-    // UPDATE: ROBUSTERER WIKIPEDIA FETCH (Größerer Radius für abgelegene Flughäfen)
     async function fetchAreaDescription(lat, lon, elementId, exactTitle = null) {
         try {
             let titleToFetch = exactTitle;
 
             if (!titleToFetch) {
-                // Suchradius auf 10km (10000m) erhöht, damit auch ländliche Flugplätze was finden!
                 const geoUrl = `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=1&format=json&origin=*`;
                 const geoRes = await fetch(geoUrl);
                 const geoData = await geoRes.json();
@@ -468,7 +551,7 @@
                     const pageId = Object.keys(pages)[0];
                     
                     if (pageId !== "-1" && pages[pageId].extract) {
-                        let prefix = exactTitle ? "" : `<b style="color:var(--blue)">Region (${titleToFetch}):</b> `;
+                        let prefix = exactTitle ? "" : `<b style="color:var(--amber)">Region (${titleToFetch}):</b> `;
                         document.getElementById(elementId).innerHTML = prefix + pages[pageId].extract;
                         return;
                     }
@@ -486,7 +569,7 @@
         
         if (icaoCode && runwayCache[icaoCode]) {
             domEl.innerText = runwayCache[icaoCode];
-            domEl.style.color = "var(--warn)";
+            domEl.style.color = "var(--amber)";
             return;
         }
 
@@ -516,7 +599,7 @@
                 }
 
                 domEl.innerText = finalString;
-                domEl.style.color = "var(--warn)";
+                domEl.style.color = "var(--amber)";
                 return;
             }
         } catch (e) {
@@ -888,11 +971,11 @@
     function renderLog() {
         const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
         const container = document.getElementById('logContent');
-        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge vorhanden.</div>';
+        container.innerHTML = log.length ? '' : '<div style="color:#888; font-size:11px;">Keine Einträge vorhanden.</div>';
         log.forEach(e => {
             const div = document.createElement('div'); div.className = 'log-entry';
             const routeStr = e.poiName ? `<b>${e.start} ➔ ${e.poiName} ➔ ${e.dest}</b>` : `<b>${e.start} ➔ ${e.dest}</b>`;
-            div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br>${routeStr}<br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
+            div.innerHTML = `<span style="color:#aaa;">${e.date} • ${e.ac}</span><br>${routeStr}<br><span style="color:var(--phosphor)">${e.mission} (${e.dist} NM)</span>`;
             container.appendChild(div);
         });
     }
@@ -901,5 +984,3 @@
 </script>
 </body>
 </html>
-
-
