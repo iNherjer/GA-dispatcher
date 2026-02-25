@@ -46,20 +46,20 @@
             transform: none !important;
         }
         
-        h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
+        h1 { font-size: 19px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
         #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; }
-        label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
+        label { font-size: 10.5px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
         input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
-        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 10px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
         .btn-preset:hover { background: #444; }
 
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
-        .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 12px; }
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
         
@@ -89,8 +89,8 @@
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
-        .stat-item { font-size: 13px; }
-        .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
+        .stat-item { font-size: 14px; }
+        .stat-label { color: #888; display: block; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
         
         .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 2px 6px; border-radius: 4px; margin-top: 4px; font-size: 11px; }
         .copy-box:hover { color: var(--green); background: #444; }
@@ -98,28 +98,28 @@
 
         .aero-info-box {
             background: #1e252b;
-            padding: 12px;
+            padding: 14px 12px;
             border-radius: 8px;
             border-left: 4px solid var(--warn);
-            font-size: 12px;
+            font-size: 13px;
             line-height: 1.6;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         
-        .rwy-info { font-size: 11px; color: #aaa; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; }
-        .wiki-info { font-size: 11px; color: #ccc; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #444; font-style: italic; line-height: 1.4; display: none; }
-
-        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
-        .highlight { color: #fff; font-weight: bold; font-size: 14px; }
+        /* Schriftgrößen-Anpassungen (Lesbarkeit) */
+        .rwy-info { font-size: 12px; color: #aaa; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #444; }
+        .wiki-info { font-size: 12px; color: #ccc; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #444; font-style: italic; line-height: 1.5; display: none; }
+        .story { font-style: italic; color: #bbb; font-size: 14px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
+        .highlight { color: #fff; font-weight: bold; font-size: 14.5px; }
         
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 11px; text-align: center; font-weight: bold; transition: 0.2s; }
         .btn-action:hover { background: #555; }
         
         .btn-metar { background: #2a3a4a; border: 1px solid #4da6ff; color: #4da6ff; }
         .btn-metar:hover { background: #3a4a5a; }
         
-        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 14px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-size: 12px;}
         .btn-log:hover { background: #33cc33; }
         
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
@@ -190,7 +190,7 @@
     <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
-        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
+        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:17px;"></h2>
         <p id="mStory" class="story"></p>
         
         <div style="display:flex; flex-direction:column;">
@@ -200,14 +200,14 @@
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
                 </div>
-                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
+                <div style="font-size:11px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
                 <div class="rwy-info">Piste: <span id="mDepRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
             </div>
 
-            <!-- ROUTE BOX -->
+            <!-- ROUTE BOX (Größerer Text) -->
             <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
-                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">✈️ Flugplan & Performance</div>
-                <div class="grid-2" style="font-size:13px; font-weight:bold; color:#fff;">
+                <div style="font-size:11px; color:#888; text-transform:uppercase; margin-bottom:10px; font-weight:bold;">✈️ Flugplan & Performance</div>
+                <div class="grid-2" style="font-size:14px; font-weight:bold; color:#fff; line-height: 1.4;">
                     <div>Kurs: <span id="mNavHeading" style="color:var(--blue)"></span></div>
                     <div>Distanz: <span id="mNavDist" style="color:var(--blue)"></span></div>
                     <div>Zeit (ETE): <span id="mNavTime" style="color:var(--blue)"></span></div>
@@ -222,7 +222,7 @@
                         <span id="destIcon">🛬</span> <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span>
                     </span>
                 </div>
-                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
+                <div style="font-size:11px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
                 
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
                 
@@ -255,7 +255,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 79.0 (Beta: Deep Story & Global Wiki)</div>
+<div class="version-info">Version 80.0 (Beta: UI Scaling & Smart Cache API)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -264,6 +264,9 @@
 <script>
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
     let globalAirports = null;
+    
+    // NEU: Runway Cache. Speichert bereits abgefragte Flughäfen für diese Sitzung.
+    let runwayCache = {};
 
     window.onload = () => {
         const lastDest = localStorage.getItem('last_icao_dest');
@@ -428,12 +431,10 @@
         return null;
     }
 
-    // --- NEU: Zieht Wikipedia für POIs UND umliegende Flughäfen ---
     async function fetchAreaDescription(lat, lon, elementId, exactTitle = null) {
         try {
             let titleToFetch = exactTitle;
 
-            // Wenn kein exakter Titel da ist (Flughafen), suchen wir den nächsten Ort in 5km
             if (!titleToFetch) {
                 const geoUrl = `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=5000&gslimit=1&format=json&origin=*`;
                 const geoRes = await fetch(geoUrl);
@@ -463,8 +464,18 @@
         }
     }
 
-    async function fetchRunwayDetails(lat, lon, elementId) {
-        const query = `[out:json][timeout:5];way["aeroway"="runway"](around:1500,${lat},${lon});out tags;`;
+    // UPDATE: Pisten Info mit Cache (Verhindert Blockierungen durch doppelte Anfragen)
+    async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
+        const domEl = document.getElementById(elementId);
+        
+        // Checken ob der ICAO Code schon im Speicher liegt (Blitzschnell!)
+        if (icaoCode && runwayCache[icaoCode]) {
+            domEl.innerText = runwayCache[icaoCode];
+            domEl.style.color = "var(--warn)";
+            return;
+        }
+
+        const query = `[out:json][timeout:5];way["aeroway"="runway"](around:2000,${lat},${lon});out tags;`;
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
@@ -483,14 +494,23 @@
                 const sfcText = surfaceTranslations[surface] || surface;
                 const lengthText = rwyElement.tags.length ? ` (${rwyElement.tags.length}m)` : "";
 
-                document.getElementById(elementId).innerText = `${ref} - ${sfcText}${lengthText}`;
-                document.getElementById(elementId).style.color = "var(--warn)";
+                const finalString = `${ref} - ${sfcText}${lengthText}`;
+                
+                // Im Cache abspeichern für zukünftige Flüge in dieser Sitzung!
+                if (icaoCode && finalString !== "??? - unbekannt") {
+                    runwayCache[icaoCode] = finalString;
+                }
+
+                domEl.innerText = finalString;
+                domEl.style.color = "var(--warn)";
                 return;
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("Runway fetch Fehler (Wahrscheinlich Rate Limit):", e);
+        }
         
-        document.getElementById(elementId).innerText = "Keine Daten gefunden";
-        document.getElementById(elementId).style.color = "#888";
+        domEl.innerText = "Keine Daten gefunden";
+        domEl.style.color = "#888";
     }
 
     function calcNav(lat1, lon1, lat2, lon2) {
@@ -517,7 +537,6 @@
 
         let templates = [];
 
-        // NEU: BRÜCKEN & VIADUKTE
         if (nameLower.includes("brücke") || nameLower.includes("viadukt") || nameLower.includes("aquädukt") || nameLower.includes("steg")) {
             templates = [
                 { i: "🌉", t: `Struktur-Prüfung: ${poiName}`, s: `Das Verkehrsministerium beauftragt dich mit einer Riss- und Statikprüfung der Pfeiler von ${poiName}. Fliege mehrere langsame Pässe.`, p: paxGov, w: cargoUtility },
@@ -535,7 +554,6 @@
                 { i: "👻", t: `Mystery-Flug: ${poiName}`, s: `Ein reicher Fan von Mythen und Legenden hat dich gebucht. Er glaubt fest daran, dass es bei ${poiName} spukt und will den Ort aus der Luft beobachten.`, p: paxVIP, w: "Ferngläser & EMF-Meter (10 lbs)" }
             ];
         } 
-        // ERWEITERT: WASSER & FLÜSSE
         else if (nameLower.includes("fluss") || nameLower.includes("strom") || nameLower.includes("kanal") || nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher") || nameLower.includes("küste") || nameLower.includes("hafen")) {
             templates = [
                 { i: "💧", t: `Pegel-Messung: ${poiName}`, s: `Die Wasserbehörde muss den aktuellen Wasserstand und mögliche Ufer-Erosionen bei ${poiName} dokumentieren.`, p: paxNone, w: cargoUtility },
@@ -564,7 +582,6 @@
             ];
         } 
         else {
-            // AUSGEDÜNNTER FALLBACK (Weniger Foto-Touren)
             templates = [
                 { i: "✈️", t: `Panoramaflug: ${poiName}`, s: `Ein klassischer Ausflugsflug zum Zielort: ${poiName}. Die Fluggäste freuen sich auf einen ruhigen Flug und tolle Ausblicke!`, p: `${maxPax} PAX`, w: "Reisegepäck (30 lbs)" },
                 { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Du wurdest gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: paxMedia, w: cargoMedia },
@@ -724,7 +741,6 @@
         document.getElementById("mNavTime").innerText = timeString;
         document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
 
-        // NEU: Ziel-Icon anpassen (Landung vs. Target)
         document.getElementById("destIcon").innerText = isPOI ? "🎯" : "🛬";
         document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
         document.getElementById("mDestName").innerText = dest.n;
@@ -734,7 +750,7 @@
         document.getElementById("mWeight").innerText = cargoText;
         
         document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
-        document.getElementById("wikiDescContainer").style.display = "block"; // Immer anzeigen!
+        document.getElementById("wikiDescContainer").style.display = "block"; 
         document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
         document.getElementById("btnMetarDest").style.display = isPOI ? "none" : "block";
 
@@ -743,18 +759,18 @@
 
         indicator.innerText = `Flugplan erstellt via ${dataSource}. Lade Infos...`;
         
-        fetchRunwayDetails(start.lat, start.lon, 'mDepRwy');
-        if (!isPOI) {
-            fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy');
-        }
+        // Asynchrone API-Kaskade (Verzögert, um Blockaden zu vermeiden)
+        fetchRunwayDetails(start.lat, start.lon, 'mDepRwy', currentStartICAO);
         
-        // NEU: Zieht Info für POI (exakter Titel) oder Airport (Umkreissuche)
-        fetchAreaDescription(dest.lat, dest.lon, 'wikiDescText', isPOI ? dest.n : null);
-
         setTimeout(() => {
+            if (!isPOI) {
+                fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy', currentDestICAO);
+            }
+            fetchAreaDescription(dest.lat, dest.lon, 'wikiDescText', isPOI ? dest.n : null);
+            
             indicator.innerText = `Briefing komplett.`;
             resetBtn(btn);
-        }, 1500);
+        }, 800); // 800 Millisekunden Verzögerung retten die API-Anfragen!
     }
 
     function updateMap(lat1, lon1, lat2, lon2, s, d) {
