@@ -339,13 +339,13 @@
    4. MECHANISCHE TROMMELZÄHLWERKE (Retro Only)
    ========================================================================== */
 
-/* Container für Zahl + Einheitstext */
 /* Container für Zahl + Einheitstext (Global für beide Themes, verhindert Zeilenumbrüche) */
 .drum-readout-container {
     display: flex;
     align-items: center;
     gap: 5px;
 }
+
 
 
 /* Das ovale Fenster, durch das man schaut */
