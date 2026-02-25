@@ -1,8 +1,8 @@
 // ==========================================
-// GA DISPATCHER - DATENBANK V42
+// GA DISPATCHER - DATENBANK V43
 // ==========================================
 
-// 1. CORE AIRPORTS (Fallback & Deutschland/Europa-Fokus)
+// 1. CORE AIRPORTS
 const coreDB = { 
     "EDTW": { icao: "EDTW", n: "Winzeln", lat: 48.279, lon: 8.428 }, 
     "EDTF": { icao: "EDTF", n: "Freiburg", lat: 48.023, lon: 7.828 },
@@ -49,9 +49,7 @@ const missions = [
     { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv." },
     { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
     { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
-    { t: "Foto-Mission", i: "📸", cat: "std", s: "Luftaufnahmen vom Zielgebiet werden benötigt." },
     { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
-    { t: "Wildlife Research", i: "🦌", cat: "std", s: "Biologen müssen Wildbestände zählen." },
     { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt Equipment zum Studio." },
     { t: "Castle Tour", i: "🏰", cat: "std", s: "Touristen wollen die berühmten Schlösser sehen." },
     { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik." },
@@ -78,18 +76,17 @@ const missions = [
     { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." }
 ];
 
-
-// 3. POI MISSIONEN (Rundflüge)
+// 3. POI MISSIONEN (Rundflüge) - Jetzt mit Wildlife Research!
 const poiMissions = [
     { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
     { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
     { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
-    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." }
+    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." },
+    { t: "Wildlife Research", i: "🦌", cat: "poi", s: "Biologen müssen Wildbestände zählen. Überfliege das Zielgebiet in konstanter Höhe." }
 ];
 
-// 4. FALLBACK POIs (Landmarks & Naturdenkmäler)
+// 4. FALLBACK POIs
 const fallbackPOIs = [
-    // Deutschland
     { n: "Schloss Neuschwanstein", lat: 47.557, lon: 10.750 },
     { n: "Kölner Dom", lat: 50.941, lon: 6.958 },
     { n: "Berliner Fernsehturm", lat: 52.520, lon: 13.409 },
@@ -107,7 +104,6 @@ const fallbackPOIs = [
     { n: "Mummelsee (Schwarzwald)", lat: 48.597, lon: 8.200 },
     { n: "Insel Mainau (Bodensee)", lat: 47.705, lon: 9.195 },
     { n: "Kreidefelsen Rügen", lat: 54.573, lon: 13.664 },
-    // Europa
     { n: "Matterhorn (CH)", lat: 45.976, lon: 7.658 },
     { n: "Mont Blanc (FR)", lat: 45.832, lon: 6.865 },
     { n: "Großglockner (AT)", lat: 47.074, lon: 12.693 },
