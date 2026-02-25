@@ -252,7 +252,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 77.0 (Beta: Dynamic POI Missions)</div>
+<div class="version-info">Version 78.0 (Beta: Deep Story Generator)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -482,41 +482,78 @@
         return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
     }
 
-    // --- NEU: Dynamische POI Mission Generierung ---
+    // --- NEU: MASSIV ERWEITERTER STORY-BAUKASTEN ---
     function generateDynamicPOIMission(poiName, maxSeats) {
         const nameLower = poiName.toLowerCase();
-        let templates = [];
         const maxPax = Math.max(1, maxSeats - 1); // Einer ist der Pilot
+        
+        // Helper-Funktion für zufällige Elemente aus Listen
+        const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-        if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom")) {
+        // Cargo & PAX Pools
+        const paxVIP = `${maxPax} PAX (VIPs)`;
+        const paxMedia = `1-2 PAX (Filmcrew)`;
+        const paxGov = `1 PAX (Beobachter)`;
+        const paxNone = `0 PAX (Nur Fracht/Sensoren)`;
+        
+        const cargoMedia = rnd(["Kamera-Gimbal (120 lbs)", "Drohnen & Akkus (80 lbs)", "Teleobjektive (40 lbs)"]);
+        const cargoVIP = rnd(["Champagner & Kaviar (15 lbs)", "Luxus-Reisegepäck (100 lbs)", "Picknick-Korb (20 lbs)"]);
+        const cargoUtility = rnd(["Lidar-Scanner (180 lbs)", "Wetter-Sensoren (50 lbs)", "Messgeräte (90 lbs)", "Vermessungs-Laser (110 lbs)"]);
+
+        let templates = [];
+
+        // 1. KATEGORIE: HISTORISCH (Burgen, Monumente, etc.)
+        if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom") || nameLower.includes("monument") || nameLower.includes("denkmal")) {
             templates = [
-                { i: "🏰", t: `Historik-Flug: ${poiName}`, s: `Ein Historiker benötigt aktuelle Luftaufnahmen von ${poiName} für ein neues Buchprojekt. Fliege das Zielgebiet in konstanter Höhe ab.`, p: "1 PAX (Historiker)", w: "Kameras & Objektive (40 lbs)" },
-                { i: "🥂", t: `VIP-Tour: ${poiName}`, s: `Ein exklusiver Sightseeing-Flug wurde gebucht. Zeige deinen zahlungskräftigen Fluggästen ${poiName} von seiner besten Seite.`, p: `${maxPax} PAX (VIPs)`, w: "Champagner & Snacks (15 lbs)" }
+                { i: "🏰", t: `Historik-Flug: ${poiName}`, s: `Ein Historiker benötigt hochauflösende Luftaufnahmen von ${poiName}, um alte Mauerstrukturen im Umland zu erkennen. Kreise mehrmals in ruhiger Höhe.`, p: paxGov, w: cargoMedia },
+                { i: "🥂", t: `Hochzeits-Tour: ${poiName}`, s: `Ein frisch vermähltes Paar hat einen exklusiven Rundflug gebucht. Zeige ihnen ${poiName} von seiner romantischsten Seite.`, p: paxVIP, w: cargoVIP },
+                { i: "🎬", t: `Location Scout: ${poiName}`, s: `Ein Regisseur aus Hollywood sucht nach Drehorten für einen neuen Mittelalter-Blockbuster. Er will prüfen, ob sich ${poiName} als Kulisse eignet.`, p: paxMedia, w: cargoMedia },
+                { i: "🛠️", t: `Denkmalschutz: ${poiName}`, s: `Nach einem schweren Sturm befürchtet das Amt für Denkmalschutz Dachschäden an ${poiName}. Führe einen langsamen Inspektionsflug durch.`, p: paxGov, w: cargoUtility },
+                { i: "👻", t: `Mystery-Flug: ${poiName}`, s: `Ein reicher Fan von Mythen und Legenden hat dich gebucht. Er glaubt fest daran, dass es bei ${poiName} spukt und will den Ort aus der Luft beobachten.`, p: paxVIP, w: "Ferngläser & EMF-Meter (10 lbs)" }
             ];
-        } else if (nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher")) {
+        } 
+        // 2. KATEGORIE: WASSER (Seen, Küsten, Talsperren)
+        else if (nameLower.includes("see") || nameLower.includes("talsperre") || nameLower.includes("teich") || nameLower.includes("insel") || nameLower.includes("weiher") || nameLower.includes("küste") || nameLower.includes("fluss") || nameLower.includes("hafen")) {
             templates = [
-                { i: "💧", t: `Umwelt-Monitoring: ${poiName}`, s: `Die Umweltbehörde beauftragt dich mit der visuellen Überwachung der Wasserqualität und Uferzonen rund um ${poiName}.`, p: "1 PAX (Beobachter)", w: "Wassersensoren (50 lbs)" },
-                { i: "🛶", t: `Werbedreh: ${poiName}`, s: `Eine Filmcrew dreht einen Werbespot über die Idylle am Wasser. Sie benötigen beeindruckende Luftaufnahmen von ${poiName}.`, p: "2 PAX (Filmcrew)", w: "Kamera-Gimbal (120 lbs)" }
+                { i: "💧", t: `Pegel-Messung: ${poiName}`, s: `Die Wasserbehörde muss den aktuellen Wasserstand und mögliche Ufer-Erosionen bei ${poiName} dokumentieren.`, p: paxNone, w: cargoUtility },
+                { i: "🛥️", t: `Regatta-Sicherung: ${poiName}`, s: `Heute findet bei ${poiName} ein großes Bootsevent statt. Du wurdest als fliegende Relais-Station für den Funkverkehr gebucht.`, p: paxGov, w: "Funk-Relais & Antennen (150 lbs)" },
+                { i: "🦆", t: `Natur-Beobachtung: ${poiName}`, s: `Ein Biologe möchte Zugvögel zählen, die momentan im Gebiet rund um ${poiName} rasten. Halte genug Abstand, um die Tiere nicht zu erschrecken!`, p: paxGov, w: "Teleobjektive (40 lbs)" },
+                { i: "🛶", t: `Werbedreh: ${poiName}`, s: `Der Tourismusverband will neue, dynamische Aufnahmen von Wassersportlern bei ${poiName}. Fliege tief und ruhig für die Kameracrew.`, p: paxMedia, w: cargoMedia },
+                { i: "🚁", t: `Search & Rescue Übung`, s: `Die lokale Wasserrettung übt heute. Du mimst den Suchflieger und sollst ein verstecktes Signal-Rettungsfloß bei ${poiName} ausfindig machen.`, p: "2 PAX (Spotter)", w: "Notfall-Kits (30 lbs)" }
             ];
-        } else if (nameLower.includes("berg") || nameLower.includes("spitze") || nameLower.includes("horn") || nameLower.includes("gipfel") || nameLower.includes("kogel") || nameLower.includes("wald")) {
+        } 
+        // 3. KATEGORIE: NATUR / GEBIRGE (Berge, Täler, Wälder)
+        else if (nameLower.includes("berg") || nameLower.includes("spitze") || nameLower.includes("horn") || nameLower.includes("gipfel") || nameLower.includes("kogel") || nameLower.includes("wald") || nameLower.includes("tal") || nameLower.includes("schlucht")) {
             templates = [
-                { i: "⛰️", t: `Vermessungsflug: ${poiName}`, s: `Für aktualisierte Topografie- und Wanderkarten sollst du das unwegsame Gelände bei ${poiName} mit einem Scanner abfliegen.`, p: "0 PAX", w: "Lidar-Scanner (180 lbs)" },
-                { i: "🚁", t: `Aufklärung: ${poiName}`, s: `Die örtliche Bergwacht bittet um einen Erkundungsflug, um mögliche Hangrutsche oder blockierte Wege rund um ${poiName} zu dokumentieren.`, p: "1 PAX (Bergwacht)", w: "Funk & Fernglas (20 lbs)" }
+                { i: "⛰️", t: `Topo-Scan: ${poiName}`, s: `Das Landesvermessungsamt aktualisiert die 3D-Karten der Region. Fliege ein präzises Raster über ${poiName} ab, damit der Laser scannen kann.`, p: paxNone, w: cargoUtility },
+                { i: "🌲", t: `Forst-Patrouille: ${poiName}`, s: `Wegen starker Trockenheit ist die Waldbrandgefahr extrem hoch. Patrouilliere das Gebiet um ${poiName} und halte Ausschau nach Rauchentwicklung.`, p: paxGov, w: "Infrarot-Kamera (60 lbs)" },
+                { i: "🧗", t: `Extremsport-Support: ${poiName}`, s: `Ein Red-Bull-Athlet plant einen waghalsigen Stunt bei ${poiName}. Sein Team muss das Terrain vorher aus der Luft genau studieren.`, p: paxMedia, w: cargoMedia },
+                { i: "❄️", t: `Lawinen-Check: ${poiName}`, s: `Die Bergwacht befürchtet, dass Hänge rund um ${poiName} instabil sein könnten. Führe einen vorsichtigen Sichtflug durch, um Schneemassen zu bewerten.`, p: paxGov, w: "Avalanche-Beacons (20 lbs)" },
+                { i: "📸", t: `Kalender-Shooting: ${poiName}`, s: `Ein bekannter Naturfotograf braucht das perfekte Bild von ${poiName} für das Cover seines neuen Alpen-Kalenders.`, p: paxMedia, w: cargoMedia }
             ];
-        } else if (nameLower.includes("stadt") || nameLower.includes("turm") || nameLower.includes("brücke") || nameLower.includes("park") || nameLower.includes("stadion")) {
+        } 
+        // 4. KATEGORIE: URBAN / INFRASTRUKTUR (Städte, Türme, Brücken)
+        else if (nameLower.includes("stadt") || nameLower.includes("turm") || nameLower.includes("brücke") || nameLower.includes("park") || nameLower.includes("stadion") || nameLower.includes("arena") || nameLower.includes("zentrum")) {
             templates = [
-                { i: "🏙️", t: `City-Tour: ${poiName}`, s: `Touristen haben einen urbanen Rundflug gebucht und möchten unbedingt ${poiName} aus der Vogelperspektive sehen.`, p: `${maxPax} PAX (Touristen)`, w: "Kameras (10 lbs)" },
-                { i: "📡", t: `Infrastruktur-Prüfung`, s: `Die Stadtverwaltung benötigt hochauflösende Bilder vom Zustand des Gebiets rund um ${poiName}.`, p: "1 PAX (Inspektor)", w: "Messgeräte (80 lbs)" }
+                { i: "🏙️", t: `City-Panorama: ${poiName}`, s: `Eine Reisegruppe aus Übersee hat eine VIP-Städtetour gebucht. Das Highlight der Route ist ganz klar ${poiName}.`, p: `${maxPax} PAX (Touristen)`, w: cargoVIP },
+                { i: "🏗️", t: `Bauaufsicht: ${poiName}`, s: `Das Ingenieurbüro verlangt hochauflösende Aufnahmen von der Statik und dem Zustand der Anlagen bei ${poiName}.`, p: paxGov, w: cargoUtility },
+                { i: "🚗", t: `Verkehrs-Überwachung`, s: `Es ist Rush-Hour. Ein lokaler Radiosender hat dich gemietet, um das Verkehrschaos rund um ${poiName} live von oben zu reportieren.`, p: "1 PAX (Radiomoderator)", w: "Funktechnik (40 lbs)" },
+                { i: "🎆", t: `Event-Vorbereitung: ${poiName}`, s: `Ein Mega-Event steht an. Die Organisatoren wollen das Gelände rund um ${poiName} aus der Luft begutachten, um Fluchtwege zu planen.`, p: "2 PAX (Security)", w: "Pläne & Laptops (30 lbs)" },
+                { i: "🏢", t: `Immobilien-Flug: ${poiName}`, s: `Ein Großinvestor überlegt, Ländereien nahe ${poiName} zu kaufen. Zeige ihm, wie sich die Infrastruktur von oben präsentiert.`, p: paxVIP, w: cargoVIP }
             ];
-        } else {
-            // Generischer Fallback
+        } 
+        // 5. KATEGORIE: GENERISCH (Falls nichts Spezielles zutrifft)
+        else {
             templates = [
-                { i: "✈️", t: `Rundflug: ${poiName}`, s: `Ein klassischer Panoramaflug zum Zielort: ${poiName}. Sorge für einen ruhigen Flug und tolle Ausblicke!`, p: `${maxPax} PAX`, w: "Reisegepäck (30 lbs)" },
-                { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Ein lokaler Fotograf hat dich gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: "1 PAX (Fotograf)", w: "Kamera-Equipment (60 lbs)" }
+                { i: "✈️", t: `Panoramaflug: ${poiName}`, s: `Ein klassischer Ausflugsflug zum Zielort: ${poiName}. Die Fluggäste freuen sich auf einen ruhigen Flug und tolle Ausblicke!`, p: `${maxPax} PAX`, w: "Reisegepäck (30 lbs)" },
+                { i: "📸", t: `Foto-Tour: ${poiName}`, s: `Du wurdest gebucht, um die Sehenswürdigkeit ${poiName} im perfekten Licht aus der Luft abzulichten.`, p: paxMedia, w: cargoMedia },
+                { i: "🎁", t: `Überraschungsflug: ${poiName}`, s: `Jemand hat diesen Flug nach ${poiName} zum Geburtstag geschenkt bekommen. Mache es zu einem unvergesslichen Erlebnis!`, p: `${maxPax} PAX`, w: cargoVIP },
+                { i: "🎓", t: `Flugschule: Nav-Übung`, s: `Heute kein Charter-Kunde! Du zeigst einem Flugschüler, wie er sauber nach VFR nach ${poiName} navigiert.`, p: "1 PAX (Flugschüler)", w: "Flugtaschen (20 lbs)" }
             ];
         }
 
-        const selected = templates[Math.floor(Math.random() * templates.length)];
+        // Einen zufälligen Auftrag aus der gewählten Liste zurückgeben
+        const selected = rnd(templates);
         return { i: selected.i, t: selected.t, s: selected.s, cat: "poi", payloadText: selected.p, cargoText: selected.w };
     }
 
@@ -619,7 +656,6 @@
         let payloadText = "", cargoText = "";
         
         if (isPOI) {
-            // NEU: Dynamischer POI Generator wird aufgerufen
             m = generateDynamicPOIMission(dest.n, maxSeats);
             totalDist = nav.dist * 2; 
             distStr = `${totalDist} NM (Roundtrip)`;
