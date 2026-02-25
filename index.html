@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V50 - Mobile Fix</title>
+    <title>GA Dispatcher V51 - Fleet Rollback</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -50,7 +50,7 @@
         /* Karten-Styling */
         #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
         
-        /* DER NEUE MOBILE-FULLSCREEN TRICK */
+        /* CSS-BASIERTER VOLLBILD TRICK */
         .map-fullscreen {
             position: fixed !important;
             top: 0 !important;
@@ -85,7 +85,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V50</h1>
+    <h1>GA Dispatcher V51</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -124,19 +124,18 @@
 
     <div class="preset-row">
         <button class="btn-preset" onclick="applyPreset(115, 9, 4, 'C172')">C172</button>
-        <button class="btn-preset" onclick="applyPreset(135, 9, 4, 'DA40')">DA40</button>
         <button class="btn-preset" onclick="applyPreset(160, 14, 4, 'PA-24')">Comanche</button>
-        <button class="btn-preset" onclick="applyPreset(320, 60, 6, 'TBM9')">TBM 930</button>
+        <button class="btn-preset" onclick="applyPreset(220, 25, 6, 'AERO')">Aerostar</button>
     </div>
 
     <div class="slider-container">
         <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--blue)">14</span></div>
-        <input type="range" id="gphSlider" min="5" max="70" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
+        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
     </div>
 
     <div class="slider-container">
         <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" style="color:var(--blue)">160</span></div>
-        <input type="range" id="tasSlider" min="80" max="350" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
+        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
     <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
@@ -453,7 +452,6 @@
             };
             L.control.layers(baseMaps).addTo(map);
 
-            // DER NEUE CSS-BASIERTE VOLLBILD BUTTON
             const fsControl = L.control({position: 'topleft'});
             fsControl.onAdd = function() {
                 const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
@@ -469,18 +467,15 @@
                     const mapDiv = document.getElementById('map');
                     
                     if (mapDiv.classList.contains('map-fullscreen')) {
-                        // Vollbild beenden
                         mapDiv.classList.remove('map-fullscreen');
-                        document.body.style.overflow = ''; // Scrollen wieder erlauben
+                        document.body.style.overflow = ''; 
                         btn.innerHTML = '⛶';
                     } else {
-                        // Vollbild starten
                         mapDiv.classList.add('map-fullscreen');
-                        document.body.style.overflow = 'hidden'; // Body Scrollen verhindern
+                        document.body.style.overflow = 'hidden'; 
                         btn.innerHTML = '✖';
                     }
                     
-                    // Karte sagen, dass sie ihre Größe neu berechnen soll
                     setTimeout(() => { if(map) map.invalidateSize(); }, 200);
                 };
                 return btn;
