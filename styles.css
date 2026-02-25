@@ -335,4 +335,71 @@
         body.theme-retro .logbook { border-top: 3px solid #444; }
         body.theme-retro .log-entry { background: #1a1c1e; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
 
-    
+    /* ==========================================================================
+   4. MECHANISCHE TROMMELZÄHLWERKE (Retro Only)
+   ========================================================================== */
+
+/* Container für Zahl + Einheitstext */
+body.theme-retro .drum-readout-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Das ovale Fenster, durch das man schaut */
+body.theme-retro .drum-window {
+    display: inline-flex;
+    background-color: #0a0a0c; /* Sehr dunkles Gehäuse */
+    border: 2px inset #333;
+    border-radius: 4px; /* Leicht abgerundete Ecken für den Oval-Look */
+    height: 22px; /* Feste Höhe ist wichtig */
+    overflow: hidden; /* Versteckt die Zahlen außerhalb */
+    position: relative;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+    padding: 0 2px;
+}
+
+/* Der 3D-Glas-Effekt und Schatten oben/unten */
+body.theme-retro .drum-window::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    /* Ein starker Gradient, der die Mitte klar lässt, aber oben und unten abdunkelt */
+    background: linear-gradient(to bottom, 
+        rgba(0,0,0,0.9) 0%, 
+        rgba(0,0,0,0.1) 20%, 
+        rgba(0,0,0,0) 50%, 
+        rgba(0,0,0,0.1) 80%, 
+        rgba(0,0,0,0.9) 100%
+    );
+    pointer-events: none; /* Klicks gehen durch */
+    border-radius: 2px;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1); /* Leichter Glanz oben */
+}
+
+/* Ein einzelner vertikaler Zahlenstreifen (0-9) */
+body.theme-retro .drum-strip {
+    display: flex;
+    flex-direction: column;
+    /* Die Animation! */
+    transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); 
+    will-change: transform;
+}
+
+/* Die einzelne Ziffer auf dem Streifen */
+body.theme-retro .drum-digit {
+    height: 22px; /* Muss exakt der Fensterhöhe entsprechen */
+    line-height: 22px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 17px;
+    color: var(--piper-white); /* Weiße Farbe wie aufgemalt */
+    text-align: center;
+    min-width: 14px;
+}
+/* Im Retro-Modus, wenn die Hauptfarbe Gelb ist, Zahlen auch Gelb machen */
+body.theme-retro .highlight .drum-digit,
+body.theme-retro .theme-green-text .drum-digit {
+    color: var(--piper-yellow);
+}
+
