@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 63.0</div>
+<div class="version-info">Version 64.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -265,15 +265,6 @@
         }
     }
 
-    function checkBearing(b, dirPref) {
-        if (dirPref === 'any') return true;
-        if (dirPref === 'N' && (b <= 45 || b >= 315)) return true;
-        if (dirPref === 'E' && (b >= 45 && b <= 135)) return true;
-        if (dirPref === 'S' && (b >= 135 && b <= 225)) return true;
-        if (dirPref === 'W' && (b >= 225 && b <= 315)) return true;
-        return false;
-    }
-    
     function getArrow(b) {
         if(b >= 337.5 || b < 22.5) return '⬆️';
         if(b >= 22.5 && b < 67.5) return '↗️';
@@ -375,134 +366,130 @@
         } catch (e) {} return null;
     }
 
+    function calcNav(lat1, lon1, lat2, lon2) {
+        const R = 3440; 
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        const dist = Math.round(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180);
+        const x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
+        return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
+    }
+
+    // DIE NEUE SCHARFSCHÜTZEN-SUCHMETHODE (SNIPER ALGORITHM)
     async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType, dirPref) {
         const indicator = document.getElementById('searchIndicator');
-        let minNM, maxNM, finalRange;
+        let minNM, maxNM;
         
         if(rangePref === "any") {
             const roll = Math.random();
-            if (roll < 0.33) { minNM=10; maxNM=50; finalRange="SHORT"; }
-            else if (roll < 0.66) { minNM=50; maxNM=100; finalRange="MEDIUM"; }
-            else { minNM=100; maxNM=250; finalRange="LONG"; }
-        } else {
-            finalRange = rangePref.toUpperCase();
-            if(rangePref === "short") { minNM=10; maxNM=50; }
-            if(rangePref === "medium") { minNM=50; maxNM=100; }
-            if(rangePref === "long") { minNM=100; maxNM=250; }
-        }
+            if (roll < 0.33) { minNM=15; maxNM=50; }
+            else if (roll < 0.66) { minNM=50; maxNM=100; }
+            else { minNM=100; maxNM=250; }
+        } else if(rangePref === "short") { minNM=15; maxNM=50; }
+        else if(rangePref === "medium") { minNM=50; maxNM=100; }
+        else if(rangePref === "long") { minNM=100; maxNM=250; }
 
-        let searchMin = minNM;
-        let searchMax = maxNM;
         if (targetType === "poi") {
-            searchMin = minNM / 2;
-            searchMax = maxNM / 2;
+            minNM = minNM / 2;
+            maxNM = maxNM / 2;
         }
 
-        const latDiff = searchMax / 60.0;
-        const lonDiff = searchMax / (60.0 * Math.cos(lat * Math.PI / 180));
-        
-        let boxS = lat - latDiff;
-        let boxN = lat + latDiff;
-        let boxW = lon - lonDiff;
-        let boxE = lon + lonDiff;
-
-        if (dirPref === 'N') { boxS = lat; } 
-        else if (dirPref === 'S') { boxN = lat; }
-        else if (dirPref === 'E') { boxW = lon; }
-        else if (dirPref === 'W') { boxE = lon; }
-
-        const s = boxS.toFixed(4), n = boxN.toFixed(4);
-        const w = boxW.toFixed(4), e = boxE.toFixed(4);
-
-        let query, typeName;
-        
-        // POI PERFORMANCE FIX: Wieder nur 1 Kategorie pro Abfrage, dafür blitzschnell!
-        if (targetType === "poi") {
-            const poiCategories = [
-                { q: '["historic"="castle"]', name: "Burgen/Schlösser" },
-                { q: '["historic"="ruins"]', name: "Historische Ruinen" },
-                { q: '["natural"="peak"]', name: "Berggipfel" },
-                { q: '["tourism"="viewpoint"]', name: "Aussichtspunkte" },
-                { q: '["tourism"="attraction"]', name: "Attraktionen" }
-            ];
-            const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
-            typeName = selectedCat.name;
-            query = `[out:json][timeout:15];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center;`;
-        } else {
-            typeName = "Flugplätze";
-            let icaoTag = '["icao"]';
-            if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
-            query = `[out:json][timeout:15];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
-        }
-
-        let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
-        indicator.innerText = `Scan ${typeName}${dirText} (${searchMin}-${searchMax} NM)...`;
-
-        try {
-            const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-            const data = await res.json();
+        // 3 VERSUCHE UM EINEN ECHTEN ZIELPUNKT ZU TREFFEN
+        for(let attempt = 1; attempt <= 3; attempt++) {
             
-            if (data && data.elements && data.elements.length > 0) {
-                // SICHERHEITS-MAPPING: Prüft vorher ob el.tags überhaupt existiert!
-                let mappedData = data.elements.map(el => {
-                    const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
-                    let name = (el.tags && el.tags.name) ? el.tags.name : "Unbekannt";
-                    if (el.tags && el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
-                    
-                    return { 
-                        icao: targetType === 'poi' ? 'POI' : ((el.tags && el.tags.icao) ? el.tags.icao.toUpperCase() : ''), 
-                        n: name, 
-                        lat: coords ? coords.lat : 0, 
-                        lon: coords ? coords.lon : 0,
-                        usage: (el.tags && el.tags.usage) ? el.tags.usage : "",
-                        gliding: (el.tags && el.tags.gliding) ? el.tags.gliding : "",
-                        sport: (el.tags && el.tags.sport) ? el.tags.sport : ""
-                    };
-                }).filter(el => el.lat !== 0 && el.n !== "Unbekannt");
+            // 1. Errechne exakte Zieldistanz
+            let targetDist = minNM + Math.random() * (maxNM - minNM);
+            
+            // 2. Errechne exakten Zielkurs
+            let targetBrng;
+            if (dirPref === 'any') { targetBrng = Math.random() * 360; } 
+            else if (dirPref === 'N') { targetBrng = Math.random() < 0.5 ? 315 + Math.random()*45 : Math.random()*45; } 
+            else if (dirPref === 'E') { targetBrng = 45 + Math.random() * 90; } 
+            else if (dirPref === 'S') { targetBrng = 135 + Math.random() * 90; } 
+            else if (dirPref === 'W') { targetBrng = 225 + Math.random() * 90; }
 
-                // 1. STRENGER FILTER
-                let strictFiltered = mappedData.filter(el => {
-                    if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
-                    if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
-                    if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
+            // 3. Wandle Distanz/Kurs in echte Zielkoordinaten um
+            const R = 3440; 
+            const d = targetDist / R;
+            const brngRad = targetBrng * Math.PI / 180;
+            const lat1Rad = lat * Math.PI / 180;
+            const lon1Rad = lon * Math.PI / 180;
 
-                    const navCalc = calcNav(lat, lon, el.lat, el.lon);
-                    if (navCalc.dist < searchMin || navCalc.dist > searchMax) return false;
-                    if (!checkBearing(navCalc.brng, dirPref)) return false;
-                    return true;
-                });
+            let targetLatRad = Math.asin(Math.sin(lat1Rad)*Math.cos(d) + Math.cos(lat1Rad)*Math.sin(d)*Math.cos(brngRad));
+            let targetLonRad = lon1Rad + Math.atan2(Math.sin(brngRad)*Math.sin(d)*Math.cos(lat1Rad), Math.cos(d)-Math.sin(lat1Rad)*Math.sin(targetLatRad));
 
-                if (strictFiltered.length > 0) {
-                    return strictFiltered[Math.floor(Math.random()*strictFiltered.length)];
-                } else {
-                    // 2. ENTSPANNTER FILTER (ANTI-FALLBACK TRICK)
-                    let relaxedFiltered = mappedData.filter(el => {
-                        if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
+            let tLat = (targetLatRad * 180 / Math.PI).toFixed(4);
+            let tLon = (targetLonRad * 180 / Math.PI).toFixed(4);
+
+            let query, typeName;
+            let radiusMeters = targetType === "poi" ? 25000 : 40000; // Radius: 25km für POI, 40km für Airports
+
+            if (targetType === "poi") {
+                const poiCategories = [
+                    { q: '["historic"="castle"]', name: "Burgen/Schlösser" },
+                    { q: '["historic"="ruins"]', name: "Historische Ruinen" },
+                    { q: '["natural"="peak"]', name: "Berggipfel" },
+                    { q: '["tourism"="viewpoint"]', name: "Aussichtspunkte" },
+                    { q: '["historic"="monument"]', name: "Monumente" }
+                ];
+                const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
+                typeName = selectedCat.name;
+                query = `[out:json][timeout:10];nwr${selectedCat.q}["name"](around:${radiusMeters},${tLat},${tLon});out center;`;
+            } else {
+                typeName = "Flugplätze";
+                let icaoTag = '["icao"]';
+                if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
+                query = `[out:json][timeout:10];nwr["aeroway"="aerodrome"]${icaoTag}(around:${radiusMeters},${tLat},${tLon});out center;`;
+            }
+
+            let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
+            indicator.innerText = `Satelliten-Scan nach ${typeName}${dirText} (Versuch ${attempt}/3)...`;
+
+            try {
+                const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                if (data && data.elements && data.elements.length > 0) {
+                    let mappedData = data.elements.map(el => {
+                        const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
+                        let name = (el.tags && el.tags.name) ? el.tags.name : "Unbekannt";
+                        if (el.tags && el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
+                        return { 
+                            icao: targetType === 'poi' ? 'POI' : ((el.tags && el.tags.icao) ? el.tags.icao.toUpperCase() : ''), 
+                            n: name, 
+                            lat: coords ? coords.lat : 0, 
+                            lon: coords ? coords.lon : 0,
+                            usage: (el.tags && el.tags.usage) ? el.tags.usage : "",
+                            gliding: (el.tags && el.tags.gliding) ? el.tags.gliding : "",
+                            sport: (el.tags && el.tags.sport) ? el.tags.sport : ""
+                        };
+                    }).filter(el => el.lat !== 0 && el.n !== "Unbekannt");
+
+                    // Da wir im exakt richtigen Radius gesucht haben, müssen wir nur noch Segelflieger filtern!
+                    let validData = mappedData.filter(el => {
+                        if (targetType === "apt" && (el.usage === "private" || el.usage === "military" || el.gliding === "yes" || el.sport === "gliding")) return false;
                         if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
                         if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
-                        return true; // Keine Himmelsrichtung / Distanz Abfrage hier!
+                        return true;
                     });
-                    
-                    if (relaxedFiltered.length > 0) {
-                        return relaxedFiltered[Math.floor(Math.random()*relaxedFiltered.length)];
+
+                    if (validData.length > 0) {
+                        return validData[Math.floor(Math.random() * validData.length)];
                     }
                 }
+            } catch (err) {
+                // Bei Timeout einfach ignorieren und nächsten Versuch starten!
             }
-        } catch (err) {} return null;
-    }
-
-    function calcNav(lat1, lon1, lat2, lon2) {
-        const R = 3440, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
-        const dist = Math.round(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-        const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
-        return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
+        }
+        return null; // Erst nach 3 leeren Versuchen geht es ins Offline-Fallback
     }
 
     async function generateMission() {
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
-        btn.innerText = "Sucht Route & Daten...";
+        btn.innerText = "Berechne Vektoren...";
         document.getElementById("briefingBox").style.display = "none";
         
         document.getElementById("mDepRunways").innerHTML = "";
@@ -529,13 +516,13 @@
         const selectedGph = document.getElementById("gphSlider").value;
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
-        let dataSource = targetDest ? "Manuell" : "Online";
+        let dataSource = targetDest ? "Manuell" : "Live Satellit";
         
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType, dirPref);
         
         if(!dest && !targetDest) {
             if (targetType === "apt") {
-                dataSource = "Core DB (Fallback)";
+                dataSource = "Offline DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
@@ -544,11 +531,15 @@
                     const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
                     return checkBearing(b, dirPref);
                 });
-                if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
-                if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+                
+                if(dirFilteredKeys.length > 0) {
+                    keys = dirFilteredKeys;
+                } else if(keys.length === 0) {
+                    keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                }
                 dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
             } else if (targetType === "poi") {
-                dataSource = "Fallback POIs";
+                dataSource = "Offline POI (Fallback)";
                 let validPOIs = fallbackPOIs.filter(p => {
                     const b = calcNav(start.lat, start.lon, p.lat, p.lon).brng;
                     return checkBearing(b, dirPref);
