@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V44 - Smart Quadrant</title>
+    <title>GA Dispatcher V45 - The Detail Update</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -51,6 +51,12 @@
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
+        
+        /* Neuer Hover-Effekt für die Koordinaten */
+        .copy-box { cursor: pointer; transition: color 0.2s; }
+        .copy-box:hover { color: var(--green); }
+        .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
+
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
@@ -63,7 +69,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V44</h1>
+    <h1>GA Dispatcher V45</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -122,8 +128,10 @@
     <div id="briefingBox" class="briefing">
         <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
         <div class="stat-grid">
-            <div class="stat-item"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
+            <div class="stat-item" style="grid-column: span 2;"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
+            <div class="stat-item"><span class="stat-label">Ziel-Koordinaten</span><span id="mCoords" class="highlight copy-box" onclick="copyCoords()" title="Klicken zum Kopieren"></span></div>
+            
             <div class="stat-item" style="grid-column: span 2; background: #1a2a3a; padding: 10px; border-radius: 6px; border-left: 4px solid var(--blue);">
                 <span class="stat-label">Treibstoffbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span>
             </div>
@@ -148,7 +156,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script src="datenbank.js"></script>
 
 <script>
@@ -164,6 +171,16 @@
         document.getElementById('tasSlider').value=t; document.getElementById('tasVal').innerText=t;
         document.getElementById('gphSlider').value=g; document.getElementById('gphVal').innerText=g;
         document.getElementById('maxSeats').value=s; selectedAC=n;
+    }
+
+    // COPY-FUNKTION
+    function copyCoords() {
+        const txt = document.getElementById("mCoords").innerText;
+        if(txt && txt !== "-") {
+            navigator.clipboard.writeText(txt).then(() => {
+                alert("Koordinaten kopiert:\n" + txt + "\n\n(Einfach im MSFS Suchfeld mit STRG+V einfügen)");
+            });
+        }
     }
 
     function checkBearing(b, dirPref) {
@@ -212,13 +229,11 @@
         const latDiff = searchMax / 60.0;
         const lonDiff = searchMax / (60.0 * Math.cos(lat * Math.PI / 180));
         
-        // HIER KOMMT DIE MAGIE: Der Bounding Box Offset nach Himmelsrichtung
         let boxS = lat - latDiff;
         let boxN = lat + latDiff;
         let boxW = lon - lonDiff;
         let boxE = lon + lonDiff;
 
-        // Wir halbieren das Suchquadrat, um den Server extrem zu entlasten
         if (dirPref === 'N') { boxS = lat; } 
         else if (dirPref === 'S') { boxN = lat; }
         else if (dirPref === 'E') { boxW = lon; }
@@ -243,7 +258,6 @@
             query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
-        // INFO-TEXT IST ZURÜCK!
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
         indicator.innerText = `Scan ${typeName}${dirText} (${searchMin}-${searchMax} NM)...`;
 
@@ -303,18 +317,18 @@
         const regionPref = document.getElementById("regionFilter").value;
         const targetType = document.getElementById("targetType").value;
         const dirPref = document.getElementById("dirPref").value;
+        const maxSeats = parseInt(document.getElementById("maxSeats").value);
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
         
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType, dirPref);
         
-        // Fallback Logik
+        // Fallback
         if(!dest && !targetDest) {
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-                
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
                 
@@ -322,21 +336,16 @@
                     const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
                     return checkBearing(b, dirPref);
                 });
-                
                 if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
                 if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
-                
                 dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
             } else if (targetType === "poi") {
                 dataSource = "Fallback POIs";
-                
                 let validPOIs = fallbackPOIs.filter(p => {
                     const b = calcNav(start.lat, start.lon, p.lat, p.lon).brng;
                     return checkBearing(b, dirPref);
                 });
-                
                 if(validPOIs.length === 0) validPOIs = fallbackPOIs; 
-                
                 dest = validPOIs[Math.floor(Math.random() * validPOIs.length)];
                 dest.icao = "POI";
             }
@@ -376,9 +385,35 @@
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = routeText;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${totalDist} NM (Total)`;
+        
+        // KOORDINATEN ANZEIGEN (Kompatibel für MSFS Copy Paste)
+        document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
+        
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
-        document.getElementById("mPay").innerText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*parseInt(document.getElementById("maxSeats").value))} PAX`;
-        document.getElementById("mWeight").innerText = isPOI ? "Kamera / Equipment" : `${Math.floor(Math.random()*300)+20} lbs`;
+
+        // SMARTE BELADUNGS-LOGIK
+        let payloadText = "", cargoText = "";
+        if (isPOI) {
+            if (m.t === "VIP-Sightseeing") {
+                payloadText = `${Math.max(1, Math.floor(Math.random()*maxSeats))} PAX (VIP)`;
+                cargoText = "Champagner & Snacks";
+            } else if (m.t === "Foto-Tour") {
+                payloadText = "1-2 PAX (Fotograf)";
+                cargoText = "Kamera / Equipment";
+            } else if (m.t === "Luftvermessung") {
+                payloadText = "0 PAX";
+                cargoText = "Lidar-Scanner (180 lbs)";
+            } else { // Naturwacht & Wildlife
+                payloadText = "1-2 PAX (Beobachter)";
+                cargoText = "Ferngläser & Funk (50 lbs)";
+            }
+        } else {
+            payloadText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*maxSeats)} PAX`;
+            cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
+        }
+
+        document.getElementById("mPay").innerText = payloadText;
+        document.getElementById("mWeight").innerText = cargoText;
         document.getElementById("mStory").innerText = m.s;
         
         document.getElementById("briefingBox").style.display = "block";
