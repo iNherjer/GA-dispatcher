@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher (Beta)</title>
+    <title>GA Dispatcher (Analog Edition)</title>
     
     <link rel="icon" type="image/png" href="IconDRK.PNG">
     <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* ==========================================================================
-           1. BASIS / CLASSIC DESIGN (Dein ursprünglicher Look)
+           1. BASIS / CLASSIC DESIGN (Modern & Clean)
            ========================================================================== */
         :root { 
             --blue: #4da6ff; 
@@ -27,12 +27,6 @@
             --warn: #ffcc00; 
             --red: #ff4444; 
             --green: #44ff44; 
-            
-            /* Variablen für das Retro-Theme (im Classic-Modus inaktiv/neutral) */
-            --amber: var(--warn); 
-            --amber-glow: transparent;
-            --phosphor: var(--blue);
-            --phosphor-glow: transparent;
         }
         
         body { 
@@ -53,7 +47,7 @@
         .container { 
             position: relative;
             background-color: rgba(30, 30, 30, 0.90); 
-            padding: 20px; border-radius: 16px; 
+            padding: 30px 20px 20px 20px; border-radius: 16px; 
             box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
             max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
             backdrop-filter: blur(8px); 
@@ -129,151 +123,199 @@
         /* Schrauben im Classic Design verstecken */
         .screw { display: none; }
 
-        /* Theme Toggle Button */
-        .theme-toggle-btn {
+        /* ==========================================================================
+           2. MECHANISCHER KIPPSCHALTER (TOGGLE) FÜR DAS THEME
+           ========================================================================== */
+        .theme-switch-wrapper {
             position: absolute;
             top: 15px;
             right: 15px;
-            background: #333;
-            color: #ccc;
-            border: 1px solid #555;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            cursor: pointer;
-            text-transform: uppercase;
-            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             z-index: 10;
         }
-        .theme-toggle-btn:hover { background: #444; color: #fff; }
+        .switch-label { font-size: 9px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Der Schalter-Container */
+        .switch { position: relative; display: inline-block; width: 26px; height: 40px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        
+        /* Der schwarze Schlitz */
+        .slider { 
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
+            background-color: #111; border-radius: 4px; border: 2px solid #333; 
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); transition: .3s; 
+        }
+        /* Der Metall-Hebel */
+        .slider:before { 
+            position: absolute; content: ""; height: 20px; width: 12px; left: 5px; bottom: 2px; 
+            background: linear-gradient(to right, #777, #fff, #777); 
+            border-radius: 3px; border-bottom: 2px solid #333; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.8); transition: .3s; 
+        }
+        /* Wenn umgelegt */
+        input:checked + .slider:before { 
+            transform: translateY(-14px); 
+            border-bottom: none; border-top: 2px solid #333; 
+            box-shadow: 0 -4px 6px rgba(0,0,0,0.8); 
+        }
 
         /* ==========================================================================
-           2. RETRO COCKPIT DESIGN (Wird aktiv, wenn <body> die Klasse "theme-retro" hat)
+           3. 60er JAHRE ANALOG COCKPIT DESIGN ("SIXPACK" VIBE)
            ========================================================================== */
         
         body.theme-retro {
-            --amber: #ffb000; 
-            --amber-glow: rgba(255, 176, 0, 0.6);
-            --phosphor: #00ff41;
-            --phosphor-glow: rgba(0, 255, 65, 0.4);
-            /* Wir überschreiben die Classic-Farben für das Map-Icon/Logbuch */
-            --blue: #00ff41; 
-            --green: #00ff41; 
-            --warn: #ffb000; 
-            font-family: 'Courier New', Courier, monospace; 
+            --piper-white: #f4f4f4;
+            --piper-yellow: #f2c12e;
+            --piper-red: #d93829;
+            --piper-bg: #222428;
+            
+            font-family: 'Arial', sans-serif; /* Clean Sans-Serif wie aufgemalte Instrumenten-Ziffern */
         }
 
+        /* Mattes, massives Metall-Panel (Kein Glas mehr!) */
         body.theme-retro .container {
-            background-color: rgba(15, 20, 25, 0.45);
-            padding: 25px; 
-            border-radius: 12px; 
-            backdrop-filter: blur(12px); 
-            -webkit-backdrop-filter: blur(12px);
-            border: none;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 2px solid rgba(0, 0, 0, 0.9);
-            border-left: 1px solid rgba(255, 255, 255, 0.05);
-            border-right: 1px solid rgba(0, 0, 0, 0.6);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,0,0,0.9);
+            background: linear-gradient(135deg, #2a2d34, #18191c);
+            padding: 35px 25px 25px 25px; 
+            border-radius: 8px; 
+            backdrop-filter: none; 
+            -webkit-backdrop-filter: none;
+            border: 2px solid #444;
+            border-bottom: 4px solid #111;
+            border-right: 4px solid #111;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         }
 
+        /* Metallschrauben */
         body.theme-retro .screw {
             display: block;
-            position: absolute; width: 10px; height: 10px; 
-            background: linear-gradient(135deg, #777, #222); border-radius: 50%; 
-            box-shadow: inset 0 0 2px #000, 0 1px 1px rgba(255, 255, 255, 0.1);
+            position: absolute; width: 14px; height: 14px; 
+            background: linear-gradient(135deg, #aaa, #444); border-radius: 50%; 
+            box-shadow: inset 0 0 3px #000, 0 1px 2px rgba(255,255,255,0.1);
         }
-        body.theme-retro .screw::after { content: ''; position: absolute; top: 4px; left: 1.5px; width: 7px; height: 1.5px; background: #111; }
-        body.theme-retro .top-left { top: 10px; left: 10px; transform: rotate(45deg); }
-        body.theme-retro .top-right { top: 10px; right: 10px; transform: rotate(15deg); }
-        body.theme-retro .bottom-left { bottom: 10px; left: 10px; transform: rotate(-20deg); }
-        body.theme-retro .bottom-right { bottom: 10px; right: 10px; transform: rotate(70deg); }
+        body.theme-retro .screw::after { content: ''; position: absolute; top: 6px; left: 2px; width: 10px; height: 2px; background: #222; }
+        body.theme-retro .top-left { top: 12px; left: 12px; transform: rotate(45deg); }
+        body.theme-retro .top-right { top: 12px; right: 12px; transform: rotate(15deg); }
+        body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20deg); }
+        body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
 
+        /* Titelschrift: Wie auflackiert */
         body.theme-retro h1 { 
-            font-size: 24px; color: var(--amber); text-shadow: 0 0 8px var(--amber-glow);
-            letter-spacing: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+            font-size: 24px; color: var(--piper-white); text-shadow: none; font-weight: 900;
+            letter-spacing: 2px; border-bottom: 2px solid #444; padding-bottom: 10px; 
         }
-        body.theme-retro #searchIndicator { color: var(--amber); }
-        body.theme-retro label { color: #aaa; letter-spacing: 1px; }
+        
+        body.theme-retro #searchIndicator { color: var(--piper-yellow); font-weight: bold; }
+        
+        /* DYMO-TAPE LABELS! 60er Jahre Plastik-Prägeband */
+        body.theme-retro label { 
+            background: #111; color: #ddd; border: 1px solid #000; 
+            padding: 3px 6px; border-radius: 2px; margin-bottom: 5px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); 
+            letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
+        }
 
+        /* Mechanische Zählwerke (Inputs) */
         body.theme-retro input, body.theme-retro select { 
-            background-color: rgba(0, 0, 0, 0.5); border: 1px inset #444; 
-            color: var(--phosphor); text-shadow: 0 0 5px var(--phosphor-glow);
-            font-family: 'Courier New', Courier, monospace; font-weight: bold; border-radius: 6px;
+            background-color: #0a0a0c; border: 3px inset #333; 
+            color: var(--piper-white); text-shadow: none;
+            font-family: 'Arial', sans-serif; font-weight: bold; border-radius: 4px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.9);
         }
-        body.theme-retro input:focus, body.theme-retro select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 5px var(--amber-glow); }
+        body.theme-retro input:focus, body.theme-retro select:focus { outline: none; border-color: var(--piper-yellow); }
 
+        /* Klobige Radio-Stack Buttons */
         body.theme-retro .btn-preset { 
-            background: linear-gradient(to bottom, #444, #222); color: #ddd; 
-            border: 1px solid #111; border-top: 1px solid #666; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: 'Courier New', Courier, monospace; border-radius: 4px;
+            background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
+            border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
+            font-family: 'Arial', sans-serif; font-weight: 900; border-radius: 4px;
         }
-        body.theme-retro .btn-preset:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.6); background: #222; }
+        body.theme-retro .btn-preset:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; border-right: 1px solid #111; }
 
-        body.theme-retro .slider-container { background: rgba(0,0,0,0.3); border: 1px solid #333; }
-        body.theme-retro input[type=range] { height: 6px; background: #111; border: 1px inset #333; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        body.theme-retro .slider-container { background: transparent; border: none; padding: 0; margin-top: 15px;}
+        body.theme-retro input[type=range] { height: 8px; background: #111; border: 2px inset #444; border-radius: 10px;}
         body.theme-retro input[type=range]::-webkit-slider-thumb { 
-            height: 20px; width: 14px; border-radius: 2px; 
+            height: 24px; width: 12px; border-radius: 2px; 
             background: linear-gradient(to right, #ccc, #fff, #ccc); 
-            border: 1px solid #000; box-shadow: 0 2px 5px rgba(0,0,0,0.8); 
+            border: 1px solid #000; box-shadow: 0 3px 5px rgba(0,0,0,0.8); 
         }
 
+        /* Master Switch (Roter Knopf) */
         body.theme-retro .btn-main { 
-            background: linear-gradient(to bottom, #ffb000, #cc8c00); color: #111; 
-            border: 2px solid #111; border-top: 2px solid #ffe082; border-radius: 6px; 
-            font-family: 'Courier New', monospace; letter-spacing: 2px;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.6); text-shadow: none;
+            background: linear-gradient(to bottom, #d93829, #8a1a12); color: #fff; 
+            border: 2px solid #222; border-bottom: 5px solid #111; border-right: 4px solid #111;
+            border-radius: 6px; font-family: 'Arial', sans-serif; font-weight: 900; letter-spacing: 1px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.6); margin-top: 10px;
         }
-        body.theme-retro .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+        body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
-        body.theme-retro #map { border: 2px inset #222; border-radius: 8px; background: #111; }
+        body.theme-retro #map { border: 4px solid #333; border-radius: 4px; background: #111; }
 
-        body.theme-retro .briefing { background-color: rgba(0,0,0,0.4); border: 1px solid #333; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
-        body.theme-retro .story { color: #aaa; border-bottom: 1px solid #333; }
+        body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
+        body.theme-retro .story { color: #ccc; border-bottom: 2px solid #444; font-family: 'Georgia', serif; }
 
+        /* DIE INSTRUMENTE (Sixpack Vibe) */
         body.theme-retro .aero-info-box { 
-            background: rgba(15, 20, 25, 0.6); border-radius: 6px; 
-            border-top: 1px solid #333; border-right: 1px solid #111; border-bottom: 1px solid #111;
-            box-shadow: inset 0 0 8px rgba(0,0,0,0.5); border-left-color: var(--amber);
+            background: #0a0a0c; 
+            border-radius: 12px; /* Runde Ecken für Instrumenten-Look */
+            border: 5px solid #4a4e59; /* Dicker grauer Instrumenten-Bezel */
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 5px 10px rgba(0,0,0,0.5); 
+            margin-bottom: 15px;
+            position: relative;
         }
-        /* Überschreibe die Box-Farben für Retro manuell */
-        body.theme-retro .aero-info-box:nth-child(1) { border-left-color: var(--phosphor); }
-        body.theme-retro .aero-info-box:nth-child(2) { border-left-color: #5a8bb8; }
-        body.theme-retro .aero-info-box:nth-child(3) { border-left-color: var(--red); }
+        /* Schrauben im Instrument */
+        body.theme-retro .aero-info-box::before, body.theme-retro .aero-info-box::after {
+            content: ''; position: absolute; width: 6px; height: 6px; 
+            background: #777; border-radius: 50%; box-shadow: inset 0 0 2px #000;
+        }
+        body.theme-retro .aero-info-box::before { top: 5px; left: 5px; }
+        body.theme-retro .aero-info-box::after { bottom: 5px; right: 5px; }
 
-        body.theme-retro .route-data { color: var(--phosphor); text-shadow: 0 0 4px var(--phosphor-glow); }
-        body.theme-retro .highlight { color: var(--amber); text-shadow: 0 0 4px var(--amber-glow); background: transparent; padding: 0;}
-        body.theme-retro .copy-box { background: #222; border: 1px solid #444; }
-        body.theme-retro .copy-box:hover { color: var(--phosphor); background: #333; border-color: var(--phosphor); }
+        body.theme-retro .route-data { color: var(--piper-white); text-shadow: none; font-size: 18px; }
+        body.theme-retro .highlight { color: var(--piper-yellow); text-shadow: none; background: transparent; padding: 0;}
+        body.theme-retro .copy-box { background: #222; border: 2px inset #444; color: #fff; }
+        body.theme-retro .copy-box:hover { color: var(--piper-yellow); }
 
+        /* Klobige Sekundär-Buttons */
         body.theme-retro .btn-action { 
-            background: linear-gradient(to bottom, #333, #1a1a1a); border: 1px solid #111; border-top: 1px solid #555; 
-            font-family: 'Courier New', monospace; box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+            background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
+            border: 2px solid #222; border-bottom: 3px solid #111; border-right: 2px solid #111;
+            font-family: 'Arial', sans-serif; font-weight: 900;
         }
-        body.theme-retro .btn-action:active { transform: translateY(2px); box-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+        body.theme-retro .btn-action:active { transform: translate(1px, 2px); border-bottom: 1px solid #111; }
 
         body.theme-retro .btn-log { 
-            background: linear-gradient(to bottom, #00ff41, #00b32d); border: 2px solid #111; border-top: 2px solid #80ff9f; 
-            font-family: 'Courier New', monospace; box-shadow: 0 6px 12px rgba(0,0,0,0.6);
+            background: linear-gradient(to bottom, #f2c12e, #a88212); color: #111; 
+            border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
+            font-family: 'Arial', sans-serif; font-weight: 900;
         }
-        body.theme-retro .btn-log:active { transform: translateY(3px); box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+        body.theme-retro .btn-log:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; }
 
-        body.theme-retro .logbook { border-top: 2px dashed #444; }
-        body.theme-retro .log-entry { background: rgba(0,0,0,0.5); border-left: 3px solid var(--amber); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        body.theme-retro .logbook { border-top: 3px solid #444; }
+        body.theme-retro .log-entry { background: #111; border-left: 4px solid var(--piper-yellow); border-radius: 2px; }
 
     </style>
 </head>
 <body>
 
 <div class="container">
-    <button class="theme-toggle-btn" onclick="toggleTheme()">🔄 Design</button>
+    
+    <div class="theme-switch-wrapper">
+        <span class="switch-label">Modern</span>
+        <label class="switch">
+            <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+            <span class="slider"></span>
+        </label>
+        <span class="switch-label" style="color: #d93829;">Analog</span>
+    </div>
 
     <div class="screw top-left"></div>
     <div class="screw top-right"></div>
     <div class="screw bottom-left"></div>
     <div class="screw bottom-right"></div>
 
-    <h1>GA Dispatcher</h1>
+    <h1 id="mainTitle">GA Dispatcher</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -317,12 +359,12 @@
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label>GPH</label><span id="gphVal" class="theme-color-text" style="font-weight:bold;">14</span></div>
+        <div class="slider-header"><label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label><span id="gphVal" class="theme-color-text" style="font-weight:bold;">14</span></div>
         <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
     </div>
 
     <div class="slider-container">
-        <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" class="theme-color-text" style="font-weight:bold;">160</span></div>
+        <div class="slider-header"><label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label><span id="tasVal" class="theme-color-text" style="font-weight:bold;">160</span></div>
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
@@ -345,7 +387,7 @@
             </div>
 
             <div class="aero-info-box" id="boxRoute">
-                <div class="route-label">✈️ Flugplan & Performance</div>
+                <div class="route-label" style="background:transparent; border:none; box-shadow:none; padding:0;">✈️ Flugplan & Performance</div>
                 <div class="route-data">
                     <div>Kurs: <span id="mNavHeading"></span></div>
                     <div>Distanz: <span id="mNavDist"></span></div>
@@ -356,7 +398,7 @@
 
             <div class="aero-info-box" id="boxDest">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span class="box-title" style="color:var(--red); text-shadow: 0 0 3px rgba(255,68,68,0.5);">
+                    <span class="box-title" style="color:var(--red);">
                         <span id="destIcon">🛬</span> <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff; text-shadow:none;"></span>
                     </span>
                 </div>
@@ -370,8 +412,8 @@
             </div>
 
             <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
-                <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
-                <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+                <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Payload</span><span id="mPay" class="highlight"></span></div>
+                <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Fracht</span><span id="mWeight" class="highlight"></span></div>
             </div>
 
         </div>
@@ -386,12 +428,12 @@
     </div>
 
     <div class="logbook">
-        <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
+        <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
         <div id="logContent"></div>
     </div>
 </div>
 
-<div class="version-info">Version 83.0 (Dual-Theme Engine)</div>
+<div class="version-info">Version 84.0 (Analog Sixpack Edition)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -399,28 +441,30 @@
 <script>
     /* THEME TOGGLE LOGIK */
     function toggleTheme() {
-        document.body.classList.toggle('theme-retro');
-        const isRetro = document.body.classList.contains('theme-retro');
-        localStorage.setItem('ga_theme', isRetro ? 'retro' : 'classic');
+        const toggle = document.getElementById('themeToggle');
+        if(toggle.checked) {
+            document.body.classList.add('theme-retro');
+            localStorage.setItem('ga_theme', 'retro');
+        } else {
+            document.body.classList.remove('theme-retro');
+            localStorage.setItem('ga_theme', 'classic');
+        }
         updateDynamicColors();
     }
 
     function updateDynamicColors() {
-        // Passt die Inline-Farben für die Spans an das jeweilige Theme an
         const isRetro = document.body.classList.contains('theme-retro');
-        const primColor = isRetro ? 'var(--amber)' : 'var(--blue)';
         
+        // Farben für Analog vs Modern
+        const primColor = isRetro ? 'var(--piper-white)' : 'var(--blue)';
+        const titleColor = isRetro ? 'var(--piper-white)' : 'var(--blue)';
+        const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--green)';
+        
+        document.getElementById('mainTitle').style.color = titleColor;
+
         document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = primColor);
-        document.querySelectorAll('.theme-title-text').forEach(el => {
-            el.style.color = primColor;
-            if(isRetro) el.style.textShadow = '0 0 5px var(--amber-glow)';
-            else el.style.textShadow = 'none';
-        });
-        document.querySelectorAll('.theme-green-text').forEach(el => {
-            el.style.color = isRetro ? 'var(--phosphor)' : 'var(--green)';
-            if(isRetro) el.style.textShadow = '0 0 3px var(--phosphor-glow)';
-            else el.style.textShadow = 'none';
-        });
+        document.querySelectorAll('.theme-title-text').forEach(el => el.style.color = titleColor);
+        document.querySelectorAll('.theme-green-text').forEach(el => el.style.color = hlColor);
     }
 
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
@@ -428,10 +472,11 @@
     let runwayCache = {};
 
     window.onload = () => {
-        // Theme laden
+        // Theme laden & Toggle Switch synchronisieren
         const savedTheme = localStorage.getItem('ga_theme');
         if (savedTheme === 'retro') {
             document.body.classList.add('theme-retro');
+            document.getElementById('themeToggle').checked = true;
         }
         updateDynamicColors();
 
@@ -440,7 +485,9 @@
         renderLog();
     };
 
-    /* Dein restlicher Javascript Code ab hier komplett identisch! */
+    /* =========================================================
+       DEIN KOMPLETTER JAVASCRIPT CODE - UNVERÄNDERT
+       ========================================================= */
 
     function applyPreset(t, g, s, n) { 
         document.getElementById('tasSlider').value=t; document.getElementById('tasVal').innerText=t;
@@ -627,7 +674,7 @@
                     
                     if (pageId !== "-1" && pages[pageId].extract) {
                         const isRetro = document.body.classList.contains('theme-retro');
-                        const hColor = isRetro ? 'var(--amber)' : 'var(--blue)';
+                        const hColor = isRetro ? 'var(--piper-yellow)' : 'var(--blue)';
                         let prefix = exactTitle ? "" : `<b style="color:${hColor}">Region (${titleToFetch}):</b> `;
                         document.getElementById(elementId).innerHTML = prefix + pages[pageId].extract;
                         return;
@@ -644,7 +691,7 @@
     async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
         const domEl = document.getElementById(elementId);
         const isRetro = document.body.classList.contains('theme-retro');
-        const hColor = isRetro ? 'var(--amber)' : 'var(--warn)';
+        const hColor = isRetro ? 'var(--piper-yellow)' : 'var(--warn)';
 
         if (icaoCode && runwayCache[icaoCode]) {
             domEl.innerText = runwayCache[icaoCode];
@@ -1058,7 +1105,7 @@
             const div = document.createElement('div'); div.className = 'log-entry';
             const routeStr = e.poiName ? `<b>${e.start} ➔ ${e.poiName} ➔ ${e.dest}</b>` : `<b>${e.start} ➔ ${e.dest}</b>`;
             
-            const hlColor = isRetro ? 'var(--phosphor)' : 'var(--blue)';
+            const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--blue)';
             const subColor = isRetro ? '#aaa' : '#888';
             
             div.innerHTML = `<span style="color:${subColor};">${e.date} • ${e.ac}</span><br>${routeStr}<br><span style="color:${hlColor}">${e.mission} (${e.dist} NM)</span>`;
