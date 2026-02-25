@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GA Dispatcher</title>
+    
+    <link rel="icon" type="image/png" href="IconDRK.PNG">
+    <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" sizes="32x32" href="IconDRK.PNG" media="(prefers-color-scheme: dark)">
+    
+    <link rel="apple-touch-icon" href="IconDRK.PNG">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#080808">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
+        
+        body { 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            background-color: var(--bg-dark); 
+            color: var(--text); 
+            margin: 0; padding: 20px 10px; 
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            
+            background-image: url('bg.jpg'); 
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+
+        .container { 
+            background-color: rgba(30, 30, 30, 0.90); 
+            padding: 20px; border-radius: 16px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
+            max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
+            backdrop-filter: blur(8px); 
+            transition: all 0.3s;
+        }
+        
+        body.fullscreen-active .container {
+            backdrop-filter: none !important;
+            transform: none !important;
+        }
+        
+        h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
+        #searchIndicator { font-size: 11px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 14px; }
+        label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
+        input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        
+        .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-preset:hover { background: #444; }
+
+        .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
+        input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
+        
+        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        
+        .btn-main:disabled {
+            background-color: #333 !important;
+            color: #888 !important;
+            cursor: wait !important;
+            border: 1px solid #555;
+        }
+        
+        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
+        
+        .map-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+        }
+
+        .custom-pin { display: flex; justify-content: center; align-items: center; }
+        .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+
+        .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
+        .stat-item { font-size: 13px; }
+        .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
+        
+        .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 2px 6px; border-radius: 4px; margin-top: 4px; font-size: 11px; }
+        .copy-box:hover { color: var(--green); background: #444; }
+        .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
+
+        .aero-info-box {
+            background: #1e252b;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--warn);
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
+        .highlight { color: #fff; font-weight: bold; font-size: 14px; }
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
+        .btn-action:hover { background: #555; }
+        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .btn-log:hover { background: #33cc33; }
+        .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
+        .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
+        
+        .leaflet-control-layers-list { color: #000; font-size: 12px; }
+        .version-info { text-align: center; font-size: 10px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>GA Dispatcher</h1>
+    <div id="searchIndicator">System bereit.</div>
+    
+    <div class="grid-2">
+        <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
+        <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
+    </div>
+    
+    <div class="grid-2">
+        <div><label>Typ</label><select id="targetType">
+            <option value="apt">Flugplatz (A ➔ B)</option>
+            <option value="poi">POI (Rundflug)</option>
+        </select></div>
+        <div><label>Distanz (Total)</label><select id="distRange">
+            <option value="any">Egal (Zufall)</option>
+            <option value="short">Short (10-50 NM)</option>
+            <option value="medium">Medium (50-100 NM)</option>
+            <option value="long">Long (100-250 NM)</option>
+        </select></div>
+    </div>
+    
+    <div class="grid-3">
+        <div><label>Region</label><select id="regionFilter">
+            <option value="any">Europaweit</option>
+            <option value="de" selected>Nur DE</option>
+            <option value="int">Nur Ausland</option>
+        </select></div>
+        <div><label>Richtung</label><select id="dirPref">
+            <option value="any">Egal</option>
+            <option value="N">Norden</option>
+            <option value="E">Osten</option>
+            <option value="S">Süden</option>
+            <option value="W">Westen</option>
+        </select></div>
+        <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
+    </div>
+
+    <div class="preset-row">
+        <button class="btn-preset" onclick="applyPreset(115, 9, 4, 'C172')">C172</button>
+        <button class="btn-preset" onclick="applyPreset(160, 14, 4, 'PA-24')">Comanche</button>
+        <button class="btn-preset" onclick="applyPreset(220, 25, 6, 'AERO')">Aerostar</button>
+    </div>
+
+    <div class="slider-container">
+        <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--blue)">14</span></div>
+        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
+    </div>
+
+    <div class="slider-container">
+        <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" style="color:var(--blue)">160</span></div>
+        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
+    </div>
+    
+    <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
+    
+    <div id="map"></div>
+
+    <div id="briefingBox" class="briefing">
+        <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
+        <p id="mStory" class="story"></p>
+        
+        <div style="display:flex; flex-direction:column;">
+            
+            <!-- START BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--green);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
+                </div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
+            </div>
+
+            <!-- ROUTE BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
+                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">✈️ Flugplan & Performance</div>
+                <div class="grid-2" style="font-size:13px; font-weight:bold; color:#fff;">
+                    <div>Kurs: <span id="mNavHeading" style="color:var(--blue)"></span></div>
+                    <div>Distanz: <span id="mNavDist" style="color:var(--blue)"></span></div>
+                    <div>Zeit (ETE): <span id="mNavTime" style="color:var(--blue)"></span></div>
+                    <div>Fuel: <span id="mFuelReq" style="color:var(--blue)"></span></div>
+                </div>
+            </div>
+
+            <!-- ZIEL BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--red);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
+                </div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
+            </div>
+
+            <!-- PAYLOAD -->
+            <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
+                <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
+                <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+            </div>
+
+        </div>
+        
+        <div class="action-row">
+            <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
+            <button class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
+            <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
+        </div>
+    </div>
+
+    <div class="logbook">
+        <h3>Flugbuch <button style="font-size:9px; background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="clearLog()">Clear</button></h3>
+        <div id="logContent"></div>
+    </div>
+</div>
+
+<div class="version-info">Version 73.0 (Wikipedia & GitHub DB Core)</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Externe Datenbank (wie bisher) -->
+<script src="datenbank.js"></script>
+
+<script>
+    // --- Fallbacks falls datenbank.js fehlt ---
+    if (typeof coreDB === 'undefined') var coreDB = {};
+    if (typeof fallbackPOIs === 'undefined') var fallbackPOIs = [{n:"Ersatz POI (Schloss)", lat:47.5576, lon:10.7498}];
+    if (typeof poiMissions === 'undefined') var poiMissions = [{i:"📸", t:"Foto-Tour", s:"Mache Luftaufnahmen vom Ziel.", cat:"poi"}];
+    if (typeof missions === 'undefined') var missions = [{i:"📦", t:"Kurierflug", s:"Bringe eilige Fracht zum Ziel.", cat:"std"}];
+    // ------------------------------------------
+
+    let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
+    let globalAirports = null; // Cache für die weltweite Airport-Datenbank
+
+    window.onload = () => {
+        const lastDest = localStorage.getItem('last_icao_dest');
+        if (lastDest) document.getElementById('startLoc').value = lastDest;
+        renderLog();
+    };
+
+    function applyPreset(t, g, s, n) { 
+        document.getElementById('tasSlider').value=t; document.getElementById('tasVal').innerText=t;
+        document.getElementById('gphSlider').value=g; document.getElementById('gphVal').innerText=g;
+        document.getElementById('maxSeats').value=s; selectedAC=n;
+    }
+
+    function copyCoords(elementId) {
+        const txt = document.getElementById(elementId).innerText;
+        if(txt && txt !== "-") {
+            navigator.clipboard.writeText(txt).then(() => {
+                alert("Koordinaten kopiert:\n" + txt + "\n\n(Einfach im MSFS Suchfeld mit STRG+V einfügen)");
+            });
+        }
+    }
+
+    function getArrow(b) {
+        if(b >= 337.5 || b < 22.5) return '⬆️';
+        if(b >= 22.5 && b < 67.5) return '↗️';
+        if(b >= 67.5 && b < 112.5) return '➡️';
+        if(b >= 112.5 && b < 157.5) return '↘️';
+        if(b >= 157.5 && b < 202.5) return '⬇️';
+        if(b >= 202.5 && b < 247.5) return '↙️';
+        if(b >= 247.5 && b < 292.5) return '⬅️';
+        if(b >= 292.5 && b < 337.5) return '↖️';
+        return '';
+    }
+
+    function checkBearing(b, dirPref) {
+        if (dirPref === 'any') return true;
+        if (dirPref === 'N' && (b <= 45 || b >= 315)) return true;
+        if (dirPref === 'E' && (b >= 45 && b <= 135)) return true;
+        if (dirPref === 'S' && (b >= 135 && b <= 225)) return true;
+        if (dirPref === 'W' && (b >= 225 && b <= 315)) return true;
+        return false;
+    }
+
+    function resetBtn(btn) {
+        btn.disabled = false;
+        btn.innerText = "Auftrag generieren";
+    }
+
+    // --- NEU: Globale Airport DB von GitHub laden (~28.000 Flughäfen weltweit) ---
+    async function loadGlobalAirports() {
+        if (globalAirports) return;
+        document.getElementById('searchIndicator').innerText = "Lade weltweite Airport-Datenbank...";
+        try {
+            const res = await fetch('https://raw.githubusercontent.com/mwgg/Airports/master/airports.json');
+            globalAirports = await res.json();
+        } catch (e) {
+            console.error("Fehler beim Laden der Airports via GitHub", e);
+            globalAirports = {}; // Leeres Objekt als Fallback
+        }
+    }
+
+    // --- NEU: Berechnung eines Zielpunktes basierend auf Start, Distanz und Richtung ---
+    function getDestinationPoint(lat, lon, distNM, bearing) {
+        const R = 3440.065; // Erdradius in NM
+        const lat1 = lat * Math.PI / 180;
+        const lon1 = lon * Math.PI / 180;
+        const brng = bearing * Math.PI / 180;
+
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distNM / R) +
+                             Math.cos(lat1) * Math.sin(distNM / R) * Math.cos(brng));
+        const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(distNM / R) * Math.cos(lat1),
+                                     Math.cos(distNM / R) - Math.sin(lat1) * Math.sin(lat2));
+
+        return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
+    }
+
+    async function getAirportData(icao) {
+        if (coreDB[icao]) return coreDB[icao]; // 1. Eigene DB checken
+        
+        await loadGlobalAirports(); // 2. GitHub DB checken
+        if (globalAirports[icao]) {
+            return {
+                icao: icao,
+                n: globalAirports[icao].name || globalAirports[icao].city,
+                lat: globalAirports[icao].lat,
+                lon: globalAirports[icao].lon
+            };
+        }
+
+        // 3. Fallback: Nominatim (falls ICAO nirgends gefunden wurde)
+        const indicator = document.getElementById('searchIndicator');
+        indicator.innerText = `Lade Standortdaten: ${icao}...`;
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`);
+            const data = await res.json();
+            if (data && data.length > 0) return { icao: icao, n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        } catch (e) {} return null;
+    }
+
+    // --- NEU: Findet einen Zufalls-Flughafen aus der GitHub JSON ---
+    async function findGithubAirport(lat, lon, minNM, maxNM, dirPref, regionPref) {
+        await loadGlobalAirports();
+        const indicator = document.getElementById('searchIndicator');
+        indicator.innerText = `Suche passenden Flughafen (${minNM}-${maxNM} NM)...`;
+
+        let validAirports = [];
+        for (const key in globalAirports) {
+            const apt = globalAirports[key];
+            if(apt.icao === currentStartICAO) continue;
+
+            const isDE = apt.icao.startsWith('ED') || apt.icao.startsWith('ET');
+            if (regionPref === "de" && !isDE) continue;
+            if (regionPref === "int" && isDE) continue;
+
+            const navCalc = calcNav(lat, lon, apt.lat, apt.lon);
+            if (navCalc.dist >= minNM && navCalc.dist <= maxNM) {
+                if (checkBearing(navCalc.brng, dirPref)) {
+                    validAirports.push({
+                        icao: apt.icao,
+                        n: apt.name || apt.city || "Unbekannt",
+                        lat: apt.lat,
+                        lon: apt.lon
+                    });
+                }
+            }
+        }
+
+        if (validAirports.length > 0) {
+            return validAirports[Math.floor(Math.random() * validAirports.length)];
+        }
+        return null;
+    }
+
+    // --- NEU: Findet POIs über die rasante Wikipedia GeoSearch API ---
+    async function findWikipediaPOI(lat, lon, minNM, maxNM, dirPref) {
+        const indicator = document.getElementById('searchIndicator');
+        indicator.innerText = `Scanne Wikipedia nach Sehenswürdigkeiten...`;
+
+        // 1. Zufällige Distanz und Richtung innerhalb der Präferenzen wählen
+        const dist = Math.floor(Math.random() * (maxNM - minNM + 1)) + minNM;
+        let minB = 0, maxB = 360;
+        if (dirPref === 'N') { minB = 315; maxB = 405; } // 405 % 360 = 45
+        else if (dirPref === 'E') { minB = 45; maxB = 135; }
+        else if (dirPref === 'S') { minB = 135; maxB = 225; }
+        else if (dirPref === 'W') { minB = 225; maxB = 315; }
+
+        let bearing = Math.floor(Math.random() * (maxB - minB + 1)) + minB;
+        bearing = bearing % 360;
+
+        // 2. Einen theoretischen Zielpunkt auf der Karte berechnen
+        const target = getDestinationPoint(lat, lon, dist, bearing);
+
+        // 3. Wikipedia API nach Artikeln im Umkreis (max 10km) dieses Punktes fragen
+        const url = `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${target.lat}|${target.lon}&gsradius=10000&gslimit=30&format=json&origin=*`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.query && data.query.geosearch && data.query.geosearch.length > 0) {
+                // Etwas Zufall ins Spiel bringen
+                const poi = data.query.geosearch[Math.floor(Math.random() * data.query.geosearch.length)];
+                return {
+                    icao: "POI",
+                    n: poi.title, // Das ist der Name des Wikipedia-Artikels (z.B. "Burg Eltz")
+                    lat: poi.lat,
+                    lon: poi.lon
+                };
+            }
+        } catch(e) { console.error("Wiki API Fehler", e); }
+        
+        return null;
+    }
+
+    function calcNav(lat1, lon1, lat2, lon2) {
+        const R = 3440, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        const dist = Math.round(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
+        return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
+    }
+
+    async function generateMission() {
+        const btn = document.getElementById('generateBtn'); 
+        btn.disabled = true;
+        btn.innerText = "Sucht Route & Daten...";
+        document.getElementById("briefingBox").style.display = "none";
+
+        const indicator = document.getElementById('searchIndicator');
+        currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
+        const start = await getAirportData(currentStartICAO);
+        
+        if(!start) { 
+            alert("Startplatz unbekannt!"); 
+            resetBtn(btn); 
+            return; 
+        }
+        
+        const rangePref = document.getElementById("distRange").value;
+        const regionPref = document.getElementById("regionFilter").value;
+        const targetType = document.getElementById("targetType").value;
+        const dirPref = document.getElementById("dirPref").value;
+        const maxSeats = parseInt(document.getElementById("maxSeats").value);
+        const selectedTas = document.getElementById("tasSlider").value;
+        const selectedGph = document.getElementById("gphSlider").value;
+        
+        let targetDest = document.getElementById("destLoc").value.toUpperCase();
+        let dataSource = targetDest ? "Manuell" : "Generiert";
+        
+        // Distanzbereiche definieren
+        let minNM, maxNM;
+        if(rangePref === "any") {
+            const roll = Math.random();
+            if (roll < 0.33) { minNM=10; maxNM=50; }
+            else if (roll < 0.66) { minNM=50; maxNM=100; }
+            else { minNM=100; maxNM=250; }
+        } else {
+            if(rangePref === "short") { minNM=10; maxNM=50; }
+            if(rangePref === "medium") { minNM=50; maxNM=100; }
+            if(rangePref === "long") { minNM=100; maxNM=250; }
+        }
+
+        // Bei POIs die Suchdistanz halbieren (da Hin- und Rückweg berechnet werden)
+        let searchMin = targetType === "poi" ? minNM / 2 : minNM;
+        let searchMax = targetType === "poi" ? maxNM / 2 : maxNM;
+
+        let dest = null;
+        
+        if (targetDest) {
+            dest = await getAirportData(targetDest);
+        } else {
+            // NEUE LOGIK VERWENDEN (GitHub DB für APT, Wikipedia für POI)
+            if (targetType === "apt") {
+                dest = await findGithubAirport(start.lat, start.lon, searchMin, searchMax, dirPref, regionPref);
+            } else if (targetType === "poi") {
+                dest = await findWikipediaPOI(start.lat, start.lon, searchMin, searchMax, dirPref);
+            }
+        }
+        
+        // Fallbacks falls die neuen APIs fehlschlagen
+        if(!dest && !targetDest) {
+            if (targetType === "apt") {
+                dataSource = "Core DB (Fallback)";
+                let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
+                if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
+                
+                let dirFilteredKeys = keys.filter(k => {
+                    const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
+                    return checkBearing(b, dirPref);
+                });
+                if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
+                if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+                dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
+            } else if (targetType === "poi") {
+                dataSource = "Fallback POIs";
+                let validPOIs = fallbackPOIs.filter(p => {
+                    const b = calcNav(start.lat, start.lon, p.lat, p.lon).brng;
+                    return checkBearing(b, dirPref);
+                });
+                if(validPOIs.length === 0) validPOIs = fallbackPOIs; 
+                dest = validPOIs[Math.floor(Math.random() * validPOIs.length)];
+                dest.icao = "POI";
+            }
+        }
+
+        if(!dest) { 
+            indicator.innerText = "Fehler: Kein passendes Ziel gefunden."; 
+            resetBtn(btn); 
+            return; 
+        }
+        
+        const isPOI = (targetType === 'poi' && !targetDest);
+        const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
+        
+        let m, totalDist, distStr;
+        
+        if (isPOI) {
+            m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
+            totalDist = nav.dist * 2; 
+            distStr = `${totalDist} NM (Roundtrip)`;
+            currentDestICAO = currentStartICAO; 
+            dataSource = "Wikipedia GeoSearch";
+        } else {
+            const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
+            m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
+            totalDist = nav.dist;
+            distStr = `${totalDist} NM (Oneway)`;
+            currentDestICAO = dest.icao;
+            if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
+        }
+        
+        // Performance Berechnung
+        const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
+        const totalMinutes = Math.round((totalDist / selectedTas) * 60);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`;
+
+        currentMissionData = { 
+            start: currentStartICAO, 
+            dest: currentDestICAO, 
+            poiName: isPOI ? dest.n : null,
+            mission: m.t, 
+            dist: totalDist, 
+            ac: selectedAC 
+        };
+        
+        document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
+        document.getElementById("mStory").innerText = m.s;
+        
+        // Start Box Setup
+        document.getElementById("mDepICAO").innerText = currentStartICAO;
+        document.getElementById("mDepName").innerText = start.n;
+        document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
+        
+        // Routen Box Setup
+        document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
+        document.getElementById("mNavDist").innerText = distStr;
+        document.getElementById("mNavTime").innerText = timeString;
+        document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
+
+        // Ziel Box Setup
+        document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
+        document.getElementById("mDestName").innerText = dest.n;
+        document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
+        
+        // Payload berechnen
+        let payloadText = "", cargoText = "";
+        if (isPOI) {
+            if (m.t === "VIP-Sightseeing") {
+                payloadText = `${Math.max(1, Math.floor(Math.random()*maxSeats))} PAX (VIP)`;
+                cargoText = "Champagner & Snacks";
+            } else if (m.t === "Foto-Tour") {
+                payloadText = "1-2 PAX (Fotograf)";
+                cargoText = "Kamera / Equipment";
+            } else if (m.t === "Luftvermessung") {
+                payloadText = "0 PAX";
+                cargoText = "Lidar-Scanner (180 lbs)";
+            } else { 
+                payloadText = "1-2 PAX (Beobachter)";
+                cargoText = "Ferngläser & Funk (50 lbs)";
+            }
+        } else {
+            payloadText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*maxSeats)} PAX`;
+            cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
+        }
+
+        document.getElementById("mPay").innerText = payloadText;
+        document.getElementById("mWeight").innerText = cargoText;
+        
+        document.getElementById("briefingBox").style.display = "block";
+        updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
+
+        indicator.innerText = `Flugplan erstellt via ${dataSource}.`;
+        resetBtn(btn);
+    }
+
+    function updateMap(lat1, lon1, lat2, lon2, s, d) {
+        document.getElementById('map').style.display = 'block';
+        
+        if (!map) { 
+            const aeroMap = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { attribution: 'AeroData / Navigraph' });
+            const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
+            const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' });
+            const satMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+
+            map = L.map('map', { layers: [aeroMap], attributionControl: false }); 
+            
+            const baseMaps = {
+                "🛩️ VFR Lufträume (Aero)": aeroMap,
+                "⛰️ Topografie (VFR)": topoMap,
+                "🌑 Dark Mode (Clean)": darkMap,
+                "🛰️ Satellit (Esri)": satMap
+            };
+            L.control.layers(baseMaps).addTo(map);
+
+            const fsControl = L.control({position: 'topleft'});
+            fsControl.onAdd = function() {
+                const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+                btn.innerHTML = '⛶';
+                btn.title = 'Vollbildmodus';
+                btn.style.width = '30px'; btn.style.height = '30px';
+                btn.style.lineHeight = '30px';
+                btn.style.backgroundColor = '#fff';
+                btn.style.border = '1px solid #ccc';
+                btn.style.cursor = 'pointer'; btn.style.fontSize = '18px'; btn.style.fontWeight = 'bold';
+                btn.style.textAlign = 'center'; btn.style.padding = '0';
+                
+                btn.onclick = function(e){
+                    e.preventDefault();
+                    const mapDiv = document.getElementById('map');
+                    
+                    if (mapDiv.classList.contains('map-fullscreen')) {
+                        mapDiv.classList.remove('map-fullscreen');
+                        document.body.classList.remove('fullscreen-active');
+                        document.body.style.overflow = ''; 
+                        btn.innerHTML = '⛶';
+                    } else {
+                        mapDiv.classList.add('map-fullscreen');
+                        document.body.classList.add('fullscreen-active');
+                        document.body.style.overflow = 'hidden'; 
+                        btn.innerHTML = '✖';
+                    }
+                    
+                    setTimeout(() => { if(map) map.invalidateSize(); }, 200);
+                };
+                return btn;
+            };
+            fsControl.addTo(map);
+        }
+        
+        markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
+        
+        const startIcon = L.divIcon({
+            className: 'custom-pin',
+            html: '<div style="background-color: #44ff44;"></div>',
+            iconSize: [22, 22], iconAnchor: [11, 11]
+        });
+
+        const destIcon = L.divIcon({
+            className: 'custom-pin',
+            html: '<div style="background-color: #ff4444;"></div>',
+            iconSize: [22, 22], iconAnchor: [11, 11]
+        });
+
+        markers = [
+            L.marker([lat1, lon1], {icon: startIcon}).addTo(map).bindPopup(`<b>DEP:</b> ${s}`), 
+            L.marker([lat2, lon2], {icon: destIcon}).addTo(map).bindPopup(`<b>DEST:</b> ${d}`)
+        ];
+        
+        polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
+        map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
+
+        setTimeout(() => {
+            if (map.getZoom() < 9) {
+                map.setZoom(9);
+            }
+        }, 50);
+    }
+
+    function openAIP(t) { window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
+
+    function logCurrentFlight() {
+        if(!currentMissionData) return;
+        const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
+        log.unshift({ ...currentMissionData, date: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) });
+        localStorage.setItem('ga_logbook', JSON.stringify(log.slice(0, 50)));
+        localStorage.setItem('last_icao_dest', currentMissionData.dest);
+        
+        document.getElementById('startLoc').value = currentMissionData.dest;
+        document.getElementById('destLoc').value = "";
+        renderLog(); 
+        alert(`Flug geloggt! Du bist in ${currentMissionData.dest}.`);
+    }
+
+    function renderLog() {
+        const log = JSON.parse(localStorage.getItem('ga_logbook')) || [];
+        const container = document.getElementById('logContent');
+        container.innerHTML = log.length ? '' : '<div style="color:#555; font-size:11px;">Keine Einträge vorhanden.</div>';
+        log.forEach(e => {
+            const div = document.createElement('div'); div.className = 'log-entry';
+            const routeStr = e.poiName ? `<b>${e.start} ➔ ${e.poiName} ➔ ${e.dest}</b>` : `<b>${e.start} ➔ ${e.dest}</b>`;
+            div.innerHTML = `<span style="color:#888;">${e.date} • ${e.ac}</span><br>${routeStr}<br><span style="color:var(--blue)">${e.mission} (${e.dist} NM)</span>`;
+            container.appendChild(div);
+        });
+    }
+
+    function clearLog() { if(confirm("Gesamtes Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
+</script>
+</body>
+</html>
+
