@@ -92,11 +92,10 @@
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
         
-        .copy-box { cursor: pointer; transition: color 0.2s; }
-        .copy-box:hover { color: var(--green); }
+        .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 2px 6px; border-radius: 4px; margin-top: 4px; font-size: 11px; }
+        .copy-box:hover { color: var(--green); background: #444; }
         .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
 
-        /* FLUGPLAN BOXEN STYLING */
         .aero-info-box {
             background: #1e252b;
             padding: 12px;
@@ -188,11 +187,11 @@
         <div style="display:flex; flex-direction:column;">
             
             <div class="aero-info-box" style="border-left-color: var(--green);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
                     <span id="mDepWx" style="font-weight:bold; font-size:11px;"></span>
                 </div>
-                <div id="mDepInfo">Lade Daten...</div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
             </div>
 
             <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
@@ -206,12 +205,11 @@
             </div>
 
             <div class="aero-info-box" style="border-left-color: var(--red);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
                     <span id="mDestWx" style="font-weight:bold; font-size:11px;"></span>
                 </div>
-                <div id="mDestInfo">Lade Daten...</div>
-                <div style="margin-top:8px; font-size:10px; color:#888;">Ziel-Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords()"></span></div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
             </div>
 
             <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
@@ -236,7 +234,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 58.0</div>
+<div class="version-info">Version 59.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -256,8 +254,8 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
-    function copyCoords() {
-        const txt = document.getElementById("mDestCoords").innerText;
+    function copyCoords(elementId) {
+        const txt = document.getElementById(elementId).innerText;
         if(txt && txt !== "-") {
             navigator.clipboard.writeText(txt).then(() => {
                 alert("Koordinaten kopiert:\n" + txt + "\n\n(Einfach im MSFS Suchfeld mit STRG+V einfügen)");
@@ -291,95 +289,49 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    // Distanz berechnen
-    function calcDistMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; 
-        const f1 = lat1 * Math.PI/180;
-        const f2 = lat2 * Math.PI/180;
-        const df = (lat2-lat1) * Math.PI/180;
-        const dl = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(df/2) * Math.sin(df/2) + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2) * Math.sin(dl/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    }
-
-    // Live METAR API Aufruf
-    async function fetchWeather(icao) {
-        if (icao === "POI") return "";
+    // NEU: Regionale Wetter-Abfrage (Bounding Box ~100km)
+    async function fetchRegionalWeather(lat, lon) {
+        if (!lat || !lon) return "";
         try {
-            const res = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`);
+            // Box von +- 0.5 Grad erzeugen (ca. 100km Kantenlänge)
+            const minLat = (lat - 0.5).toFixed(2);
+            const maxLat = (lat + 0.5).toFixed(2);
+            const minLon = (lon - 0.5).toFixed(2);
+            const maxLon = (lon + 0.5).toFixed(2);
+            
+            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
+            const res = await fetch(url);
             const data = await res.json();
+            
             if (data && data.length > 0) {
-                const cat = data[0].fltcat || "VFR";
-                if (cat === "VFR") return "<span title='VFR Bedingungen'>🟢 VFR</span>";
-                if (cat === "MVFR") return "<span title='Marginal VFR (Grenzwertig)'>🟡 MVFR</span>";
-                if (cat === "IFR") return "<span title='IFR Bedingungen'>🔴 IFR</span>";
-                if (cat === "LIFR") return "<span title='Low IFR (Schlechtwetter)'>🟣 LIFR</span>";
-            }
-            return "<span title='Keine lokale Messstation'>⚪ Kein lokales METAR</span>";
-        } catch(e) { return "<span title='Fehler'>⚪ N/A</span>"; }
-    }
-
-    // OSM Flugplatz Details
-    async function fetchAirportDetails(lat, lon) {
-        try {
-            const query = `[out:json][timeout:10];(node["aeroway"="aerodrome"](around:2500,${lat},${lon});way["aeroway"="runway"](around:2500,${lat},${lon}););out geom;`;
-            const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-            const data = await res.json();
-            
-            let eleStr = "Unbekannt (siehe AIP)";
-            let rwList = [];
-            
-            if (data && data.elements) {
-                const adNode = data.elements.find(el => el.tags && el.tags.aeroway === "aerodrome" && el.tags.ele);
-                if (adNode) {
-                    let eleM = parseFloat(adNode.tags.ele);
-                    if (!isNaN(eleM)) {
-                        eleStr = `${Math.round(eleM * 3.28084)} ft`; 
-                    }
-                }
+                // Suche die nächste Station in der Box (Pythagoras-Annäherung)
+                let closest = data[0];
+                let minDist = 9999;
                 
-                const runways = data.elements.filter(el => el.tags && el.tags.aeroway === "runway");
-                runways.forEach(rw => {
-                    let ref = rw.tags.ref || "??";
-                    let sfc = rw.tags.surface || "Unbekannt";
-                    
-                    const sfcL = sfc.toLowerCase();
-                    if(sfcL.includes('asphalt')) sfc = 'Asphalt';
-                    else if(sfcL.includes('grass')) sfc = 'Gras';
-                    else if(sfcL.includes('concrete')) sfc = 'Beton';
-                    else if(sfcL.includes('paved')) sfc = 'Befestigt';
-                    else if(sfcL.includes('unpaved')) sfc = 'Unbefestigt';
-                    else if(sfcL.includes('gravel')) sfc = 'Schotter';
-                    else if(sfcL.includes('dirt') || sfcL.includes('earth')) sfc = 'Erde';
-                    
-                    let lenStr = "";
-                    if (rw.geometry && rw.geometry.length > 1) {
-                        let len = 0;
-                        for(let i=0; i<rw.geometry.length-1; i++) {
-                            len += calcDistMeters(rw.geometry[i].lat, rw.geometry[i].lon, rw.geometry[i+1].lat, rw.geometry[i+1].lon);
+                data.forEach(st => {
+                    if (st.lat && st.lon) {
+                        const d = Math.pow(st.lat - lat, 2) + Math.pow(st.lon - lon, 2);
+                        if (d < minDist) { 
+                            minDist = d; 
+                            closest = st; 
                         }
-                        if(len > 150) {
-                            lenStr = ` (${Math.round(len)}m)`;
-                            rwList.push(`<b>RWY ${ref}:</b> ${sfc}${lenStr}`);
-                        }
-                    } else if (rw.tags.length && parseInt(rw.tags.length) > 150) {
-                        rwList.push(`<b>RWY ${ref}:</b> ${sfc} (${rw.tags.length}m)`);
                     }
                 });
+
+                const cat = closest.fltcat || "VFR";
+                const station = closest.icaoId || "Unbekannt";
+                
+                let icon = "⚪";
+                if (cat === "VFR") icon = "🟢 VFR";
+                if (cat === "MVFR") icon = "🟡 MVFR";
+                if (cat === "IFR") icon = "🔴 IFR";
+                if (cat === "LIFR") icon = "🟣 LIFR";
+                
+                return `<span title='Regionales Wetter von Station ${station}'>${icon} (${station})</span>`;
             }
-            
-            let finalStr = `<div style="margin-bottom: 4px;"><b>Elevation:</b> ${eleStr}</div>`;
-            if (rwList.length > 0) {
-                let uniqueRw = [...new Set(rwList)]; 
-                finalStr += `<div>${uniqueRw.join("<br>")}</div>`;
-            } else {
-                finalStr += `<div><b>Runway:</b> Keine OSM-Daten (Wetter/AIP prüfen)</div>`;
-            }
-            return finalStr;
-            
-        } catch(e) {
-            return "Konnte Realdaten nicht laden. Bitte AIP prüfen.";
+            return "<span title='Keine METAR Station in 50km Umkreis'>⚪ Kein Wetter</span>";
+        } catch(e) { 
+            return "<span title='Wetter-API nicht erreichbar'>⚪ N/A</span>"; 
         }
     }
 
@@ -576,7 +528,6 @@
             currentDestICAO = dest.icao;
         }
         
-        // Berechnungen Performance
         const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
         const totalMinutes = Math.round((totalDist / selectedTas) * 60);
         const hrs = Math.floor(totalMinutes / 60);
@@ -592,14 +543,14 @@
             ac: selectedAC 
         };
         
-        // Texte setzen
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mStory").innerText = m.s;
         
         // Start Box Setup
         document.getElementById("mDepICAO").innerText = currentStartICAO;
         document.getElementById("mDepName").innerText = start.n;
-        document.getElementById("mDepInfo").innerText = "Lade Platzdaten...";
+        document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
+        document.getElementById("mDepWx").innerText = "Lade Wetter...";
         
         // Routen Box Setup
         document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
@@ -611,7 +562,7 @@
         document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
         document.getElementById("mDestName").innerText = dest.n;
         document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
-        document.getElementById("mDestInfo").innerText = "Lade Platzdaten...";
+        document.getElementById("mDestWx").innerText = "Lade Wetter...";
         
         // Payload berechnen
         let payloadText = "", cargoText = "";
@@ -637,24 +588,18 @@
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
         
-        // Anzeigen und Karte zeichnen
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
-        // API Abfragen asynchron starten
-        btn.innerText = "Lade Live-Wetter & Platzdaten...";
+        btn.innerText = "Lade Live-Wetter...";
         
-        // Departure laden
-        fetchAirportDetails(start.lat, start.lon).then(data => document.getElementById("mDepInfo").innerHTML = data);
-        fetchWeather(currentStartICAO).then(wx => document.getElementById("mDepWx").innerHTML = wx);
+        // Asynchrones Laden des Regional-Wetters (über die Koordinaten!)
+        fetchRegionalWeather(start.lat, start.lon).then(wx => document.getElementById("mDepWx").innerHTML = wx);
 
-        // Destination laden
         if (isPOI) {
-            document.getElementById("mDestInfo").innerHTML = `<div><b>Typ:</b> Wendepunkt (Rundflug)</div><div>Keine Flugplatzdaten vorhanden.</div>`;
             document.getElementById("mDestWx").innerHTML = "";
         } else {
-            fetchAirportDetails(dest.lat, dest.lon).then(data => document.getElementById("mDestInfo").innerHTML = data);
-            fetchWeather(currentDestICAO).then(wx => document.getElementById("mDestWx").innerHTML = wx);
+            fetchRegionalWeather(dest.lat, dest.lon).then(wx => document.getElementById("mDestWx").innerHTML = wx);
         }
 
         indicator.innerText = `Flugplan erstellt (${dataSource}).`;
