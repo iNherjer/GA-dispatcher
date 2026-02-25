@@ -205,20 +205,22 @@
             letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
         }
 
-        /* --- DIE ATC FLIGHT STRIPS (Papier-Streifen Optik) --- */
-        body.theme-retro input, body.theme-retro select { 
-            background-color: #f0eada; /* Echtes, leicht vergilbtes Papier-Beige */
-            border: 1px solid #c2bba8; 
-            color: #111; /* Schwarze Tinten-Schrift */
-            text-shadow: none;
-            font-family: 'Courier New', Courier, monospace; /* Schreibmaschine! */
-            font-weight: bold; 
-            border-radius: 2px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3); /* Wirft leichten Schatten aufs Panel */
-            letter-spacing: 1px;
-            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-            position: relative;
-        }
+        /* Schreibmaschinen-Schrift für die Inputs (Papier-Streifen) */
+body.theme-retro input, body.theme-retro select { 
+    background-color: #f0eada; 
+    border: 1px solid #c2bba8; 
+    color: #111; 
+    text-shadow: none;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 14px;     /* UPDATE: Kleiner (war 16px) */
+    border-radius: 2px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); 
+    letter-spacing: -0.5px; /* UPDATE: Enger zusammen (war 1px) */
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+}
+
 
         /* Individuelle Schräglagen und Farbmarkierungen an den Rändern der Lotsen-Streifen */
         body.theme-retro #startLoc { transform: rotate(-1.5deg); border-left: 6px solid #d93829; }
@@ -383,10 +385,12 @@ body.theme-retro .drum-window::after {
 body.theme-retro .drum-strip {
     display: flex;
     flex-direction: column;
-    /* Die Animation! */
     transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); 
     will-change: transform;
+    /* UPDATE: Feine Schattierung an den Seiten für 3D-Separation */
+    box-shadow: inset 1px 0 1px rgba(255,255,255,0.15), inset -1px 0 1px rgba(0,0,0,0.6);
 }
+
 
 /* Die einzelne Ziffer auf dem Streifen */
 body.theme-retro .drum-digit {
