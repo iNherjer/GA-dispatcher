@@ -112,11 +112,19 @@
 
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
+        
+        /* Action Buttons Grid Update */
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
         .btn-action:hover { background: #555; }
+        
+        /* Style für die METAR Buttons */
+        .btn-metar { background: #2a3a4a; border: 1px solid #4da6ff; color: #4da6ff; }
+        .btn-metar:hover { background: #3a4a5a; }
+        
         .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .btn-log:hover { background: #33cc33; }
+        
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
         
@@ -196,7 +204,6 @@
                     <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
-                <!-- NEU: Runway Info -->
                 <div class="rwy-info">Piste: <span id="mDepRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
             </div>
 
@@ -217,7 +224,6 @@
                     <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
                 </div>
                 <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
-                <!-- NEU: Runway Info -->
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
             </div>
 
@@ -229,9 +235,12 @@
 
         </div>
         
+        <!-- Action Buttons inkl. METAR -->
         <div class="action-row">
             <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
-            <button class="btn-action" onclick="openAIP('dest')">📄 AIP DEST</button>
+            <button class="btn-action" onclick="openAIP('dest')" id="btnAipDest">📄 AIP DEST</button>
+            <button class="btn-action btn-metar" onclick="openMetar('dep')">☁️ METAR DEP</button>
+            <button class="btn-action btn-metar" onclick="openMetar('dest')" id="btnMetarDest">☁️ METAR DEST</button>
             <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
         </div>
     </div>
@@ -242,7 +251,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 74.0 (Beta: Fast RWY Fetching)</div>
+<div class="version-info">Version 75.0 (Beta: METAR & RWY Fetching)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Externe Datenbank -->
@@ -415,9 +424,7 @@
         return null;
     }
 
-    // --- NEU: Zielsichere Pisten-Suche über Overpass (Blitzschnell, da lokaler Radius) ---
     async function fetchRunwayDetails(lat, lon, elementId) {
-        // Sucht im 1500m Radius um die Flughafen-Koordinaten nach Runways
         const query = `[out:json][timeout:5];way["aeroway"="runway"](around:1500,${lat},${lon});out tags;`;
         
         try {
@@ -425,21 +432,17 @@
             const data = await res.json();
             
             if (data && data.elements && data.elements.length > 0) {
-                // Wir suchen die erste Piste mit einer Pisten-Bezeichnung (ref)
                 let rwyElement = data.elements.find(el => el.tags && el.tags.ref);
-                if (!rwyElement) rwyElement = data.elements[0]; // Fallback falls keine Nummerierung vorhanden
+                if (!rwyElement) rwyElement = data.elements[0];
 
                 const ref = rwyElement.tags.ref ? rwyElement.tags.ref : "???";
                 let surface = rwyElement.tags.surface ? rwyElement.tags.surface.toLowerCase() : "unbekannt";
                 
-                // Übersetzung der Beläge
                 const surfaceTranslations = {
                     "asphalt": "Asphalt", "concrete": "Beton", "grass": "Gras", 
                     "paved": "Befestigt", "unpaved": "Unbefestigt", "dirt": "Erde", "gravel": "Schotter"
                 };
                 const sfcText = surfaceTranslations[surface] || surface;
-                
-                // Länge der Piste, falls angegeben
                 const lengthText = rwyElement.tags.length ? ` (${rwyElement.tags.length}m)` : "";
 
                 document.getElementById(elementId).innerText = `${ref} - ${sfcText}${lengthText}`;
@@ -450,7 +453,6 @@
             console.error("Runway fetch Fehler:", e);
         }
         
-        // Fallback wenn nichts gefunden wurde
         document.getElementById(elementId).innerText = "Keine Daten gefunden";
         document.getElementById(elementId).style.color = "#888";
     }
@@ -469,7 +471,6 @@
         btn.innerText = "Sucht Route & Daten...";
         document.getElementById("briefingBox").style.display = "none";
         
-        // Reset Runway Text
         document.getElementById("mDepRwy").innerText = "Sucht Pisten-Infos...";
         document.getElementById("mDepRwy").style.color = "#fff";
         document.getElementById("mDestRwy").innerText = "Sucht Pisten-Infos...";
@@ -620,15 +621,16 @@
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
         
-        // Pisten Container bei POI ausblenden, sonst einblenden
+        // Hide Dest RWY, AIP and METAR if it's a POI
         document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
+        document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
+        document.getElementById("btnMetarDest").style.display = isPOI ? "none" : "block";
 
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
         indicator.innerText = `Flugplan erstellt via ${dataSource}. Lade Pisten...`;
         
-        // Asynchrones Laden der Runway Infos, stört nicht den Rest der Ansicht!
         fetchRunwayDetails(start.lat, start.lon, 'mDepRwy');
         if (!isPOI) {
             fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy');
@@ -723,7 +725,14 @@
         }, 50);
     }
 
-    function openAIP(t) { window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
+    // --- Action Button Functions ---
+    function openAIP(t) { 
+        window.open(`https://aip.aero/de/vfr/?${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); 
+    }
+    
+    function openMetar(t) {
+        window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank');
+    }
 
     function logCurrentFlight() {
         if(!currentMissionData) return;
