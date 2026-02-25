@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 60.0</div>
+<div class="version-info">Version 61.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -291,28 +291,32 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    // NEU: Regionale Wetter-Abfrage (GEFIXT: Bbox Reihenfolge lon,lat,lon,lat)
+    // ROBUSTES WETTER: Größere Box (+- 1.5 Grad), korrekte Sortierung minLat, minLon
     async function fetchRegionalWeather(lat, lon) {
         if (!lat || !lon) return "";
         try {
-            // Box von +- 1.0 Grad erzeugen (um sicher eine Station zu finden)
-            const minLon = (lon - 1.0).toFixed(2);
-            const minLat = (lat - 1.0).toFixed(2);
-            const maxLon = (lon + 1.0).toFixed(2);
-            const maxLat = (lat + 1.0).toFixed(2);
+            const latF = parseFloat(lat);
+            const lonF = parseFloat(lon);
             
-            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLon},${minLat},${maxLon},${maxLat}&format=json`;
+            // AviationWeather API Format: minLat,minLon,maxLat,maxLon
+            const minLat = (latF - 1.5).toFixed(2);
+            const maxLat = (latF + 1.5).toFixed(2);
+            const minLon = (lonF - 1.5).toFixed(2);
+            const maxLon = (lonF + 1.5).toFixed(2);
+            
+            // hours=3 sorgt dafür, dass auch Stationen mit leichten Verzögerungen auftauchen
+            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&hours=3`;
             const res = await fetch(url);
             const data = await res.json();
             
             if (data && data.length > 0) {
-                // Suche die nächste Station in der Box
+                // Finde die Station, die den Koordinaten am nächsten ist
                 let closest = data[0];
                 let minDist = 9999;
                 
                 data.forEach(st => {
                     if (st.lat && st.lon) {
-                        const d = Math.pow(st.lat - lat, 2) + Math.pow(st.lon - lon, 2);
+                        const d = Math.pow(st.lat - latF, 2) + Math.pow(st.lon - lonF, 2);
                         if (d < minDist) { 
                             minDist = d; 
                             closest = st; 
@@ -331,24 +335,24 @@
                 
                 return `<span title='Regionales Wetter von Station ${station}'>${icon} (${station})</span>`;
             }
-            return "<span title='Keine METAR Station in Umgebung gefunden'>⚪ Kein lokales METAR</span>";
+            return "<span title='Keine METAR Station gefunden'>⚪ Kein lokales METAR</span>";
         } catch(e) { 
             return "<span title='Wetter-API Fehler'>⚪ N/A</span>"; 
         }
     }
 
-    // NEU: Nur noch Pisten-Ausrichtung und Belag holen
+    // ROBUSTE RUNWAYS: Erweiterter Radius (4000m) und flexibler nwr-Tag
     async function fetchRunways(lat, lon) {
         try {
-            const query = `[out:json][timeout:10];way["aeroway"="runway"](around:2500,${lat},${lon});out tags;`;
+            const query = `[out:json][timeout:10];nwr["aeroway"~"runway|airstrip"](around:4000,${lat},${lon});out tags;`;
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             
             let rwList = [];
             if (data && data.elements) {
                 data.elements.forEach(rw => {
-                    if (!rw.tags) return;
-                    let ref = rw.tags.ref || "??";
+                    if (!rw.tags || !rw.tags.surface) return; // Überspringe leere Tags
+                    let ref = rw.tags.ref ? `RWY ${rw.tags.ref}` : "RWY";
                     let sfc = rw.tags.surface || "Unbekannt";
                     
                     const sfcL = sfc.toLowerCase();
@@ -359,8 +363,9 @@
                     else if(sfcL.includes('unpaved')) sfc = 'Unbefestigt';
                     else if(sfcL.includes('gravel')) sfc = 'Schotter';
                     else if(sfcL.includes('dirt') || sfcL.includes('earth')) sfc = 'Erde';
+                    else if(sfcL.includes('sand')) sfc = 'Sand';
                     
-                    rwList.push(`RWY ${ref} (${sfc})`);
+                    rwList.push(`${ref} (${sfc})`);
                 });
             }
             if(rwList.length > 0) {
@@ -425,15 +430,15 @@
 
         let query, typeName;
         if (targetType === "poi") {
-            const poiCategories = [
-                { q: 'nwr["historic"="castle"]["name"]', name: "Burgen/Schlösser" },
-                { q: 'nwr["natural"="peak"]["name"]', name: "Berggipfel" },
-                { q: 'nwr["tourism"="attraction"]["name"]', name: "Attraktionen" },
-                { q: 'nwr["historic"="monument"]["name"]', name: "Monumente" }
-            ];
-            const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
-            typeName = selectedCat.name;
-            query = `[out:json][timeout:25];(${selectedCat.q}(${s},${w},${n},${e}););out center;`;
+            typeName = "Sehenswürdigkeiten";
+            // ROBUSTE POI ABFRAGE: Sucht nach ALLEM gleichzeitig, um Fallbacks zu minimieren!
+            query = `[out:json][timeout:25];(
+                nwr["historic"="castle"]["name"](${s},${w},${n},${e});
+                nwr["natural"="peak"]["name"](${s},${w},${n},${e});
+                nwr["tourism"="attraction"]["name"](${s},${w},${n},${e});
+                nwr["historic"="monument"]["name"](${s},${w},${n},${e});
+                nwr["tourism"="viewpoint"]["name"](${s},${w},${n},${e});
+            );out center;`;
         } else {
             typeName = "Flugplätze";
             let icaoTag = '["icao"]';
@@ -495,7 +500,6 @@
         btn.innerText = "Sucht Route & Daten...";
         document.getElementById("briefingBox").style.display = "none";
         
-        // Reset Runway/Weather Text
         document.getElementById("mDepRunways").innerHTML = "";
         document.getElementById("mDestRunways").innerHTML = "";
         document.getElementById("mDepWx").innerText = "Lade Wetter...";
@@ -635,7 +639,7 @@
 
         btn.innerText = "Lade Live-Wetter & Pisten...";
         
-        // Parallele Abfragen starten (Wetter & Pisten)
+        // API Aufrufe
         fetchRegionalWeather(start.lat, start.lon).then(wx => document.getElementById("mDepWx").innerHTML = wx);
         fetchRunways(start.lat, start.lon).then(rw => document.getElementById("mDepRunways").innerHTML = rw);
 
