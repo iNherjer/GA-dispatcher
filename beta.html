@@ -72,19 +72,17 @@
     <div class="slider-container">
         <div class="slider-header">
             <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label>
-            <div id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">
-                </div>
+            <span id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;"></span>
         </div>
-        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="setDrumCounter('gphDrum', this.value)">
+        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="handleSliderChange('gph', this.value)">
     </div>
 
     <div class="slider-container">
         <div class="slider-header">
             <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label>
-            <div id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">
-                </div>
+            <span id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;"></span>
         </div>
-        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="setDrumCounter('tasDrum', this.value)">
+        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="handleSliderChange('tas', this.value)">
     </div>
     
     <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
@@ -108,18 +106,10 @@
             <div class="aero-info-box" id="boxRoute">
                 <div class="route-label" style="background:transparent; border:none; box-shadow:none; padding:0;">✈️ Flugplan & Performance</div>
                 <div class="route-data">
-                    <div class="drum-readout-container">
-                        Kurs: <div id="headingDrum"></div> <span id="headingArrow"></span>
-                    </div>
-                    <div class="drum-readout-container">
-                        Dist: <div id="distDrum"></div> <span>NM</span>
-                    </div>
-                    <div class="drum-readout-container">
-                        Zeit: <div id="timeDrum"></div> <span>Min</span>
-                    </div>
-                    <div class="drum-readout-container">
-                        Fuel: <div id="fuelDrum"></div> <span>Gal</span>
-                    </div>
+                    <div class="drum-readout-container">Kurs: <span id="headingDrum"></span> <span id="headingArrow"></span></div>
+                    <div class="drum-readout-container">Dist: <span id="distDrum"></span> <span>NM</span></div>
+                    <div class="drum-readout-container">Zeit: <span id="timeDrum"></span> <span>Min</span></div>
+                    <div class="drum-readout-container">Fuel: <span id="fuelDrum"></span> <span>Gal</span></div>
                 </div>
             </div>
 
@@ -170,7 +160,7 @@
 
 </div>
 
-<div class="version-info">Version 87.0 (Mechanical Drum Counters)</div>
+<div class="version-info">Version 88.0 (Live Dynamic Drums)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
