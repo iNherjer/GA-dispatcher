@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 66.0</div>
+<div class="version-info">Version 67.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -282,7 +282,8 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    async function fetchWithTimeout(url, timeoutMs = 9000) {
+    // Erhöhter Timeout auf 27 Sekunden! So bricht das Script nicht zu früh ab.
+    async function fetchWithTimeout(url, timeoutMs = 27000) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeoutMs);
         try {
@@ -306,7 +307,7 @@
             const maxLat = (latF + 1.5).toFixed(2);
             
             const url = `https://aviationweather.gov/api/data/metar?bbox=${minLon},${minLat},${maxLon},${maxLat}&format=json&hours=3`;
-            const res = await fetchWithTimeout(url, 4000);
+            const res = await fetchWithTimeout(url, 6000);
             const data = await res.json();
             
             if (data && data.length > 0) {
@@ -336,8 +337,8 @@
 
     async function fetchRunways(lat, lon) {
         try {
-            const query = `[out:json][timeout:4];nwr["aeroway"~"runway|airstrip"](around:4000,${lat},${lon});out tags;`;
-            const res = await fetchWithTimeout(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, 4500);
+            const query = `[out:json][timeout:10];nwr["aeroway"~"runway|airstrip"](around:4000,${lat},${lon});out tags;`;
+            const res = await fetchWithTimeout(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, 12000);
             const data = await res.json();
             
             let rwList = [];
@@ -382,7 +383,7 @@
         const indicator = document.getElementById('searchIndicator');
         indicator.innerText = `Lade Standortdaten: ${icao}...`;
         try {
-            const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`, 4000);
+            const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&q=${icao}+airport`, 6000);
             const data = await res.json();
             if (data && data.length > 0) return { icao: icao, n: data[0].display_name.split(',')[0], lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
         } catch (e) {} return null;
@@ -396,7 +397,7 @@
         return { dist, brng: Math.round((Math.atan2(y, x)*180/Math.PI + 360)%360) };
     }
 
-    // ZURÜCK ZUR "SMART QUADRANT" METHODE - SCHNELL & ROBUST
+    // ZURÜCK ZUR BEWÄHRTEN V45 METHODE!
     async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType, dirPref) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM;
@@ -417,7 +418,6 @@
             searchMax = maxNM / 2;
         }
 
-        // Bounding Box auf Basis der gewünschten Distanz spannen
         const latDiff = searchMax / 60.0;
         const lonDiff = searchMax / (60.0 * Math.cos(lat * Math.PI / 180));
         
@@ -426,7 +426,6 @@
         let boxW = lon - lonDiff;
         let boxE = lon + lonDiff;
 
-        // Verschiebe die Box in die gewünschte Himmelsrichtung
         if (dirPref === 'N') { boxS = lat; } 
         else if (dirPref === 'S') { boxN = lat; }
         else if (dirPref === 'E') { boxW = lon; }
@@ -437,29 +436,30 @@
 
         let query, typeName;
         
+        // GENAU WIE IN V45: Bewährte Kategorien und saubere Abfrage
         if (targetType === "poi") {
-            // FIX: Nur eine Kategorie pro Suchlauf auswählen (Verhindert Timeouts!)
             const poiCategories = [
                 { q: '["historic"="castle"]', name: "Burgen/Schlösser" },
-                { q: '["historic"="ruins"]', name: "Ruinen" },
                 { q: '["natural"="peak"]', name: "Berggipfel" },
-                { q: '["tourism"="viewpoint"]', name: "Aussichtspunkte" }
+                { q: '["tourism"="attraction"]', name: "Attraktionen" },
+                { q: '["historic"="monument"]', name: "Monumente" }
             ];
             const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
             typeName = selectedCat.name;
-            query = `[out:json][timeout:8];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center;`;
+            // Timeout auf serverseite auf 25 Sekunden erhöht (für große Scans)
+            query = `[out:json][timeout:25];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center;`;
         } else {
             typeName = "Flugplätze";
-            let icaoTag = '["icao"]';
-            if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
-            query = `[out:json][timeout:8];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
+            // Zurück zum schnellen V45-Basis-Filter ohne langsame Regex
+            query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
-        indicator.innerText = `Satelliten-Scan nach ${typeName}${dirText}...`;
+        indicator.innerText = `Scan ${typeName}${dirText} (${searchMin}-${searchMax} NM)...`;
 
         try {
-            const res = await fetchWithTimeout(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, 9000);
+            // Dem Script genug Zeit geben (27 Sekunden), damit der Server antworten kann
+            const res = await fetchWithTimeout(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, 27000);
             const data = await res.json();
             
             if (data && data.elements && data.elements.length > 0) {
@@ -480,9 +480,10 @@
                     };
                 }).filter(el => el.lat !== 0 && el.n !== "Unbekannt");
 
-                // 1. STRENGER FILTER
                 let strictFiltered = mappedData.filter(el => {
                     if (targetType === "apt" && (el.usage === "private" || el.usage === "military" || el.gliding === "yes" || el.sport === "gliding")) return false;
+                    
+                    // Filter für DE / INT jetzt wieder blitzschnell im Javascript statt auf dem Server!
                     if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
                     if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
 
@@ -495,9 +496,6 @@
                 if (strictFiltered.length > 0) {
                     return strictFiltered[Math.floor(Math.random()*strictFiltered.length)];
                 } else {
-                    // 2. ENTSPANNTER FILTER (Verhindert Fallbacks!)
-                    // Wenn der Server was in der Box gefunden hat, es aber an ein paar Meilen oder Grad scheitert, 
-                    // drückt das System ein Auge zu und nimmt es trotzdem!
                     let relaxedFiltered = mappedData.filter(el => {
                         if (targetType === "apt" && (el.usage === "private" || el.usage === "military" || el.gliding === "yes" || el.sport === "gliding")) return false;
                         if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
@@ -511,7 +509,7 @@
                 }
             }
         } catch (err) {
-            console.error("Satelliten-Scan fehlgeschlagen oder Timeout.");
+            console.error("Satelliten-Scan fehlgeschlagen oder Timeout.", err);
         }
         return null;
     }
@@ -519,7 +517,7 @@
     async function generateMission() {
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
-        btn.innerText = "Berechne Vektoren...";
+        btn.innerText = "Satelliten-Suche läuft (kann dauern)...";
         document.getElementById("briefingBox").style.display = "none";
         
         document.getElementById("mDepRunways").innerHTML = "";
@@ -704,7 +702,8 @@
                 btn.title = 'Vollbildmodus';
                 btn.style.width = '30px'; btn.style.height = '30px';
                 btn.style.lineHeight = '30px';
-                btn.style.backgroundColor = '#fff'; btn.style.border = '1px solid #ccc';
+                btn.style.backgroundColor = '#fff';
+                btn.style.border = '1px solid #ccc';
                 btn.style.cursor = 'pointer'; btn.style.fontSize = '18px'; btn.style.fontWeight = 'bold';
                 btn.style.textAlign = 'center'; btn.style.padding = '0';
                 
