@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V42 - Precision Sightseeing</title>
+    <title>GA Dispatcher V43 - The Navigator Update</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -37,6 +37,7 @@
         input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
         .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
@@ -62,7 +63,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V42</h1>
+    <h1>GA Dispatcher V43</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -83,11 +84,18 @@
         </select></div>
     </div>
     
-    <div class="grid-2">
+    <div class="grid-3">
         <div><label>Region</label><select id="regionFilter">
             <option value="any">Europaweit</option>
             <option value="de" selected>Nur DE</option>
             <option value="int">Nur Ausland</option>
+        </select></div>
+        <div><label>Richtung</label><select id="dirPref">
+            <option value="any">Egal</option>
+            <option value="N">Norden</option>
+            <option value="E">Osten</option>
+            <option value="S">Süden</option>
+            <option value="W">Westen</option>
         </select></div>
         <div><label>Sitze</label><select id="maxSeats"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
     </div>
@@ -158,6 +166,16 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
+    // Hilfsfunktion: Prüft, ob ein Kurs in der gewünschten Himmelsrichtung liegt
+    function checkBearing(b, dirPref) {
+        if (dirPref === 'any') return true;
+        if (dirPref === 'N' && (b <= 45 || b >= 315)) return true;
+        if (dirPref === 'E' && (b >= 45 && b <= 135)) return true;
+        if (dirPref === 'S' && (b >= 135 && b <= 225)) return true;
+        if (dirPref === 'W' && (b >= 225 && b <= 315)) return true;
+        return false;
+    }
+
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
@@ -169,7 +187,7 @@
         } catch (e) {} return null;
     }
 
-    async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType) {
+    async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType, dirPref) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM, finalRange;
         
@@ -213,7 +231,8 @@
             query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
-        indicator.innerText = `Scan nach ${typeName} (Suchradius ${searchMin}-${searchMax} NM)...`;
+        let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
+        indicator.innerText = `Scan nach ${typeName}${dirText}...`;
 
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
@@ -235,8 +254,13 @@
                 }).filter(el => {
                     if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
 
-                    const d = calcNav(lat, lon, el.lat, el.lon).dist;
-                    if (d < searchMin || d > searchMax) return false;
+                    const navCalc = calcNav(lat, lon, el.lat, el.lon);
+                    
+                    // Filter nach Distanz
+                    if (navCalc.dist < searchMin || navCalc.dist > searchMax) return false;
+                    
+                    // Filter nach Himmelsrichtung
+                    if (!checkBearing(navCalc.brng, dirPref)) return false;
                     
                     if (targetType === "apt") {
                         const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
@@ -268,25 +292,46 @@
         const distPref = document.getElementById("distRange").value;
         const regionPref = document.getElementById("regionFilter").value;
         const targetType = document.getElementById("targetType").value;
+        const dirPref = document.getElementById("dirPref").value;
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
         
-        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType);
+        let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType, dirPref);
         
-        // Fallback Logik
+        // Fallback Logik (berücksichtigt nun auch die gewünschte Richtung!)
         if(!dest && !targetDest) {
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                
+                // Regionen-Filter
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
+                
+                // Richtungs-Filter für CoreDB
+                let dirFilteredKeys = keys.filter(k => {
+                    const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
+                    return checkBearing(b, dirPref);
+                });
+                
+                // Wenn die Richtung nichts hergibt, Fallback aufdröseln
+                if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
                 if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+                
                 dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
             } else if (targetType === "poi") {
                 dataSource = "Fallback POIs";
-                // Lade zufälligen POI aus der neuen datenbank.js
-                dest = fallbackPOIs[Math.floor(Math.random() * fallbackPOIs.length)];
+                
+                // Richtungs-Filter für POIs
+                let validPOIs = fallbackPOIs.filter(p => {
+                    const b = calcNav(start.lat, start.lon, p.lat, p.lon).brng;
+                    return checkBearing(b, dirPref);
+                });
+                
+                if(validPOIs.length === 0) validPOIs = fallbackPOIs; // Sicherheitsnetz
+                
+                dest = validPOIs[Math.floor(Math.random() * validPOIs.length)];
                 dest.icao = "POI";
             }
         }
@@ -300,8 +345,8 @@
         
         if (isPOI) {
             m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
-            totalDist = nav.dist * 2; // Rundflug hin und zurück
-            currentDestICAO = currentStartICAO; // Wir landen wieder am Start!
+            totalDist = nav.dist * 2; 
+            currentDestICAO = currentStartICAO; 
             routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
         } else {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
