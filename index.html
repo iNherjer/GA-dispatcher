@@ -85,20 +85,28 @@
             border-radius: 0 !important;
         }
 
-        /* Marker Styling für die Map */
         .custom-pin { display: flex; justify-content: center; align-items: center; }
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
         
-        .copy-box { cursor: pointer; transition: color 0.2s; }
-        .copy-box:hover { color: var(--green); }
+        .copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 2px 6px; border-radius: 4px; margin-top: 4px; font-size: 11px; }
+        .copy-box:hover { color: var(--green); background: #444; }
         .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
 
-        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
+        .aero-info-box {
+            background: #1e252b;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--warn);
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; padding-bottom: 10px; margin-bottom: 15px; border-bottom: 1px solid #444; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
         .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
@@ -174,18 +182,44 @@
 
     <div id="briefingBox" class="briefing">
         <h2 id="mTitle" style="margin-top:0; color:var(--blue); font-size:16px;"></h2>
-        <div class="stat-grid">
-            <div class="stat-item" style="grid-column: span 2;"><span class="stat-label">Route</span><span id="mRoute" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Kurs / Distanz</span><span id="mNav" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Ziel-Koordinaten</span><span id="mCoords" class="highlight copy-box" onclick="copyCoords()" title="Klicken zum Kopieren"></span></div>
-            
-            <div class="stat-item" style="grid-column: span 2; background: #1a2a3a; padding: 10px; border-radius: 6px; border-left: 4px solid var(--blue);">
-                <span class="stat-label">Treibstoffbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span>
-            </div>
-            <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
-        </div>
         <p id="mStory" class="story"></p>
+        
+        <div style="display:flex; flex-direction:column;">
+            
+            <!-- START BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--green);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--green); text-transform:uppercase;">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff;"></span></span>
+                </div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
+            </div>
+
+            <!-- ROUTE BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--blue); background: #1a2a3a;">
+                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:8px; font-weight:bold;">✈️ Flugplan & Performance</div>
+                <div class="grid-2" style="font-size:13px; font-weight:bold; color:#fff;">
+                    <div>Kurs: <span id="mNavHeading" style="color:var(--blue)"></span></div>
+                    <div>Distanz: <span id="mNavDist" style="color:var(--blue)"></span></div>
+                    <div>Zeit (ETE): <span id="mNavTime" style="color:var(--blue)"></span></div>
+                    <div>Fuel: <span id="mFuelReq" style="color:var(--blue)"></span></div>
+                </div>
+            </div>
+
+            <!-- ZIEL BOX -->
+            <div class="aero-info-box" style="border-left-color: var(--red);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:bold; color:var(--red); text-transform:uppercase;">🛬 <span id="mDestICAO"></span> | <span id="mDestName" style="color:#fff;"></span></span>
+                </div>
+                <div style="font-size:10px; color:#888;">Koordinaten: <span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
+            </div>
+
+            <!-- PAYLOAD -->
+            <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
+                <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
+                <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
+            </div>
+
+        </div>
         
         <div class="action-row">
             <button class="btn-action" onclick="openWeather('dep')">🌦️ METAR DEP</button>
@@ -202,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 56.0</div>
+<div class="version-info">Version 69.0 (Classic Core Update)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -222,8 +256,8 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
-    function copyCoords() {
-        const txt = document.getElementById("mCoords").innerText;
+    function copyCoords(elementId) {
+        const txt = document.getElementById(elementId).innerText;
         if(txt && txt !== "-") {
             navigator.clipboard.writeText(txt).then(() => {
                 alert("Koordinaten kopiert:\n" + txt + "\n\n(Einfach im MSFS Suchfeld mit STRG+V einfügen)");
@@ -240,7 +274,6 @@
         return false;
     }
     
-    // NEU: Himmelsrichtung als Pfeil
     function getArrow(b) {
         if(b >= 337.5 || b < 22.5) return '⬆️';
         if(b >= 22.5 && b < 67.5) return '↗️';
@@ -269,6 +302,7 @@
         } catch (e) {} return null;
     }
 
+    // DER V56 SUCH-ALGORITHMUS (ZURÜCK ZUR BEWÄHRTEN QUADRANT-METHODE)
     async function findRandomOnlineDest(lat, lon, rangePref, regionPref, targetType, dirPref) {
         const indicator = document.getElementById('searchIndicator');
         let minNM, maxNM, finalRange;
@@ -321,11 +355,8 @@
             query = `[out:json][timeout:25];(${selectedCat.q}(${s},${w},${n},${e}););out center;`;
         } else {
             typeName = "Flugplätze";
-            
-            // NEU: Smarter Regex-Filter für deutsche Airports direkt auf dem Server!
             let icaoTag = '["icao"]';
             if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
-            
             query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
@@ -381,6 +412,7 @@
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
         btn.innerText = "Sucht Route & Daten...";
+        document.getElementById("briefingBox").style.display = "none";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -397,6 +429,8 @@
         const targetType = document.getElementById("targetType").value;
         const dirPref = document.getElementById("dirPref").value;
         const maxSeats = parseInt(document.getElementById("maxSeats").value);
+        const selectedTas = document.getElementById("tasSlider").value;
+        const selectedGph = document.getElementById("gphSlider").value;
         
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
@@ -438,23 +472,26 @@
         const isPOI = (targetType === 'poi' && !targetDest);
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
         
-        let m, totalDist, routeText;
+        let m, totalDist;
         
         if (isPOI) {
             m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
             totalDist = nav.dist * 2; 
             currentDestICAO = currentStartICAO; 
-            routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
         } else {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
             m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
             totalDist = nav.dist;
             currentDestICAO = dest.icao;
-            routeText = `${currentStartICAO} ➔ ${currentDestICAO} (${dest.n})`;
         }
         
-        const fuel = Math.ceil((totalDist / document.getElementById("tasSlider").value * document.getElementById("gphSlider").value) + (0.75 * document.getElementById("gphSlider").value));
-        
+        // Performance Berechnung
+        const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
+        const totalMinutes = Math.round((totalDist / selectedTas) * 60);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`;
+
         currentMissionData = { 
             start: currentStartICAO, 
             dest: currentDestICAO, 
@@ -464,13 +501,27 @@
             ac: selectedAC 
         };
         
+        // UI Texte setzen
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
-        document.getElementById("mRoute").innerText = routeText;
-        // NEU: Hinzufügen des Pfeils zum Steuerkurs
-        document.getElementById("mNav").innerText = `${nav.brng}° ${getArrow(nav.brng)} / ${totalDist} NM (Total)`;
-        document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
-        document.getElementById("mFuel").innerText = `${fuel} Gal`;
+        document.getElementById("mStory").innerText = m.s;
+        
+        // Start Box Setup
+        document.getElementById("mDepICAO").innerText = currentStartICAO;
+        document.getElementById("mDepName").innerText = start.n;
+        document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
+        
+        // Routen Box Setup
+        document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
+        document.getElementById("mNavDist").innerText = `${totalDist} NM`;
+        document.getElementById("mNavTime").innerText = timeString;
+        document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
 
+        // Ziel Box Setup
+        document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
+        document.getElementById("mDestName").innerText = dest.n;
+        document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
+        
+        // Payload berechnen
         let payloadText = "", cargoText = "";
         if (isPOI) {
             if (m.t === "VIP-Sightseeing") {
@@ -493,12 +544,11 @@
 
         document.getElementById("mPay").innerText = payloadText;
         document.getElementById("mWeight").innerText = cargoText;
-        document.getElementById("mStory").innerText = m.s;
         
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
-        indicator.innerText = `Routenplanung abgeschlossen (${dataSource}).`;
-        
+
+        indicator.innerText = `Flugplan erstellt (${dataSource}).`;
         resetBtn(btn);
     }
 
@@ -526,8 +576,10 @@
                 const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
                 btn.innerHTML = '⛶';
                 btn.title = 'Vollbildmodus';
-                btn.style.width = '30px'; btn.style.height = '30px'; btn.style.lineHeight = '30px';
-                btn.style.backgroundColor = '#fff'; btn.style.border = '1px solid #ccc';
+                btn.style.width = '30px'; btn.style.height = '30px';
+                btn.style.lineHeight = '30px';
+                btn.style.backgroundColor = '#fff';
+                btn.style.border = '1px solid #ccc';
                 btn.style.cursor = 'pointer'; btn.style.fontSize = '18px'; btn.style.fontWeight = 'bold';
                 btn.style.textAlign = 'center'; btn.style.padding = '0';
                 
@@ -556,7 +608,6 @@
         
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         
-        // NEU: Eigene grüne und rote Marker generieren
         const startIcon = L.divIcon({
             className: 'custom-pin',
             html: '<div style="background-color: #44ff44;"></div>',
@@ -616,4 +667,5 @@
 </script>
 </body>
 </html>
- 
+
+
