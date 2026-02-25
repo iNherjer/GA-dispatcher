@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V49 - The Airspace Update</title>
+    <title>GA Dispatcher V50 - Mobile Fix</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -15,7 +15,6 @@
             margin: 0; padding: 20px 10px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
-            /* HINTERGRUND */
             background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
@@ -48,10 +47,20 @@
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
         .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         
-        /* Karten-Styling für Vollbild */
+        /* Karten-Styling */
         #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
-        #map:fullscreen { border-radius: 0; border: none; }
-        #map:-webkit-full-screen { border-radius: 0; border: none; }
+        
+        /* DER NEUE MOBILE-FULLSCREEN TRICK */
+        .map-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+        }
 
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
@@ -70,14 +79,13 @@
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
         
-        /* Fix für dunkle Schrift im Leaflet Layer Control Dropdown */
         .leaflet-control-layers-list { color: #000; font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V49</h1>
+    <h1>GA Dispatcher V50</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -333,7 +341,6 @@
         
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType, dirPref);
         
-        // Fallback
         if(!dest && !targetDest) {
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
@@ -431,16 +438,13 @@
         document.getElementById('map').style.display = 'block';
         
         if (!map) { 
-            // 1. NEUE KARTEN EBENEN INKLUSIVE LUFTRÄUME!
             const aeroMap = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { attribution: 'AeroData / Navigraph' });
             const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
             const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' });
             const satMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
 
-            // 2. KARTE INITIALISIEREN (Aero-Map ist jetzt Standard!)
             map = L.map('map', { layers: [aeroMap], attributionControl: false }); 
             
-            // 3. LAYER CONTROL HINZUFÜGEN
             const baseMaps = {
                 "🛩️ VFR Lufträume (Aero)": aeroMap,
                 "⛰️ Topografie (VFR)": topoMap,
@@ -449,7 +453,7 @@
             };
             L.control.layers(baseMaps).addTo(map);
 
-            // 4. VOLLBILD BUTTON HINZUFÜGEN
+            // DER NEUE CSS-BASIERTE VOLLBILD BUTTON
             const fsControl = L.control({position: 'topleft'});
             fsControl.onAdd = function() {
                 const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
@@ -463,36 +467,35 @@
                 btn.onclick = function(e){
                     e.preventDefault();
                     const mapDiv = document.getElementById('map');
-                    if (!document.fullscreenElement) {
-                        mapDiv.requestFullscreen().catch(err => {
-                            console.log(`Vollbild Fehler: ${err.message}`);
-                        });
+                    
+                    if (mapDiv.classList.contains('map-fullscreen')) {
+                        // Vollbild beenden
+                        mapDiv.classList.remove('map-fullscreen');
+                        document.body.style.overflow = ''; // Scrollen wieder erlauben
+                        btn.innerHTML = '⛶';
                     } else {
-                        document.exitFullscreen();
+                        // Vollbild starten
+                        mapDiv.classList.add('map-fullscreen');
+                        document.body.style.overflow = 'hidden'; // Body Scrollen verhindern
+                        btn.innerHTML = '✖';
                     }
+                    
+                    // Karte sagen, dass sie ihre Größe neu berechnen soll
+                    setTimeout(() => { if(map) map.invalidateSize(); }, 200);
                 };
                 return btn;
             };
             fsControl.addTo(map);
-
-            // Resizing Fix für Vollbild
-            document.addEventListener('fullscreenchange', () => {
-                setTimeout(() => { if(map) map.invalidateSize(); }, 200);
-            });
         }
         
-        // MARKER & LINIEN ZEICHNEN
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         
-        // ICAO Codes oder Namen in den Markern
         markers = [
             L.marker([lat1, lon1]).addTo(map).bindPopup(`<b>DEP:</b> ${s}`), 
             L.marker([lat2, lon2]).addTo(map).bindPopup(`<b>DEST:</b> ${d}`)
         ];
         
-        // Stylische rote Linie für VFR
         polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
-        
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
     }
 
