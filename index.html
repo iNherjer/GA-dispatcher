@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V51 - Fleet Rollback</title>
+    <title>GA Dispatcher V52 - The Polish Update</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -28,6 +28,13 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
             max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
             backdrop-filter: blur(8px); 
+            transition: all 0.3s;
+        }
+        
+        /* FIX FÜR VOLLBILD AM PC: Schaltet den Filter ab, der das Element festhält */
+        body.fullscreen-active .container {
+            backdrop-filter: none !important;
+            transform: none !important;
         }
         
         h1 { font-size: 18px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
@@ -39,18 +46,26 @@
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
-        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-        
+        .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-preset:hover { background: #444; }
+
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
-        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         
-        /* Karten-Styling */
+        .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        
+        /* NEU: Gestylter Button wenn er deaktiviert/am Suchen ist */
+        .btn-main:disabled {
+            background-color: #333 !important;
+            color: #888 !important;
+            cursor: wait !important;
+            border: 1px solid #555;
+        }
+        
         #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
         
-        /* CSS-BASIERTER VOLLBILD TRICK */
         .map-fullscreen {
             position: fixed !important;
             top: 0 !important;
@@ -74,8 +89,10 @@
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; }
-        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+        .btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 10px; text-align: center; font-weight: bold; transition: 0.2s; }
+        .btn-action:hover { background: #555; }
+        .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .btn-log:hover { background: #33cc33; }
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
         
@@ -85,7 +102,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V51</h1>
+    <h1>GA Dispatcher V52</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -208,6 +225,12 @@
         return false;
     }
 
+    // Hilfsfunktion, um den Button am Ende wieder zu aktivieren
+    function resetBtn(btn) {
+        btn.disabled = false;
+        btn.innerText = "Auftrag generieren";
+    }
+
     async function getAirportData(icao) {
         if (coreDB[icao]) return coreDB[icao];
         const indicator = document.getElementById('searchIndicator');
@@ -323,11 +346,20 @@
     }
 
     async function generateMission() {
-        const btn = document.getElementById('generateBtn'); btn.disabled = true;
+        // BUTTON FEEDBACK STARTEN
+        const btn = document.getElementById('generateBtn'); 
+        btn.disabled = true;
+        btn.innerText = "Sucht Route & Daten...";
+
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
         const start = await getAirportData(currentStartICAO);
-        if(!start) { alert("Startplatz unbekannt!"); btn.disabled=false; return; }
+        
+        if(!start) { 
+            alert("Startplatz unbekannt!"); 
+            resetBtn(btn); 
+            return; 
+        }
         
         const distPref = document.getElementById("distRange").value;
         const regionPref = document.getElementById("regionFilter").value;
@@ -366,7 +398,11 @@
             }
         }
 
-        if(!dest) { indicator.innerText = "Fehler: Kein Ziel gefunden."; btn.disabled=false; return; }
+        if(!dest) { 
+            indicator.innerText = "Fehler: Kein Ziel gefunden."; 
+            resetBtn(btn); 
+            return; 
+        }
         
         const isPOI = (targetType === 'poi' && !targetDest);
         const nav = calcNav(start.lat, start.lon, dest.lat, dest.lon);
@@ -430,7 +466,9 @@
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
         indicator.innerText = `Routenplanung abgeschlossen (${dataSource}).`;
-        btn.disabled = false;
+        
+        // BUTTON FEEDBACK ZURÜCKSETZEN
+        resetBtn(btn);
     }
 
     function updateMap(lat1, lon1, lat2, lon2, s, d) {
@@ -468,10 +506,12 @@
                     
                     if (mapDiv.classList.contains('map-fullscreen')) {
                         mapDiv.classList.remove('map-fullscreen');
+                        document.body.classList.remove('fullscreen-active');
                         document.body.style.overflow = ''; 
                         btn.innerHTML = '⛶';
                     } else {
                         mapDiv.classList.add('map-fullscreen');
+                        document.body.classList.add('fullscreen-active');
                         document.body.style.overflow = 'hidden'; 
                         btn.innerHTML = '✖';
                     }
@@ -492,6 +532,13 @@
         
         polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
+
+        // LUFTRÄUME SICHTBAR MACHEN (Zwingt das Minimum-Zoomlevel auf 9)
+        setTimeout(() => {
+            if (map.getZoom() < 9) {
+                map.setZoom(9);
+            }
+        }, 50);
     }
 
     function openWeather(t) { window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
