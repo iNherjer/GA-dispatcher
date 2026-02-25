@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V45 - The Detail Update</title>
+    <title>GA Dispatcher V49 - The Airspace Update</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -41,18 +41,23 @@
         
         .preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
         .btn-preset { flex: 1; padding: 8px 4px; font-size: 9px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        
         .slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; }
         .slider-header { display: flex; justify-content: space-between; font-size: 11px; }
         input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
         input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
         .btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
-        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; }
+        
+        /* Karten-Styling für Vollbild */
+        #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; }
+        #map:fullscreen { border-radius: 0; border: none; }
+        #map:-webkit-full-screen { border-radius: 0; border: none; }
+
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
         .stat-label { color: #888; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
         
-        /* Neuer Hover-Effekt für die Koordinaten */
         .copy-box { cursor: pointer; transition: color 0.2s; }
         .copy-box:hover { color: var(--green); }
         .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
@@ -64,12 +69,15 @@
         .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 12px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         .logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; }
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
+        
+        /* Fix für dunkle Schrift im Leaflet Layer Control Dropdown */
+        .leaflet-control-layers-list { color: #000; font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V45</h1>
+    <h1>GA Dispatcher V49</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -108,21 +116,23 @@
 
     <div class="preset-row">
         <button class="btn-preset" onclick="applyPreset(115, 9, 4, 'C172')">C172</button>
+        <button class="btn-preset" onclick="applyPreset(135, 9, 4, 'DA40')">DA40</button>
         <button class="btn-preset" onclick="applyPreset(160, 14, 4, 'PA-24')">Comanche</button>
-        <button class="btn-preset" onclick="applyPreset(220, 25, 6, 'AERO')">Aerostar</button>
+        <button class="btn-preset" onclick="applyPreset(320, 60, 6, 'TBM9')">TBM 930</button>
     </div>
 
     <div class="slider-container">
         <div class="slider-header"><label>GPH</label><span id="gphVal" style="color:var(--blue)">14</span></div>
-        <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
+        <input type="range" id="gphSlider" min="5" max="70" value="14" oninput="document.getElementById('gphVal').innerText=this.value">
     </div>
 
     <div class="slider-container">
         <div class="slider-header"><label>TAS (kts)</label><span id="tasVal" style="color:var(--blue)">160</span></div>
-        <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
+        <input type="range" id="tasSlider" min="80" max="350" value="160" step="5" oninput="document.getElementById('tasVal').innerText=this.value">
     </div>
     
     <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
+    
     <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
@@ -173,7 +183,6 @@
         document.getElementById('maxSeats').value=s; selectedAC=n;
     }
 
-    // COPY-FUNKTION
     function copyCoords() {
         const txt = document.getElementById("mCoords").innerText;
         if(txt && txt !== "-") {
@@ -385,13 +394,9 @@
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = routeText;
         document.getElementById("mNav").innerText = `${nav.brng}° / ${totalDist} NM (Total)`;
-        
-        // KOORDINATEN ANZEIGEN (Kompatibel für MSFS Copy Paste)
         document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
-        
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
 
-        // SMARTE BELADUNGS-LOGIK
         let payloadText = "", cargoText = "";
         if (isPOI) {
             if (m.t === "VIP-Sightseeing") {
@@ -403,7 +408,7 @@
             } else if (m.t === "Luftvermessung") {
                 payloadText = "0 PAX";
                 cargoText = "Lidar-Scanner (180 lbs)";
-            } else { // Naturwacht & Wildlife
+            } else { 
                 payloadText = "1-2 PAX (Beobachter)";
                 cargoText = "Ferngläser & Funk (50 lbs)";
             }
@@ -424,11 +429,71 @@
 
     function updateMap(lat1, lon1, lat2, lon2, s, d) {
         document.getElementById('map').style.display = 'block';
-        if (!map) { map = L.map('map', { attributionControl: false }); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map); }
+        
+        if (!map) { 
+            // 1. NEUE KARTEN EBENEN INKLUSIVE LUFTRÄUME!
+            const aeroMap = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { attribution: 'AeroData / Navigraph' });
+            const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
+            const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' });
+            const satMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+
+            // 2. KARTE INITIALISIEREN (Aero-Map ist jetzt Standard!)
+            map = L.map('map', { layers: [aeroMap], attributionControl: false }); 
+            
+            // 3. LAYER CONTROL HINZUFÜGEN
+            const baseMaps = {
+                "🛩️ VFR Lufträume (Aero)": aeroMap,
+                "⛰️ Topografie (VFR)": topoMap,
+                "🌑 Dark Mode (Clean)": darkMap,
+                "🛰️ Satellit (Esri)": satMap
+            };
+            L.control.layers(baseMaps).addTo(map);
+
+            // 4. VOLLBILD BUTTON HINZUFÜGEN
+            const fsControl = L.control({position: 'topleft'});
+            fsControl.onAdd = function() {
+                const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+                btn.innerHTML = '⛶';
+                btn.title = 'Vollbildmodus';
+                btn.style.width = '30px'; btn.style.height = '30px'; btn.style.lineHeight = '30px';
+                btn.style.backgroundColor = '#fff'; btn.style.border = '1px solid #ccc';
+                btn.style.cursor = 'pointer'; btn.style.fontSize = '18px'; btn.style.fontWeight = 'bold';
+                btn.style.textAlign = 'center'; btn.style.padding = '0';
+                
+                btn.onclick = function(e){
+                    e.preventDefault();
+                    const mapDiv = document.getElementById('map');
+                    if (!document.fullscreenElement) {
+                        mapDiv.requestFullscreen().catch(err => {
+                            console.log(`Vollbild Fehler: ${err.message}`);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                };
+                return btn;
+            };
+            fsControl.addTo(map);
+
+            // Resizing Fix für Vollbild
+            document.addEventListener('fullscreenchange', () => {
+                setTimeout(() => { if(map) map.invalidateSize(); }, 200);
+            });
+        }
+        
+        // MARKER & LINIEN ZEICHNEN
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
-        markers = [L.marker([lat1, lon1]).addTo(map).bindPopup(s), L.marker([lat2, lon2]).addTo(map).bindPopup(d)];
-        polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#4da6ff', weight: 3, dashArray: '5,10' }).addTo(map);
-        map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [30, 30] });
+        
+        // ICAO Codes oder Namen in den Markern
+        markers = [
+            L.marker([lat1, lon1]).addTo(map).bindPopup(`<b>DEP:</b> ${s}`), 
+            L.marker([lat2, lon2]).addTo(map).bindPopup(`<b>DEST:</b> ${d}`)
+        ];
+        
+        // Stylische rote Linie für VFR
+        polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
+        
+        map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
     }
 
     function openWeather(t) { window.open(`https://metar-taf.com/de/${t==='dep'?currentStartICAO:currentDestICAO}`, '_blank'); }
