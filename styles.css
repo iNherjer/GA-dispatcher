@@ -340,11 +340,13 @@
    ========================================================================== */
 
 /* Container für Zahl + Einheitstext */
-body.theme-retro .drum-readout-container {
+/* Container für Zahl + Einheitstext (Global für beide Themes, verhindert Zeilenumbrüche) */
+.drum-readout-container {
     display: flex;
     align-items: center;
     gap: 5px;
 }
+
 
 /* Das ovale Fenster, durch das man schaut */
 body.theme-retro .drum-window {
