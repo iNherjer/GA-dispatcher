@@ -16,6 +16,9 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* Import für den 60er US-Car Font (Chrome Badge Look) */
+        @import url('https://fonts.googleapis.com/css2?family=Oleo+Script:wght@700&display=swap');
+
         /* ==========================================================================
            1. BASIS / CLASSIC DESIGN (Modern & Clean)
            ========================================================================== */
@@ -193,9 +196,22 @@
         body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20deg); }
         body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
 
+        /* 60er Jahre US-Car Font: Oleo Script (Verchromt/Emblem-Look) */
         body.theme-retro h1 { 
-            font-size: 24px; color: var(--piper-white); text-shadow: none; font-weight: 900;
-            letter-spacing: 2px; border-bottom: 2px solid #444; padding-bottom: 10px; 
+            font-family: 'Oleo Script', cursive; 
+            font-size: 38px; 
+            color: #f4f4f4; 
+            text-shadow: 
+                -1px -1px 0 #aaa,
+                1px 1px 0 #555,
+                2px 2px 0 #444,
+                3px 3px 5px rgba(0,0,0,0.8);
+            font-weight: 400;
+            letter-spacing: 1px; 
+            border-bottom: none; /* Kein Strich mehr drunter */
+            padding-bottom: 0; 
+            margin-bottom: 15px;
+            transform: rotate(-2deg); /* Leicht schräg wie ein Auto-Badge */
         }
         
         body.theme-retro #searchIndicator { color: var(--piper-yellow); font-weight: bold; }
@@ -207,17 +223,39 @@
             letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
         }
 
-        /* Schreibmaschinen-Schrift für die Inputs */
+        /* --- DIE ATC FLIGHT STRIPS (Papier-Streifen Optik) --- */
         body.theme-retro input, body.theme-retro select { 
-            background-color: #0a0a0c; border: 3px inset #333; 
-            color: var(--piper-white); text-shadow: none;
-            font-family: 'Courier New', Courier, monospace; /* <-- NEU */
-            font-weight: bold; border-radius: 4px;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.9);
+            background-color: #f0eada; /* Echtes, leicht vergilbtes Papier-Beige */
+            border: 1px solid #c2bba8; 
+            color: #111; /* Schwarze Tinten-Schrift */
+            text-shadow: none;
+            font-family: 'Courier New', Courier, monospace; /* Schreibmaschine! */
+            font-weight: bold; 
+            border-radius: 2px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3); /* Wirft leichten Schatten aufs Panel */
             letter-spacing: 1px;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
         }
-        body.theme-retro input:focus, body.theme-retro select:focus { outline: none; border-color: var(--piper-yellow); }
 
+        /* Individuelle Schräglagen und Farbmarkierungen an den Rändern der Lotsen-Streifen */
+        body.theme-retro #startLoc { transform: rotate(-1.5deg); border-left: 6px solid #d93829; }
+        body.theme-retro #destLoc { transform: rotate(1deg); border-left: 6px solid #d93829; }
+        body.theme-retro #targetType { transform: rotate(-0.5deg); border-left: 6px solid #4da6ff; }
+        body.theme-retro #distRange { transform: rotate(1.5deg); border-left: 6px solid #4da6ff; }
+        body.theme-retro #regionFilter { transform: rotate(-1deg); border-left: 6px solid #f2c12e; }
+        body.theme-retro #dirPref { transform: rotate(0.5deg); border-left: 6px solid #f2c12e; }
+        body.theme-retro #maxSeats { transform: rotate(-1.5deg); border-left: 6px solid #f2c12e; }
+
+        /* Wenn man reinklickt, wird der Zettel kurz "gerade gezogen" */
+        body.theme-retro input:focus, body.theme-retro select:focus { 
+            outline: none; 
+            transform: scale(1.02) rotate(0deg) !important; 
+            box-shadow: 4px 4px 12px rgba(0,0,0,0.5); 
+            z-index: 10;
+        }
+
+        /* Klobige Radio-Stack Buttons */
         body.theme-retro .btn-preset { 
             background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
             border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
@@ -226,7 +264,7 @@
         body.theme-retro .btn-preset:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; border-right: 1px solid #111; }
 
         body.theme-retro .slider-container { background: transparent; border: none; padding: 0; margin-top: 15px;}
-        body.theme-retro input[type=range] { height: 8px; background: #111; border: 2px inset #444; border-radius: 10px;}
+        body.theme-retro input[type=range] { height: 8px; background: #111; border: 2px inset #444; border-radius: 10px; transform: none; box-shadow:none;}
         body.theme-retro input[type=range]::-webkit-slider-thumb { 
             height: 24px; width: 12px; border-radius: 2px; 
             background: linear-gradient(to right, #ccc, #fff, #ccc); 
@@ -241,10 +279,13 @@
         }
         body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
-        /* Vintage Map Filter (verschwindet im Fullscreen!) */
+        /* Helle Vintage Map (Vergilbtes Papier, nicht mehr schwarz) */
         body.theme-retro #map { 
-            border: 4px solid #333; border-radius: 4px; background: #111; 
-            filter: sepia(0.4) contrast(1.1) brightness(0.95); /* <-- NEU */
+            border: 4px solid #e0d8c8; /* Papier-farbener Rand */
+            border-radius: 4px; 
+            background: #e0d8c8; 
+            filter: sepia(0.2) brightness(1.05) contrast(0.95); /* Leicht vergilbt, aber hell! */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
         body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
@@ -271,12 +312,12 @@
             z-index: 0;
         }
 
-        /* Die Instrumente selbst */
+        /* --- SANFTERE INSTRUMENTE --- */
         body.theme-retro .aero-info-box { 
-            background: #0a0a0c; 
+            background: #2b2d31; /* SANFTES GRAU anstatt hartem Schwarz (#0a0a0c) */
             border-radius: 12px; 
-            border: 5px solid #4a4e59; 
-            box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 5px 10px rgba(0,0,0,0.8); 
+            border: 4px solid #5a5f6a; /* Etwas hellerer Rahmen */
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.4), 0 5px 10px rgba(0,0,0,0.8); 
             margin-bottom: 15px;
             position: relative;
             z-index: 2; /* Instrumente liegen ÜBER dem weißen Streifen */
@@ -310,7 +351,7 @@
         body.theme-retro .theme-switch-wrapper { border-top: 2px dashed #444; }
 
         body.theme-retro .logbook { border-top: 3px solid #444; }
-        body.theme-retro .log-entry { background: #111; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
+        body.theme-retro .log-entry { background: #1a1c1e; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
 
     </style>
 </head>
@@ -449,7 +490,7 @@
 
 </div>
 
-<div class="version-info">Version 85.0 (Retro Final Polish)</div>
+<div class="version-info">Version 86.0 (ATC Strips & Chrome Badge)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -479,7 +520,7 @@
         document.getElementById('mainTitle').style.color = titleColor;
 
         document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = primColor);
-        document.querySelectorAll('.theme-title-text').forEach(el => el.style.color = titleColor);
+        // Da die Schreibschrift (Oleo) den Textschatten selbst regelt, ignorieren wir title-text color Anpassung hier leicht.
         document.querySelectorAll('.theme-green-text').forEach(el => el.style.color = hlColor);
     }
 
