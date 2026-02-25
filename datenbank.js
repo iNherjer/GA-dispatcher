@@ -1,5 +1,5 @@
 // ==========================================
-// GA DISPATCHER - DATENBANK
+// GA DISPATCHER - DATENBANK V42
 // ==========================================
 
 // 1. CORE AIRPORTS (Fallback & Deutschland/Europa-Fokus)
@@ -84,4 +84,40 @@ const poiMissions = [
     { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
     { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
     { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." }
+];
+
+// 4. FALLBACK POIs (Landmarks & Naturdenkmäler)
+const fallbackPOIs = [
+    // Deutschland
+    { n: "Schloss Neuschwanstein", lat: 47.557, lon: 10.750 },
+    { n: "Kölner Dom", lat: 50.941, lon: 6.958 },
+    { n: "Berliner Fernsehturm", lat: 52.520, lon: 13.409 },
+    { n: "Zugspitze (Gipfel)", lat: 47.421, lon: 10.985 },
+    { n: "Burg Hohenzollern", lat: 48.323, lon: 8.967 },
+    { n: "Brocken (Harz)", lat: 51.799, lon: 10.615 },
+    { n: "Loreley (Rhein)", lat: 50.139, lon: 7.728 },
+    { n: "Basteibrücke (Elbsandstein)", lat: 50.961, lon: 14.073 },
+    { n: "Hermannsdenkmal", lat: 51.911, lon: 8.839 },
+    { n: "Schloss Heidelberg", lat: 49.410, lon: 8.715 },
+    { n: "Schweriner Schloss", lat: 53.624, lon: 11.419 },
+    { n: "Watzmann (Gipfel)", lat: 47.554, lon: 12.924 },
+    { n: "Externsteine", lat: 51.868, lon: 8.917 },
+    { n: "Völkerschlachtdenkmal", lat: 51.312, lon: 12.413 },
+    { n: "Mummelsee (Schwarzwald)", lat: 48.597, lon: 8.200 },
+    { n: "Insel Mainau (Bodensee)", lat: 47.705, lon: 9.195 },
+    { n: "Kreidefelsen Rügen", lat: 54.573, lon: 13.664 },
+    // Europa
+    { n: "Matterhorn (CH)", lat: 45.976, lon: 7.658 },
+    { n: "Mont Blanc (FR)", lat: 45.832, lon: 6.865 },
+    { n: "Großglockner (AT)", lat: 47.074, lon: 12.693 },
+    { n: "Eiffelturm (FR)", lat: 48.858, lon: 2.294 },
+    { n: "Mont Saint-Michel (FR)", lat: 48.636, lon: -1.511 },
+    { n: "Colosseum Rom (IT)", lat: 41.890, lon: 12.492 },
+    { n: "Jungfraujoch (CH)", lat: 46.547, lon: 7.982 },
+    { n: "Schloss Schönbrunn (AT)", lat: 48.184, lon: 16.312 },
+    { n: "Kreuzbergpass (IT/AT)", lat: 46.656, lon: 12.419 },
+    { n: "Viaduc de Millau (FR)", lat: 44.077, lon: 3.022 },
+    { n: "Sagrada Familia (ES)", lat: 41.403, lon: 2.174 },
+    { n: "Stonehenge (UK)", lat: 51.178, lon: -1.826 },
+    { n: "Akropolis Athen (GR)", lat: 37.971, lon: 23.725 }
 ];
