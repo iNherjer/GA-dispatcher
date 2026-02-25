@@ -85,7 +85,6 @@
             border-radius: 0 !important;
         }
 
-        /* Marker Styling für die Map */
         .custom-pin { display: flex; justify-content: center; align-items: center; }
         .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
@@ -97,6 +96,18 @@
         .copy-box { cursor: pointer; transition: color 0.2s; }
         .copy-box:hover { color: var(--green); }
         .copy-box::after { content: ' 📋'; font-size: 10px; opacity: 0.5; }
+
+        /* NEU: Flugplatz Info Box (Runway/Höhe) */
+        .aero-info-box {
+            grid-column: span 2;
+            background: #1e252b;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--warn);
+            font-size: 12px;
+            line-height: 1.6;
+            display: none;
+        }
 
         .story { font-style: italic; color: #bbb; font-size: 13px; line-height: 1.5; border-top: 1px solid #444; padding-top: 10px; margin-top: 15px; }
         .highlight { color: #fff; font-weight: bold; font-size: 14px; }
@@ -182,6 +193,12 @@
             <div class="stat-item" style="grid-column: span 2; background: #1a2a3a; padding: 10px; border-radius: 6px; border-left: 4px solid var(--blue);">
                 <span class="stat-label">Treibstoffbedarf</span><span id="mFuel" class="highlight" style="color:var(--blue)"></span>
             </div>
+            
+            <div id="mDestInfoBox" class="aero-info-box">
+                <span class="stat-label" style="color: var(--warn); margin-bottom: 5px;">📍 Flugplatz-Daten (Ziel)</span>
+                <div id="mDestInfo">Lade reale Daten...</div>
+            </div>
+
             <div class="stat-item"><span class="stat-label">Payload</span><span id="mPay" class="highlight"></span></div>
             <div class="stat-item"><span class="stat-label">Fracht</span><span id="mWeight" class="highlight"></span></div>
         </div>
@@ -202,7 +219,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 56.0</div>
+<div class="version-info">Version 57.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -240,7 +257,6 @@
         return false;
     }
     
-    // NEU: Himmelsrichtung als Pfeil
     function getArrow(b) {
         if(b >= 337.5 || b < 22.5) return '⬆️';
         if(b >= 22.5 && b < 67.5) return '↗️';
@@ -256,6 +272,87 @@
     function resetBtn(btn) {
         btn.disabled = false;
         btn.innerText = "Auftrag generieren";
+    }
+
+    // NEU: Berechnung der Distanz zwischen zwei Koordinaten (für die Pistenlänge)
+    function calcDistMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; 
+        const f1 = lat1 * Math.PI/180;
+        const f2 = lat2 * Math.PI/180;
+        const df = (lat2-lat1) * Math.PI/180;
+        const dl = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(df/2) * Math.sin(df/2) + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2) * Math.sin(dl/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // NEU: Lade exakte Runways & Elevation aus OpenStreetMap
+    async function fetchAirportDetails(lat, lon) {
+        try {
+            const query = `[out:json][timeout:10];(node["aeroway"="aerodrome"](around:2500,${lat},${lon});way["aeroway"="runway"](around:2500,${lat},${lon}););out geom;`;
+            const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            
+            let eleStr = "Unbekannt (siehe AIP)";
+            let rwList = [];
+            
+            if (data && data.elements) {
+                // 1. Platzhöhe (Elevation) suchen
+                const adNode = data.elements.find(el => el.tags && el.tags.aeroway === "aerodrome" && el.tags.ele);
+                if (adNode) {
+                    let eleM = parseFloat(adNode.tags.ele);
+                    if (!isNaN(eleM)) {
+                        eleStr = `${Math.round(eleM * 3.28084)} ft`; // Konvertierung Meter in Fuß
+                    }
+                }
+                
+                // 2. Runways auslesen und übersetzen
+                const runways = data.elements.filter(el => el.tags && el.tags.aeroway === "runway");
+                
+                runways.forEach(rw => {
+                    let ref = rw.tags.ref || "??";
+                    let sfc = rw.tags.surface || "Unbekannt";
+                    
+                    // Oberfläche auf Deutsch übersetzen
+                    const sfcL = sfc.toLowerCase();
+                    if(sfcL.includes('asphalt')) sfc = 'Asphalt';
+                    else if(sfcL.includes('grass')) sfc = 'Gras';
+                    else if(sfcL.includes('concrete')) sfc = 'Beton';
+                    else if(sfcL.includes('paved')) sfc = 'Befestigt';
+                    else if(sfcL.includes('unpaved')) sfc = 'Unbefestigt';
+                    else if(sfcL.includes('gravel')) sfc = 'Schotter';
+                    else if(sfcL.includes('dirt') || sfcL.includes('earth')) sfc = 'Erde';
+                    
+                    // Länge berechnen (aus der echten Geometrie!)
+                    let lenStr = "";
+                    if (rw.geometry && rw.geometry.length > 1) {
+                        let len = 0;
+                        for(let i=0; i<rw.geometry.length-1; i++) {
+                            len += calcDistMeters(rw.geometry[i].lat, rw.geometry[i].lon, rw.geometry[i+1].lat, rw.geometry[i+1].lon);
+                        }
+                        // Pisten unter 150m sind oft nur Helipads oder falsch getaggte Rollwege
+                        if(len > 150) {
+                            lenStr = ` (${Math.round(len)}m)`;
+                            rwList.push(`<b>RWY ${ref}:</b> ${sfc}${lenStr}`);
+                        }
+                    } else if (rw.tags.length && parseInt(rw.tags.length) > 150) {
+                        rwList.push(`<b>RWY ${ref}:</b> ${sfc} (${rw.tags.length}m)`);
+                    }
+                });
+            }
+            
+            let finalStr = `<div style="margin-bottom: 4px;"><b>Elevation:</b> ${eleStr}</div>`;
+            if (rwList.length > 0) {
+                let uniqueRw = [...new Set(rwList)]; // Doppelte Einträge filtern
+                finalStr += `<div>${uniqueRw.join("<br>")}</div>`;
+            } else {
+                finalStr += `<div><b>Runway:</b> Keine OSM-Daten (Wetter/AIP prüfen)</div>`;
+            }
+            return finalStr;
+            
+        } catch(e) {
+            return "Konnte Realdaten nicht laden. Bitte AIP prüfen.";
+        }
     }
 
     async function getAirportData(icao) {
@@ -321,11 +418,8 @@
             query = `[out:json][timeout:25];(${selectedCat.q}(${s},${w},${n},${e}););out center;`;
         } else {
             typeName = "Flugplätze";
-            
-            // NEU: Smarter Regex-Filter für deutsche Airports direkt auf dem Server!
             let icaoTag = '["icao"]';
             if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
-            
             query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
@@ -381,6 +475,7 @@
         const btn = document.getElementById('generateBtn'); 
         btn.disabled = true;
         btn.innerText = "Sucht Route & Daten...";
+        document.getElementById("mDestInfoBox").style.display = "none";
 
         const indicator = document.getElementById('searchIndicator');
         currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
@@ -466,8 +561,7 @@
         
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = routeText;
-        // NEU: Hinzufügen des Pfeils zum Steuerkurs
-        document.getElementById("mNav").innerText = `${nav.brng}° ${getArrow(nav.brng)} / ${totalDist} NM (Total)`;
+        document.getElementById("mNav").innerText = `${nav.brng}° ${getArrow(nav.brng)} / ${totalDist} NM`;
         document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
 
@@ -497,8 +591,20 @@
         
         document.getElementById("briefingBox").style.display = "block";
         updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
+
+        // Lade Pisten-Informationen wenn es ein Flugplatz ist
+        if (!isPOI) {
+            btn.innerText = "Lade Pisten-Daten...";
+            const infoBox = document.getElementById("mDestInfoBox");
+            const infoText = document.getElementById("mDestInfo");
+            infoBox.style.display = "block";
+            infoText.innerText = "Verbinde mit OSM für Flugplatzdaten...";
+            
+            const aeroData = await fetchAirportDetails(dest.lat, dest.lon);
+            infoText.innerHTML = aeroData;
+        }
+
         indicator.innerText = `Routenplanung abgeschlossen (${dataSource}).`;
-        
         resetBtn(btn);
     }
 
@@ -556,7 +662,6 @@
         
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         
-        // NEU: Eigene grüne und rote Marker generieren
         const startIcon = L.divIcon({
             className: 'custom-pin',
             html: '<div style="background-color: #44ff44;"></div>',
