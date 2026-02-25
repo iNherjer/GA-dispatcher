@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 62.0</div>
+<div class="version-info">Version 63.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -416,7 +416,7 @@
 
         let query, typeName;
         
-        // POI PERFORMANCE FIX: Immer nur EINE Kategorie pro Suche abfragen, um Overpass nicht zu überlasten!
+        // POI PERFORMANCE FIX: Wieder nur 1 Kategorie pro Abfrage, dafür blitzschnell!
         if (targetType === "poi") {
             const poiCategories = [
                 { q: '["historic"="castle"]', name: "Burgen/Schlösser" },
@@ -427,10 +427,12 @@
             ];
             const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
             typeName = selectedCat.name;
-            query = `[out:json][timeout:15];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center 150;`;
+            query = `[out:json][timeout:15];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center;`;
         } else {
             typeName = "Flugplätze";
-            query = `[out:json][timeout:15];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
+            let icaoTag = '["icao"]';
+            if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
+            query = `[out:json][timeout:15];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
@@ -439,48 +441,46 @@
         try {
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
-            if (data && data.elements.length > 0) {
-                
-                // Vor-Mapping der Daten
+            
+            if (data && data.elements && data.elements.length > 0) {
+                // SICHERHEITS-MAPPING: Prüft vorher ob el.tags überhaupt existiert!
                 let mappedData = data.elements.map(el => {
                     const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
-                    let name = el.tags.name || "Unbekannt";
-                    if (el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
+                    let name = (el.tags && el.tags.name) ? el.tags.name : "Unbekannt";
+                    if (el.tags && el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
+                    
                     return { 
-                        icao: targetType === 'poi' ? 'POI' : (el.tags.icao ? el.tags.icao.toUpperCase() : ''), 
+                        icao: targetType === 'poi' ? 'POI' : ((el.tags && el.tags.icao) ? el.tags.icao.toUpperCase() : ''), 
                         n: name, 
                         lat: coords ? coords.lat : 0, 
                         lon: coords ? coords.lon : 0,
-                        usage: el.tags.usage || "",
-                        gliding: el.tags.gliding || "",
-                        sport: el.tags.sport || ""
+                        usage: (el.tags && el.tags.usage) ? el.tags.usage : "",
+                        gliding: (el.tags && el.tags.gliding) ? el.tags.gliding : "",
+                        sport: (el.tags && el.tags.sport) ? el.tags.sport : ""
                     };
                 }).filter(el => el.lat !== 0 && el.n !== "Unbekannt");
 
-                // STRENGER FILTER
+                // 1. STRENGER FILTER
                 let strictFiltered = mappedData.filter(el => {
                     if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
-                    
                     if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
                     if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
 
                     const navCalc = calcNav(lat, lon, el.lat, el.lon);
                     if (navCalc.dist < searchMin || navCalc.dist > searchMax) return false;
                     if (!checkBearing(navCalc.brng, dirPref)) return false;
-                    
                     return true;
                 });
 
                 if (strictFiltered.length > 0) {
                     return strictFiltered[Math.floor(Math.random()*strictFiltered.length)];
                 } else {
-                    // FALLBACK-FILTER: Wenn der Server was im Zielgebiet gefunden hat, 
-                    // der strikte Distanz/Kurs-Filter es aber verworfen hat, nimm es trotzdem! (Besser als Core-Fallback)
+                    // 2. ENTSPANNTER FILTER (ANTI-FALLBACK TRICK)
                     let relaxedFiltered = mappedData.filter(el => {
                         if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
                         if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
                         if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
-                        return true;
+                        return true; // Keine Himmelsrichtung / Distanz Abfrage hier!
                     });
                     
                     if (relaxedFiltered.length > 0) {
@@ -537,8 +537,6 @@
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-                
-                // REGION-FALLBACK FIX: Zwingt Fallbacks im gewählten Land zu bleiben!
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
                 
@@ -546,13 +544,8 @@
                     const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
                     return checkBearing(b, dirPref);
                 });
-                
-                if(dirFilteredKeys.length > 0) {
-                    keys = dirFilteredKeys;
-                } else if(keys.length === 0) {
-                    // Absolute Notlösung, ignoriert alle Filter
-                    keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
-                }
+                if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
+                if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
                 dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
             } else if (targetType === "poi") {
                 dataSource = "Fallback POIs";
@@ -652,7 +645,7 @@
 
         if (isPOI) {
             document.getElementById("mDestWx").innerHTML = "";
-            document.getElementById("mDestRunways").innerHTML = "<div>Keine Pisten (Wendepunkt)</div>";
+            document.getElementById("mDestRunways").innerHTML = "<div style='color:#888; font-size:11px; margin-top:4px;'>Keine Pisten (Wendepunkt)</div>";
         } else {
             fetchRegionalWeather(dest.lat, dest.lon).then(wx => document.getElementById("mDestWx").innerHTML = wx);
             fetchRunways(dest.lat, dest.lon).then(rw => document.getElementById("mDestRunways").innerHTML = rw);
