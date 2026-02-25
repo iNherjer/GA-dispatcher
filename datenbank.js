@@ -1,5 +1,5 @@
 // ==========================================
-// GA DISPATCHER - DATENBANK V46 (MASSIVE EXPANSION)
+// GA DISPATCHER - DATENBANK V46.1 (CLUB & LEISURE UPDATE)
 // ==========================================
 
 // 1. CORE AIRPORTS (Fallback & Europa-Fokus)
@@ -40,31 +40,40 @@ const coreDB = {
 
 // 2. STANDARD MISSIONEN (A nach B - Flugplätze)
 const missions = [
+    // === VEREINS- UND PRIVATFLIEGEREI (NEU!) ===
+    { t: "$100 Hamburger", i: "🍔", cat: "std", s: "Zeit für den klassischen Burger-Run! Das Flugplatz-Restaurant am Ziel soll fantastisch sein." },
+    { t: "Tagesausflug", i: "🎒", cat: "std", s: "Einfach mal raus! Schnapp dir Freunde oder Familie für einen entspannten Tag am Zielort." },
+    { t: "Städtetrip", i: "🏙️", cat: "std", s: "Ein Wochenende in der Stadt. Parke die Maschine am GAT, bestell ein Taxi und ab ins Hotel." },
+    { t: "Flugplatzfest-Logistik", i: "🎉", cat: "std", s: "Unser Vereinsfest steht an! Du musst dringend noch Banner, Biertischgarnituren und Equipment vom Nachbarverein holen." },
+    { t: "Teile für die Vereinsmaschine", i: "⚙️", cat: "std", s: "Die Vereins-Cessna hat einen defekten Magnetos. Hol das neue Bauteil beim Avionik-Shop am Zielplatz ab." },
+    { t: "Kollegen-Hilfe", i: "🔑", cat: "std", s: "Ein Vereinsmitglied musste die Maschine wegen Schlechtwetter stehen lassen. Flieg hin und bring sie heim!" },
+    { t: "Piloten-Stammtisch", i: "🍻", cat: "std", s: "Treffen mit befreundeten Piloten aus der Region am Zielplatz. Alkoholfreies Bier für den Rückflug ist gebongt!" },
+    { t: "Fly-In Event", i: "🎪", cat: "std", s: "Großes GA-Treffen (Fly-In) am Zielort. Mach dich auf viel Traffic in der Platzrunde gefasst und halte die Augen offen!" },
+    { t: "Kuchen-Express", i: "🍰", cat: "std", s: "Die legendäre Schwarzwälder Kirschtorte vom Flugplatzcafé am Zielort ruft. Ein reiner Genussflug!" },
+    
+    // === BUSINESS & LOGISTIK ===
     { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
     { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
-    { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine am Zielort liefern." },
-    { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein VIP möchte diskret reisen. Achte auf sanfte Manöver und Komfort." },
-    { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine sanfte Landung." },
+    { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein großes Bauteil für einen gestrandeten Airliner am Zielort liefern." },
+    { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein VIP möchte diskret reisen. Achte auf sanfte Manöver und maximalen Komfort." },
+    { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Luxusuhren an Bord. Die Versicherung verlangt eine butterweiche Landung." },
     { t: "Hunderettung", i: "🐾", cat: "std", s: "Tiere aus dem Tierschutz zu neuen Besitzern fliegen. Vermeide starke Turbulenzen." },
     { t: "Labor-Kurier", i: "🧪", cat: "std", s: "Zeitkritische biologische Proben. Die Kühlkette ist aktiv, beeil dich." },
-    { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem Notfall auf einem Gestüt." },
-    { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer exklusiven Verkostung." },
-    { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige vertrauliche Dokumente müssen vor Geschäftsschluss zugestellt werden." },
+    { t: "Horse-Vet", i: "🐎", cat: "std", s: "Ein spezialisierter Tierarzt muss zu einem dringenden Notfall auf einem Gestüt." },
+    { t: "Urgent Mail", i: "📂", cat: "std", s: "Vertrauliche Verträge müssen vor Geschäftsschluss persönlich übergeben werden." },
     { t: "Music Producer", i: "🎧", cat: "std", s: "Ein Produzent muss mitsamt empfindlichem Equipment dringend zum Studio." },
     { t: "Medicine Emergency", i: "💊", cat: "std", s: "Spezialmedikamente für eine abgelegene Klinik. Jede Minute zählt." },
-    { t: "Unexpected Guest", i: "🙋", cat: "std", s: "Ein Überraschungsbesuch bei alten Freunden. Ein entspannter VFR-Hüpfer." },
-    { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle historische Dokumente müssen in ein neues Archiv." },
+    { t: "Archive Transport", i: "📜", cat: "std", s: "Alte, wertvolle historische Dokumente müssen in ein neues Archiv umziehen." },
     { t: "Flower Delivery", i: "🌹", cat: "std", s: "Frische exotische Blumen für eine große Hochzeit. Heizung im Cockpit anpassen!" },
-    { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht um und hat das wichtigste Hab und Gut dabei." },
-    { t: "High Priority Courier", i: "📦", cat: "std", s: "Ein extrem wichtiges Paket muss noch heute zugestellt werden." },
-    { t: "Skydiver Drop", i: "🪂", cat: "std", s: "Bringe ein Team von Fallschirmspringern zum Zielplatz für ein Event." },
+    { t: "Relocation Flight", i: "📦", cat: "std", s: "Jemand zieht in eine andere Stadt und hat sein wichtigstes Hab und Gut dabei." },
+    { t: "Skydiver Drop", i: "🪂", cat: "std", s: "Bringe ein Team von Fallschirmspringern zum Zielplatz für einen Event-Sprung." },
     { t: "Art Transfer", i: "🖼️", cat: "std", s: "Ein wertvolles Gemälde wird zu einer Galerie geflogen. Vermeide G-Kräfte." },
     { t: "Ferry Flight", i: "🛠️", cat: "std", s: "Die Maschine muss zur großen Jahresnachprüfung (JNP) in die Werft." },
     { t: "Casino Run", i: "🎰", cat: "std", s: "High-Roller wollen einen Abend im Casino verbringen. Geld spielt keine Rolle." },
-    { t: "Bank Transfer", i: "💰", cat: "std", s: "Sicherer Transport von Wertpapieren. Diskretion ist oberstes Gebot." },
     { t: "VFR Night Flight", i: "🌃", cat: "std", s: "Plane eine Landung bei Nacht am Zielort ein (NVFR)." },
-    { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz." },
-    // Trainings-Missionen (nur < 50 NM)
+    { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz für die Saison." },
+
+    // === TRAININGS-MISSIONEN (nur < 50 NM) ===
     { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery auf dem Weg." },
     { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch, halte die Höhe!" },
     { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und eine Notlandung im Feld." },
@@ -75,8 +84,8 @@ const missions = [
     { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere einen Ausfall der Klappen. Lande am Zielort ohne Flaps." },
     { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für ein sauberes Aufsetzen auf einem Rad." },
     { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere einen Kabinenbrand. Leite sofort einen Notabstieg ein." },
-    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere schlechtes Wetter am Ziel. Plane im Flug spontan um." },
-    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Decke das GPS ab. Fliege den Anflug nur nach Sicht und Karte." },
+    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere schlechtes Wetter am Ziel. Plane im Flug spontan auf einen Alternate um." },
+    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Decke das GPS ab. Fliege den Anflug nur nach Sicht, Karte und Kompass." },
     { t: "Flight Review (BFR)", i: "📝", cat: "trn", s: "Ein Fluglehrer ist an Bord. Fliege sauber, halte deine Höhen und Kurse exakt." }
 ];
 
@@ -94,7 +103,7 @@ const poiMissions = [
     { t: "Police Support", i: "🚓", cat: "poi", s: "Die Polizei sucht eine vermisste Person in der Nähe des POIs. Unterstütze aus der Luft." }
 ];
 
-// 4. FALLBACK POIs (Massiv erweitert - Fokus D-A-CH & Schwarzwald)
+// 4. FALLBACK POIs (Fokus D-A-CH & Schwarzwald)
 const fallbackPOIs = [
     // === LOKAL: Schwarzwald & BaWü ===
     { n: "Triberger Wasserfälle", lat: 48.127, lon: 8.227 },
