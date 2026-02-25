@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 61.0</div>
+<div class="version-info">Version 62.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -291,36 +291,27 @@
         btn.innerText = "Auftrag generieren";
     }
 
-    // ROBUSTES WETTER: Größere Box (+- 1.5 Grad), korrekte Sortierung minLat, minLon
     async function fetchRegionalWeather(lat, lon) {
         if (!lat || !lon) return "";
         try {
             const latF = parseFloat(lat);
             const lonF = parseFloat(lon);
-            
-            // AviationWeather API Format: minLat,minLon,maxLat,maxLon
-            const minLat = (latF - 1.5).toFixed(2);
-            const maxLat = (latF + 1.5).toFixed(2);
             const minLon = (lonF - 1.5).toFixed(2);
+            const minLat = (latF - 1.5).toFixed(2);
             const maxLon = (lonF + 1.5).toFixed(2);
+            const maxLat = (latF + 1.5).toFixed(2);
             
-            // hours=3 sorgt dafür, dass auch Stationen mit leichten Verzögerungen auftauchen
-            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&hours=3`;
+            const url = `https://aviationweather.gov/api/data/metar?bbox=${minLon},${minLat},${maxLon},${maxLat}&format=json&hours=3`;
             const res = await fetch(url);
             const data = await res.json();
             
             if (data && data.length > 0) {
-                // Finde die Station, die den Koordinaten am nächsten ist
                 let closest = data[0];
                 let minDist = 9999;
-                
                 data.forEach(st => {
                     if (st.lat && st.lon) {
                         const d = Math.pow(st.lat - latF, 2) + Math.pow(st.lon - lonF, 2);
-                        if (d < minDist) { 
-                            minDist = d; 
-                            closest = st; 
-                        }
+                        if (d < minDist) { minDist = d; closest = st; }
                     }
                 });
 
@@ -336,12 +327,9 @@
                 return `<span title='Regionales Wetter von Station ${station}'>${icon} (${station})</span>`;
             }
             return "<span title='Keine METAR Station gefunden'>⚪ Kein lokales METAR</span>";
-        } catch(e) { 
-            return "<span title='Wetter-API Fehler'>⚪ N/A</span>"; 
-        }
+        } catch(e) { return "<span title='Wetter-API Fehler'>⚪ N/A</span>"; }
     }
 
-    // ROBUSTE RUNWAYS: Erweiterter Radius (4000m) und flexibler nwr-Tag
     async function fetchRunways(lat, lon) {
         try {
             const query = `[out:json][timeout:10];nwr["aeroway"~"runway|airstrip"](around:4000,${lat},${lon});out tags;`;
@@ -351,7 +339,7 @@
             let rwList = [];
             if (data && data.elements) {
                 data.elements.forEach(rw => {
-                    if (!rw.tags || !rw.tags.surface) return; // Überspringe leere Tags
+                    if (!rw.tags || !rw.tags.surface) return;
                     let ref = rw.tags.ref ? `RWY ${rw.tags.ref}` : "RWY";
                     let sfc = rw.tags.surface || "Unbekannt";
                     
@@ -373,9 +361,7 @@
                 return `<b>Pisten:</b> <span style="color:#fff;">${uniqueRw.join(" | ")}</span>`;
             }
             return "<b>Pisten:</b> Keine OSM-Daten (Siehe AIP)";
-        } catch(e) {
-            return "";
-        }
+        } catch(e) { return ""; }
     }
 
     async function getAirportData(icao) {
@@ -429,21 +415,22 @@
         const w = boxW.toFixed(4), e = boxE.toFixed(4);
 
         let query, typeName;
+        
+        // POI PERFORMANCE FIX: Immer nur EINE Kategorie pro Suche abfragen, um Overpass nicht zu überlasten!
         if (targetType === "poi") {
-            typeName = "Sehenswürdigkeiten";
-            // ROBUSTE POI ABFRAGE: Sucht nach ALLEM gleichzeitig, um Fallbacks zu minimieren!
-            query = `[out:json][timeout:25];(
-                nwr["historic"="castle"]["name"](${s},${w},${n},${e});
-                nwr["natural"="peak"]["name"](${s},${w},${n},${e});
-                nwr["tourism"="attraction"]["name"](${s},${w},${n},${e});
-                nwr["historic"="monument"]["name"](${s},${w},${n},${e});
-                nwr["tourism"="viewpoint"]["name"](${s},${w},${n},${e});
-            );out center;`;
+            const poiCategories = [
+                { q: '["historic"="castle"]', name: "Burgen/Schlösser" },
+                { q: '["historic"="ruins"]', name: "Historische Ruinen" },
+                { q: '["natural"="peak"]', name: "Berggipfel" },
+                { q: '["tourism"="viewpoint"]', name: "Aussichtspunkte" },
+                { q: '["tourism"="attraction"]', name: "Attraktionen" }
+            ];
+            const selectedCat = poiCategories[Math.floor(Math.random() * poiCategories.length)];
+            typeName = selectedCat.name;
+            query = `[out:json][timeout:15];nwr${selectedCat.q}["name"](${s},${w},${n},${e});out center 150;`;
         } else {
             typeName = "Flugplätze";
-            let icaoTag = '["icao"]';
-            if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
-            query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
+            query = `[out:json][timeout:15];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
@@ -453,35 +440,53 @@
             const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
             const data = await res.json();
             if (data && data.elements.length > 0) {
-                const filtered = data.elements.map(el => {
+                
+                // Vor-Mapping der Daten
+                let mappedData = data.elements.map(el => {
                     const coords = el.type === 'node' ? {lat: el.lat, lon: el.lon} : el.center;
                     let name = el.tags.name || "Unbekannt";
                     if (el.tags.natural === "peak" && el.tags.ele) name += ` (${el.tags.ele}m)`;
                     return { 
                         icao: targetType === 'poi' ? 'POI' : (el.tags.icao ? el.tags.icao.toUpperCase() : ''), 
                         n: name, 
-                        lat: coords.lat, 
-                        lon: coords.lon,
+                        lat: coords ? coords.lat : 0, 
+                        lon: coords ? coords.lon : 0,
                         usage: el.tags.usage || "",
                         gliding: el.tags.gliding || "",
                         sport: el.tags.sport || ""
                     };
-                }).filter(el => {
+                }).filter(el => el.lat !== 0 && el.n !== "Unbekannt");
+
+                // STRENGER FILTER
+                let strictFiltered = mappedData.filter(el => {
                     if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
+                    
+                    if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
+                    if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
 
                     const navCalc = calcNav(lat, lon, el.lat, el.lon);
-                    
                     if (navCalc.dist < searchMin || navCalc.dist > searchMax) return false;
                     if (!checkBearing(navCalc.brng, dirPref)) return false;
                     
-                    if (targetType === "apt") {
-                        const isDE = el.icao.startsWith('ED') || el.icao.startsWith('ET');
-                        if (regionPref === "de" && !isDE) return false;
-                        if (regionPref === "int" && isDE) return false;
-                    }
                     return true;
                 });
-                if (filtered.length > 0) return filtered[Math.floor(Math.random()*filtered.length)];
+
+                if (strictFiltered.length > 0) {
+                    return strictFiltered[Math.floor(Math.random()*strictFiltered.length)];
+                } else {
+                    // FALLBACK-FILTER: Wenn der Server was im Zielgebiet gefunden hat, 
+                    // der strikte Distanz/Kurs-Filter es aber verworfen hat, nimm es trotzdem! (Besser als Core-Fallback)
+                    let relaxedFiltered = mappedData.filter(el => {
+                        if (targetType === "apt" && (el.usage === "private" || el.gliding === "yes" || el.sport === "gliding")) return false;
+                        if (targetType === "apt" && regionPref === "de" && !el.icao.startsWith('ED') && !el.icao.startsWith('ET')) return false;
+                        if (targetType === "apt" && regionPref === "int" && (el.icao.startsWith('ED') || el.icao.startsWith('ET'))) return false;
+                        return true;
+                    });
+                    
+                    if (relaxedFiltered.length > 0) {
+                        return relaxedFiltered[Math.floor(Math.random()*relaxedFiltered.length)];
+                    }
+                }
             }
         } catch (err) {} return null;
     }
@@ -532,6 +537,8 @@
             if (targetType === "apt") {
                 dataSource = "Core DB (Fallback)";
                 let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                
+                // REGION-FALLBACK FIX: Zwingt Fallbacks im gewählten Land zu bleiben!
                 if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
                 if(regionPref === "int") keys = keys.filter(k => !k.startsWith('ED') && !k.startsWith('ET'));
                 
@@ -539,8 +546,13 @@
                     const b = calcNav(start.lat, start.lon, coreDB[k].lat, coreDB[k].lon).brng;
                     return checkBearing(b, dirPref);
                 });
-                if(dirFilteredKeys.length > 0) keys = dirFilteredKeys;
-                if(keys.length === 0) keys = Object.keys(coreDB).filter(k => k !== currentStartICAO); 
+                
+                if(dirFilteredKeys.length > 0) {
+                    keys = dirFilteredKeys;
+                } else if(keys.length === 0) {
+                    // Absolute Notlösung, ignoriert alle Filter
+                    keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
+                }
                 dest = coreDB[keys[Math.floor(Math.random()*keys.length)]];
             } else if (targetType === "poi") {
                 dataSource = "Fallback POIs";
@@ -594,23 +606,19 @@
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mStory").innerText = m.s;
         
-        // Start Box Setup
         document.getElementById("mDepICAO").innerText = currentStartICAO;
         document.getElementById("mDepName").innerText = start.n;
         document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
         
-        // Routen Box Setup
         document.getElementById("mNavHeading").innerText = `${nav.brng}° ${getArrow(nav.brng)}`;
         document.getElementById("mNavDist").innerText = `${totalDist} NM`;
         document.getElementById("mNavTime").innerText = timeString;
         document.getElementById("mFuelReq").innerText = `${fuel} Gal`;
 
-        // Ziel Box Setup
         document.getElementById("mDestICAO").innerText = isPOI ? "POI" : currentDestICAO;
         document.getElementById("mDestName").innerText = dest.n;
         document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
         
-        // Payload berechnen
         let payloadText = "", cargoText = "";
         if (isPOI) {
             if (m.t === "VIP-Sightseeing") {
@@ -639,7 +647,6 @@
 
         btn.innerText = "Lade Live-Wetter & Pisten...";
         
-        // API Aufrufe
         fetchRegionalWeather(start.lat, start.lon).then(wx => document.getElementById("mDepWx").innerHTML = wx);
         fetchRunways(start.lat, start.lon).then(rw => document.getElementById("mDepRunways").innerHTML = rw);
 
