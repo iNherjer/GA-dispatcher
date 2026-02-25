@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -7,7 +6,6 @@
     <title>GA Dispatcher</title>
     
     <link rel="icon" type="image/png" href="IconDRK.PNG">
-    
     <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="32x32" href="IconDRK.PNG" media="(prefers-color-scheme: dark)">
     
@@ -15,6 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#080808">
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -86,6 +85,10 @@
             border-radius: 0 !important;
         }
 
+        /* Marker Styling für die Map */
+        .custom-pin { display: flex; justify-content: center; align-items: center; }
+        .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+
         .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
         .stat-item { font-size: 13px; }
@@ -106,8 +109,6 @@
         .log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 11px; }
         
         .leaflet-control-layers-list { color: #000; font-size: 12px; }
-
-        /* NEU: Versionsinfo unter dem Fenster */
         .version-info { text-align: center; font-size: 10px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
@@ -201,7 +202,7 @@
     </div>
 </div>
 
-<div class="version-info">Version 55.0</div>
+<div class="version-info">Version 56.0</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
@@ -237,6 +238,19 @@
         if (dirPref === 'S' && (b >= 135 && b <= 225)) return true;
         if (dirPref === 'W' && (b >= 225 && b <= 315)) return true;
         return false;
+    }
+    
+    // NEU: Himmelsrichtung als Pfeil
+    function getArrow(b) {
+        if(b >= 337.5 || b < 22.5) return '⬆️';
+        if(b >= 22.5 && b < 67.5) return '↗️';
+        if(b >= 67.5 && b < 112.5) return '➡️';
+        if(b >= 112.5 && b < 157.5) return '↘️';
+        if(b >= 157.5 && b < 202.5) return '⬇️';
+        if(b >= 202.5 && b < 247.5) return '↙️';
+        if(b >= 247.5 && b < 292.5) return '⬅️';
+        if(b >= 292.5 && b < 337.5) return '↖️';
+        return '';
     }
 
     function resetBtn(btn) {
@@ -307,7 +321,12 @@
             query = `[out:json][timeout:25];(${selectedCat.q}(${s},${w},${n},${e}););out center;`;
         } else {
             typeName = "Flugplätze";
-            query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]["icao"]["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
+            
+            // NEU: Smarter Regex-Filter für deutsche Airports direkt auf dem Server!
+            let icaoTag = '["icao"]';
+            if (regionPref === "de") { icaoTag = '["icao"~"^E[DT]"]'; }
+            
+            query = `[out:json][timeout:25];nwr["aeroway"="aerodrome"]${icaoTag}["usage"!="private"]["gliding"!="yes"]["sport"!="gliding"](${s},${w},${n},${e});out center;`;
         }
 
         let dirText = dirPref !== 'any' ? ` (Richtung: ${dirPref})` : "";
@@ -447,7 +466,8 @@
         
         document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
         document.getElementById("mRoute").innerText = routeText;
-        document.getElementById("mNav").innerText = `${nav.brng}° / ${totalDist} NM (Total)`;
+        // NEU: Hinzufügen des Pfeils zum Steuerkurs
+        document.getElementById("mNav").innerText = `${nav.brng}° ${getArrow(nav.brng)} / ${totalDist} NM (Total)`;
         document.getElementById("mCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
         document.getElementById("mFuel").innerText = `${fuel} Gal`;
 
@@ -536,9 +556,22 @@
         
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         
+        // NEU: Eigene grüne und rote Marker generieren
+        const startIcon = L.divIcon({
+            className: 'custom-pin',
+            html: '<div style="background-color: #44ff44;"></div>',
+            iconSize: [22, 22], iconAnchor: [11, 11]
+        });
+
+        const destIcon = L.divIcon({
+            className: 'custom-pin',
+            html: '<div style="background-color: #ff4444;"></div>',
+            iconSize: [22, 22], iconAnchor: [11, 11]
+        });
+
         markers = [
-            L.marker([lat1, lon1]).addTo(map).bindPopup(`<b>DEP:</b> ${s}`), 
-            L.marker([lat2, lon2]).addTo(map).bindPopup(`<b>DEST:</b> ${d}`)
+            L.marker([lat1, lon1], {icon: startIcon}).addTo(map).bindPopup(`<b>DEP:</b> ${s}`), 
+            L.marker([lat2, lon2], {icon: destIcon}).addTo(map).bindPopup(`<b>DEST:</b> ${d}`)
         ];
         
         polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
