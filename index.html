@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GA Dispatcher V40 - The Scenic Update</title>
+    <title>GA Dispatcher V41 - Modular Edition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --blue: #4da6ff; --bg-dark: #080808; --card: #1e1e1e; --text: #e0e0e0; --warn: #ffcc00; --red: #ff4444; --green: #44ff44; }
@@ -15,7 +15,7 @@
             margin: 0; padding: 20px 10px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
             
-            /* DEIN NEUER HINTERGRUND */
+            /* HINTERGRUND */
             background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
@@ -62,7 +62,7 @@
 <body>
 
 <div class="container">
-    <h1>GA Dispatcher V40</h1>
+    <h1>GA Dispatcher V41</h1>
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
@@ -140,36 +140,10 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="datenbank.js"></script>
+
 <script>
-    const coreDB = { 
-        "EDTW": {icao:"EDTW", n:"Winzeln", lat:48.279, lon:8.428}, "EDTF": {icao:"EDTF", n:"Freiburg", lat:48.023, lon:7.828},
-        "EDNY": {icao:"EDNY", n:"Friedrichshafen", lat:47.671, lon:9.511}, "EDDS": {icao:"EDDS", n:"Stuttgart", lat:48.689, lon:9.221},
-        "EDMA": {icao:"EDMA", n:"Augsburg", lat:48.42, lon:10.93}, "EDJA": {icao:"EDJA", n:"Memmingen", lat:47.98, lon:10.23},
-        "EDTD": {icao:"EDTD", n:"Donaueschingen", lat:47.97, lon:8.52}, "EDTY": {icao:"EDTY", n:"Schwäbisch Hall", lat:49.11, lon:9.77},
-        "EDRK": {icao:"EDRK", n:"Koblenz", lat:50.32, lon:7.52}, "EDKB": {icao:"EDKB", n:"Bonn-Hangelar", lat:50.76, lon:7.16},
-        "LOWI": {icao:"LOWI", n:"Innsbruck", lat:47.26, lon:11.34}, "LOWS": {icao:"LOWS", n:"Salzburg", lat:47.79, lon:13.00},
-        "LSZH": {icao:"LSZH", n:"Zürich", lat:47.46, lon:8.54}, "LFSB": {icao:"LFSB", n:"Basel", lat:47.59, lon:7.52}
-    };
-    
-    const missions = [
-        { t: "Business Charter", i: "🧑‍💼", cat: "std", s: "Ein lokaler Unternehmer muss zu einem Meeting. Pünktlichkeit zählt!" },
-        { t: "Organtransport", i: "🚑", cat: "std", s: "HÖCHSTE PRIORITÄT: Ein Spenderorgan muss sofort geliefert werden." },
-        { t: "AOG Ersatzteil", i: "🔧", cat: "std", s: "Technik-Support: Ein Bauteil für eine gestrandete Maschine liefern." },
-        { t: "VIP Transfer", i: "🍾", cat: "std", s: "Ein Gast möchte diskret reisen. Komfort einplanen." },
-        { t: "Uhren-Logistik", i: "⌚", cat: "std", s: "Wertvolle Fracht. Die Versicherung verlangt eine sanfte Landung." },
-        { t: "Gourmet-Trip", i: "🍽️", cat: "std", s: "Zwei Weinkenner fliegen zu einer Verkostung." },
-        { t: "Urgent Mail", i: "📂", cat: "std", s: "Wichtige Dokumente müssen vor Geschäftsschluss zugestellt werden." },
-        { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei Touch-and-Go Platzrunden." },
-        { t: "Training: Crosswind", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." }
-    ];
-
-    const poiMissions = [
-        { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
-        { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
-        { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
-        { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." }
-    ];
-
     let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
 
     window.onload = () => {
@@ -219,7 +193,6 @@
         let query, typeName;
         if (targetType === "poi") {
             typeName = "Landmarks & Natur";
-            // Sucht nach Schlössern, Bergen, Monumenten, Sehenswürdigkeiten
             query = `[out:json][timeout:25];(node["historic"="castle"]["name"](${s},${w},${n},${e});way["historic"="castle"]["name"](${s},${w},${n},${e});node["natural"="peak"]["name"](${s},${w},${n},${e});node["waterway"="waterfall"]["name"](${s},${w},${n},${e});node["tourism"="attraction"]["name"](${s},${w},${n},${e});way["tourism"="attraction"]["name"](${s},${w},${n},${e});node["historic"="monument"]["name"](${s},${w},${n},${e});way["historic"="monument"]["name"](${s},${w},${n},${e}););out center;`;
         } else {
             typeName = "Flugplätze";
@@ -285,10 +258,10 @@
         let targetDest = document.getElementById("destLoc").value.toUpperCase();
         let dataSource = targetDest ? "Manuell" : "Online";
         
-        // Wenn Manuell eingegeben wurde, überschreibt das den POI Modus
         let dest = targetDest ? await getAirportData(targetDest) : await findRandomOnlineDest(start.lat, start.lon, distPref, regionPref, targetType);
         
-        if(!dest && !targetDest) {
+        // Fallback zur CoreDB nur bei Flugplätzen, nicht bei POIs
+        if(!dest && !targetDest && targetType === "apt") {
             dataSource = "Core DB (Fallback)";
             let keys = Object.keys(coreDB).filter(k => k !== currentStartICAO);
             if(regionPref === "de") keys = keys.filter(k => k.startsWith('ED') || k.startsWith('ET'));
@@ -306,8 +279,8 @@
         
         if (isPOI) {
             m = poiMissions[Math.floor(Math.random()*poiMissions.length)];
-            totalDist = nav.dist * 2; // Rundflug hin und zurück
-            currentDestICAO = currentStartICAO; // Wir landen wieder am Start!
+            totalDist = nav.dist * 2; 
+            currentDestICAO = currentStartICAO; 
             routeText = `${currentStartICAO} ➔ ${dest.n} ➔ ${currentStartICAO}`;
         } else {
             const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
@@ -347,8 +320,6 @@
         if (!map) { map = L.map('map', { attributionControl: false }); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map); }
         markers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline);
         markers = [L.marker([lat1, lon1]).addTo(map).bindPopup(s), L.marker([lat2, lon2]).addTo(map).bindPopup(d)];
-        
-        // Gestrichelte Linie für VFR
         polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#4da6ff', weight: 3, dashArray: '5,10' }).addTo(map);
         map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [30, 30] });
     }
