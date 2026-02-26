@@ -80,13 +80,14 @@ window.onload = () => {
         }
     }
 
-        renderLog();
+            renderLog();
     
     // Gibt dem Browser 100ms Zeit, das CSS zu laden, bevor die Trommeln einrasten
     setTimeout(() => {
         refreshAllDrums();
-    }, 100);
+    }, 200);
 };
+
 
 
 // API Key speichern
