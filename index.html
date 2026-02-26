@@ -15,7 +15,6 @@
     <meta name="theme-color" content="#080808">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -103,14 +102,28 @@
 
     <div id="briefingBox" class="briefing">
         
-        <div class="mission-note-wrapper">
-            <h2 id="mTitle"></h2>
-            <p id="mStory" class="story"></p>
+        <div class="notes-stack" id="notesStack">
             
-            <div class="note-manifest">
-                <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
-                <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
+            <div class="paperclip" onclick="toggleNotes()"></div>
+            
+            <div class="mission-note-page front-note" id="notePage1" onclick="toggleNotes()">
+                <div class="page-number">Seite 1</div>
+                <h2 id="mTitle"></h2>
+                <p id="mStory" class="story"></p>
+                <div class="note-manifest">
+                    <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
+                    <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
+                </div>
             </div>
+
+            <div class="mission-note-page back-note" id="notePage2" onclick="toggleNotes()">
+                <div class="page-number">Seite 2</div>
+                <h2 class="wiki-title">Ziel-Info</h2>
+                <div id="wikiDescContainer" class="wiki-info-note">
+                    📖 <span id="wikiDescText">Warte auf Daten...</span>
+                </div>
+            </div>
+            
         </div>
         
         <div class="flightplan-container" style="display:flex; flex-direction:column;">
@@ -154,10 +167,6 @@
                 
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
                 
-                <div class="wiki-info" id="wikiDescContainer">
-                    📖 <span id="wikiDescText">Lade Region/Wikipedia-Info...</span>
-                </div>
-
                 <div class="switch-row" id="destSwitchRow">
                     <div class="retro-switch-container" onclick="openMetar('dest')">
                         <div class="retro-switch"></div>
@@ -193,7 +202,7 @@
 
 </div>
 
-<div class="version-info">Version 90.0 (Full Cockpit Edition)</div>
+<div class="version-info">Version 91.0 (Interactive Clipboard)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
