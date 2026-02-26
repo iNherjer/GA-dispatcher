@@ -84,17 +84,10 @@ input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width:
 .route-data { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 16px; font-weight: bold; color: #fff; line-height: 1.4; }
 
 .rwy-info { font-size: 14px; color: #aaa; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; }
-.wiki-info { font-size: 14px; color: #ccc; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; font-style: italic; line-height: 1.5; display: none; }
 
 .stat-item { font-size: 16px; }
 .stat-label { color: #888; display: block; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
 .highlight { color: #fff; font-weight: bold; font-size: 16px; }
-
-.action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
-.btn-action { background: #333; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; font-weight: bold; transition: 0.2s; }
-.btn-action:hover { background: #555; }
-.btn-metar { background: #2a3a4a; border: 1px solid #4da6ff; color: #4da6ff; }
-.btn-metar:hover { background: #3a4a5a; }
 
 .btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 16px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-size: 14px;}
 .btn-log:hover { background: #33cc33; }
@@ -105,26 +98,18 @@ input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width:
 .leaflet-control-layers-list { color: #000; font-size: 12px; }
 .version-info { text-align: center; font-size: 11px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
 
-/* Schrauben im Classic Design verstecken */
 .screw { display: none; }
 
 /* ==========================================================================
    2. MECHANISCHER KIPPSCHALTER (TOGGLE)
    ========================================================================== */
 .theme-switch-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-    margin-top: 35px;
-    padding-top: 20px;
-    border-top: 1px dashed #444;
+    display: flex; justify-content: center; align-items: center; gap: 15px;
+    margin-top: 35px; padding-top: 20px; border-top: 1px dashed #444;
 }
 .switch-label { font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-
 .switch { position: relative; display: inline-block; width: 26px; height: 40px; }
 .switch input { opacity: 0; width: 0; height: 0; }
-
 .slider { 
     position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
     background-color: #111; border-radius: 4px; border: 2px solid #333; 
@@ -137,15 +122,13 @@ input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width:
     box-shadow: 0 4px 6px rgba(0,0,0,0.8); transition: .3s; 
 }
 input:checked + .slider:before { 
-    transform: translateY(-14px); 
-    border-bottom: none; border-top: 2px solid #333; 
+    transform: translateY(-14px); border-bottom: none; border-top: 2px solid #333; 
     box-shadow: 0 -4px 6px rgba(0,0,0,0.8); 
 }
 
 /* ==========================================================================
    3. 60er JAHRE ANALOG COCKPIT DESIGN ("SIXPACK" VIBE)
    ========================================================================== */
-
 body.theme-retro {
     --piper-white: #f4f4f4;
     --piper-yellow: #f2c12e;
@@ -157,18 +140,13 @@ body.theme-retro {
 body.theme-retro .container {
     background: linear-gradient(135deg, #2a2d34, #18191c);
     padding: 35px 25px 25px 25px; 
-    border-radius: 8px; 
-    backdrop-filter: none; 
-    -webkit-backdrop-filter: none;
-    border: 2px solid #444;
-    border-bottom: 4px solid #111;
-    border-right: 4px solid #111;
+    border-radius: 8px; backdrop-filter: none; -webkit-backdrop-filter: none;
+    border: 2px solid #444; border-bottom: 4px solid #111; border-right: 4px solid #111;
     box-shadow: 0 20px 50px rgba(0,0,0,0.9);
 }
 
 body.theme-retro .screw {
-    display: block;
-    position: absolute; width: 14px; height: 14px; 
+    display: block; position: absolute; width: 14px; height: 14px; 
     background: linear-gradient(135deg, #aaa, #444); border-radius: 50%; 
     box-shadow: inset 0 0 3px #000, 0 1px 2px rgba(255,255,255,0.1);
 }
@@ -179,50 +157,26 @@ body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20d
 body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
 
 body.theme-retro h1 { 
-    font-family: 'Oleo Script', cursive; 
-    font-size: 38px; 
-    color: #f4f4f4; 
-    text-shadow: 
-        -1px -1px 0 #aaa,
-        1px 1px 0 #555,
-        2px 2px 0 #444,
-        3px 3px 5px rgba(0,0,0,0.8);
-    font-weight: 400;
-    letter-spacing: 1px; 
-    border-bottom: none; 
-    padding-bottom: 0; 
-    margin-bottom: 15px;
-    transform: rotate(-2deg);
+    font-family: 'Oleo Script', cursive; font-size: 38px; color: #f4f4f4; 
+    text-shadow: -1px -1px 0 #aaa, 1px 1px 0 #555, 2px 2px 0 #444, 3px 3px 5px rgba(0,0,0,0.8);
+    font-weight: 400; letter-spacing: 1px; border-bottom: none; padding-bottom: 0; 
+    margin-bottom: 15px; transform: rotate(-2deg);
 }
 
 body.theme-retro #searchIndicator { color: var(--piper-yellow); font-weight: bold; }
 
 body.theme-retro label { 
-    background: #111; color: #ddd; border: 1px solid #000; 
-    padding: 3px 6px; border-radius: 2px; margin-bottom: 5px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); 
-    letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
+    background: #111; color: #ddd; border: 1px solid #000; padding: 3px 6px; border-radius: 2px; margin-bottom: 5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
 }
 
 body.theme-retro input, body.theme-retro select { 
-    background-color: #f0eada; 
-    border: 1px solid #c2bba8;
-    border-right: none; 
-    color: #111; 
-    text-shadow: none;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: bold;
-    font-size: 14px;
-    border-radius: 2px 0 0 2px;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); 
-    letter-spacing: -0.5px;
-    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    position: relative;
-    padding-right: 20px; 
+    background-color: #f0eada; border: 1px solid #c2bba8; border-right: none; color: #111; text-shadow: none;
+    font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 14px; border-radius: 2px 0 0 2px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); letter-spacing: -0.5px; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative; padding-right: 20px; 
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='40' viewBox='0 0 15 40'%3E%3Cpath fill='%23f0eada' d='M0 0h15L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6H0z'/%3E%3Cpath fill='none' stroke='%23c2bba8' stroke-width='1.5' stroke-linecap='round' d='M15 0L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6' opacity='0.7'/%3E%3C/svg%3E");
-    background-repeat: repeat-y;
-    background-position: right top;
-    background-size: auto 100%;
+    background-repeat: repeat-y; background-position: right top; background-size: auto 100%;
 }
 
 body.theme-retro #startLoc { transform: rotate(-1.5deg); border-left: 6px solid #d93829; }
@@ -233,12 +187,7 @@ body.theme-retro #regionFilter { transform: rotate(-1deg); border-left: 6px soli
 body.theme-retro #dirPref { transform: rotate(0.5deg); border-left: 6px solid #f2c12e; }
 body.theme-retro #maxSeats { transform: rotate(-1.5deg); border-left: 6px solid #f2c12e; }
 
-body.theme-retro input:focus, body.theme-retro select:focus { 
-    outline: none; 
-    transform: scale(1.02) rotate(0deg) !important; 
-    box-shadow: 4px 4px 12px rgba(0,0,0,0.5); 
-    z-index: 10;
-}
+body.theme-retro input:focus, body.theme-retro select:focus { outline: none; transform: scale(1.02) rotate(0deg) !important; box-shadow: 4px 4px 12px rgba(0,0,0,0.5); z-index: 10; }
 
 body.theme-retro .btn-preset { 
     background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
@@ -249,430 +198,218 @@ body.theme-retro .btn-preset:active { transform: translate(2px, 2px); border-bot
 
 body.theme-retro .slider-container { background: transparent; border: none; padding: 0; margin-top: 15px;}
 body.theme-retro input[type=range] { height: 8px; background: #111; border: 2px inset #444; border-radius: 10px; transform: none; box-shadow:none;}
-body.theme-retro input[type=range]::-webkit-slider-thumb { 
-    height: 24px; width: 12px; border-radius: 2px; 
-    background: linear-gradient(to right, #ccc, #fff, #ccc); 
-    border: 1px solid #000; box-shadow: 0 3px 5px rgba(0,0,0,0.8); 
-}
+body.theme-retro input[type=range]::-webkit-slider-thumb { height: 24px; width: 12px; border-radius: 2px; background: linear-gradient(to right, #ccc, #fff, #ccc); border: 1px solid #000; box-shadow: 0 3px 5px rgba(0,0,0,0.8); }
 
 body.theme-retro .btn-main { 
     background: linear-gradient(to bottom, #d93829, #8a1a12); color: #fff; 
     border: 2px solid #222; border-bottom: 5px solid #111; border-right: 4px solid #111;
-    border-radius: 6px; font-family: 'Arial', sans-serif; font-weight: 900; letter-spacing: 1px;
-    box-shadow: 0 5px 10px rgba(0,0,0,0.6);
+    border-radius: 6px; font-family: 'Arial', sans-serif; font-weight: 900; letter-spacing: 1px; box-shadow: 0 5px 10px rgba(0,0,0,0.6);
 }
 body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
-body.theme-retro #map { 
-    border: 4px solid #e0d8c8; 
-    border-radius: 4px; 
-    background: #e0d8c8; 
-    filter: sepia(0.2) brightness(1.05) contrast(0.95);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-}
-
+body.theme-retro #map { border: 4px solid #e0d8c8; border-radius: 4px; background: #e0d8c8; filter: sepia(0.2) brightness(1.05) contrast(0.95); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
 body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
 
-body.theme-retro .flightplan-container {
-    position: relative;
-    z-index: 1;
-}
+body.theme-retro .flightplan-container { position: relative; z-index: 1; }
 body.theme-retro .flightplan-container::before {
-    content: '';
-    position: absolute;
-    top: 25px; bottom: 25px; left: 50%; transform: translateX(-50%);
-    width: 14px;
+    content: ''; position: absolute; top: 25px; bottom: 25px; left: 50%; transform: translateX(-50%); width: 14px;
     background-color: #e4e4e4;
-    background-image: 
-        linear-gradient(transparent 15%, #2a2d34 16%, transparent 18%),
-        linear-gradient(transparent 42%, #2a2d34 44%, #2a2d34 46%, transparent 48%),
-        linear-gradient(transparent 78%, #2a2d34 79%, transparent 81%);
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4);
-    border-radius: 2px;
-    z-index: 0;
+    background-image: linear-gradient(transparent 15%, #2a2d34 16%, transparent 18%), linear-gradient(transparent 42%, #2a2d34 44%, #2a2d34 46%, transparent 48%), linear-gradient(transparent 78%, #2a2d34 79%, transparent 81%);
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4); border-radius: 2px; z-index: 0;
 }
 
 body.theme-retro .aero-info-box { 
-    background: #2b2d31; 
-    border-radius: 12px; 
-    border: 4px solid #5a5f6a; 
+    background: #2b2d31; border-radius: 12px; border: 4px solid #5a5f6a; 
     box-shadow: inset 0 5px 15px rgba(0,0,0,0.4), 0 5px 10px rgba(0,0,0,0.8); 
-    margin-bottom: 15px;
-    position: relative;
-    z-index: 2; 
+    margin-bottom: 15px; position: relative; z-index: 2; 
 }
-body.theme-retro .aero-info-box::before, body.theme-retro .aero-info-box::after {
-    content: ''; position: absolute; width: 6px; height: 6px; 
-    background: #777; border-radius: 50%; box-shadow: inset 0 0 2px #000;
-}
+body.theme-retro .aero-info-box::before, body.theme-retro .aero-info-box::after { content: ''; position: absolute; width: 6px; height: 6px; background: #777; border-radius: 50%; box-shadow: inset 0 0 2px #000; }
 body.theme-retro .aero-info-box::before { top: 5px; left: 5px; }
 body.theme-retro .aero-info-box::after { bottom: 5px; right: 5px; }
 
 body.theme-retro .route-data { color: var(--piper-white); text-shadow: none; font-size: 18px; }
-body.theme-retro .highlight { color: var(--piper-yellow); text-shadow: none; background: transparent; padding: 0;}
 body.theme-retro .copy-box { background: #222; border: 2px inset #444; color: #fff; }
 body.theme-retro .copy-box:hover { color: var(--piper-yellow); }
 
-body.theme-retro .btn-action { 
-    background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
-    border: 2px solid #222; border-bottom: 3px solid #111; border-right: 2px solid #111;
-    font-family: 'Arial', sans-serif; font-weight: 900;
-}
-body.theme-retro .btn-action:active { transform: translate(1px, 2px); border-bottom: 1px solid #111; }
-
 body.theme-retro .btn-log { 
     background: linear-gradient(to bottom, #f2c12e, #a88212); color: #111; 
-    border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
-    font-family: 'Arial', sans-serif; font-weight: 900;
+    border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111; font-family: 'Arial', sans-serif; font-weight: 900;
 }
-body.theme-retro .btn-log:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; }
+body.theme-retro .btn-log:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
 body.theme-retro .theme-switch-wrapper { border-top: 2px dashed #444; }
-
 body.theme-retro .logbook { border-top: 3px solid #444; }
 body.theme-retro .log-entry { background: #1a1c1e; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
 
 /* ==========================================================================
    4. MECHANISCHE TROMMELZÄHLWERKE (Flat & Clean)
    ========================================================================== */
-.drum-readout-container {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
+.drum-readout-container { display: inline-flex; align-items: center; gap: 4px; }
 body.theme-retro .drum-window {
-    display: inline-flex;
-    gap: 1px; 
-    background-color: #111; 
-    border-radius: 3px;
-    height: 22px; 
-    overflow: hidden; 
-    position: relative;
-    padding: 0 2px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); 
+    display: inline-flex; gap: 1px; background-color: #111; border-radius: 3px; height: 22px; 
+    overflow: hidden; position: relative; padding: 0 2px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); 
 }
-
-body.theme-retro .drum-strip {
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); 
-    will-change: transform;
-    background-color: transparent; 
-}
-
-body.theme-retro .drum-digit {
-    height: 22px;
-    line-height: 22px;
-    font-family: 'Courier New', monospace;
-    font-weight: bold;
-    font-size: 17px;
-    color: var(--piper-white);
-    text-align: center;
-    width: 12px; 
-    background-color: transparent; 
-}
-
-body.theme-retro .highlight .drum-digit,
-body.theme-retro .theme-green-text .drum-digit {
-    color: var(--piper-yellow);
-}
+body.theme-retro .drum-strip { display: flex; flex-direction: column; transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); will-change: transform; background-color: transparent; }
+body.theme-retro .drum-digit { height: 22px; line-height: 22px; font-family: 'Courier New', monospace; font-weight: bold; font-size: 17px; color: var(--piper-white); text-align: center; width: 12px; background-color: transparent; }
+body.theme-retro .highlight .drum-digit, body.theme-retro .theme-green-text .drum-digit { color: var(--piper-yellow); }
 
 /* ==========================================================================
-   5. ACTION BAR & ANALOGES S-METER (Funk-Pegel)
+   5. ACTION BAR & ANALOGES S-METER
    ========================================================================== */
-.action-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    margin-top: 15px; 
-}
+.action-bar { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 15px; }
+.action-bar .btn-main { flex-grow: 1; margin-top: 0 !important; }
 
-.action-bar .btn-main {
-    flex-grow: 1;
-    margin-top: 0 !important; 
-}
-
-/* --- MODERN DESIGN --- */
-.analog-meter {
-    display: none; /* <--- WICHTIG: Versteckt das Instrument im modernen Design! */
-    width: 65px; height: 45px;
-    background: #111; border: 1px solid #444; border-radius: 6px;
-    position: relative; overflow: hidden; flex-shrink: 0;
-}
+.analog-meter { display: none; width: 65px; height: 45px; background: #111; border: 1px solid #444; border-radius: 6px; position: relative; overflow: hidden; flex-shrink: 0; }
 .meter-face { position: absolute; inset: 4px; border-top: 2px dashed #555; border-radius: 50% 50% 0 0; }
 .meter-needle { position: absolute; bottom: -2px; left: 50%; width: 2px; height: 40px; background: var(--blue); transform-origin: bottom center; transform: translateX(-50%) rotate(-45deg); transition: transform 0.1s; }
 .meter-led { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #222; }
 .meter-led.led-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .meter-label { display: none; }
 
-/* --- RETRO DESIGN: Das alte Radio-Instrument --- */
-body.theme-retro .analog-meter {
-    display: block; /* <--- WICHTIG: Holt das Instrument im Retro-Mode zurück! */
-    width: 75px; 
-    height: 50px;
-    background: #1e1f22; 
-    border: 3px solid #4a4e59; 
-    border-radius: 6px;
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5);
-}
-
-.meter-face { position: absolute; inset: 4px; border-top: 2px dashed #555; border-radius: 50% 50% 0 0; }
-.meter-needle { position: absolute; bottom: -2px; left: 50%; width: 2px; height: 40px; background: var(--blue); transform-origin: bottom center; transform: translateX(-50%) rotate(-45deg); transition: transform 0.1s; }
-.meter-led { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #222; }
-.meter-led.led-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.meter-label { display: none; }
-
-body.theme-retro .analog-meter {
-    width: 75px; 
-    height: 50px;
-    background: #1e1f22; 
-    border: 3px solid #4a4e59; 
-    border-radius: 6px;
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5);
-}
-
-body.theme-retro .meter-face {
-    position: absolute;
-    top: 5px; left: 5px; right: 5px; bottom: 3px;
-    background-color: #f0eada; 
-    border-radius: 2px 2px 0 0;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-    border: none;
-}
-
-body.theme-retro .meter-scale {
-    position: absolute;
-    bottom: 0; left: 10%; width: 80%; height: 90%;
-    border-radius: 50% 50% 0 0;
-    border-top: 2px solid #555;
-    border-left: 2px solid transparent;
-    border-right: 2px solid transparent;
-}
-
-body.theme-retro .meter-needle {
-    background: #d93829;
-    height: 38px;
-    bottom: 2px;
-    box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    transition: transform 0.12s cubic-bezier(0.25, 1, 0.5, 1);
-    z-index: 2;
-}
-
-body.theme-retro .analog-meter::after {
-    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 10px; height: 6px; background: #222; border-radius: 50% 50% 0 0;
-    border: 1px solid #000; z-index: 3;
-}
-
-body.theme-retro .meter-led {
-    width: 6px; height: 6px;
-    top: 6px; right: 8px;
-    background: #002200; 
-    border: 1px solid #000;
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.2);
-    z-index: 3;
-}
-
-body.theme-retro .meter-led.led-active {
-    background: #00ff41; 
-    box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff;
-    border-color: #fff;
-}
-
-body.theme-retro .meter-label {
-    display: block; position: absolute; bottom: 2px; left: 4px;
-    font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif;
-}
+body.theme-retro .analog-meter { display: block; width: 75px; height: 50px; background: #1e1f22; border: 3px solid #4a4e59; border-radius: 6px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5); }
+body.theme-retro .meter-face { position: absolute; top: 5px; left: 5px; right: 5px; bottom: 3px; background-color: #f0eada; border-radius: 2px 2px 0 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); border: none; }
+body.theme-retro .meter-scale { position: absolute; bottom: 0; left: 10%; width: 80%; height: 90%; border-radius: 50% 50% 0 0; border-top: 2px solid #555; border-left: 2px solid transparent; border-right: 2px solid transparent; }
+body.theme-retro .meter-needle { background: #d93829; height: 38px; bottom: 2px; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); transition: transform 0.12s cubic-bezier(0.25, 1, 0.5, 1); z-index: 2; }
+body.theme-retro .analog-meter::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 10px; height: 6px; background: #222; border-radius: 50% 50% 0 0; border: 1px solid #000; z-index: 3; }
+body.theme-retro .meter-led { width: 6px; height: 6px; top: 6px; right: 8px; background: #002200; border: 1px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); z-index: 3; }
+body.theme-retro .meter-led.led-active { background: #00ff41; box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff; border-color: #fff; }
+body.theme-retro .meter-label { display: block; position: absolute; bottom: 2px; left: 4px; font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif; }
 
 /* ==========================================================================
-   6. DER NOTIZZETTEL (Mission Briefing)
+   6. DER NOTIZZETTEL-STAPEL (Interaktive Blätter)
    ========================================================================== */
-#mTitle {
-    margin-top: 0;
-    font-size: 19px;
-    color: var(--blue);
-}
-.mission-note-wrapper {
-    margin-bottom: 15px;
-}
+#mTitle { margin-top: 0; font-size: 19px; color: var(--blue); }
 .story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
+.wiki-title { display: none; } /* Nur in Retro sichtbar */
+.wiki-info-note { font-size: 14px; color: #ccc; font-style: italic; line-height: 1.5; }
 
-body.theme-retro .mission-note-wrapper {
+/* Modern Mode (Normale Reihenfolge, kein Stapel) */
+.notes-stack { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+.paperclip, .page-number { display: none; } /* Im Modern Mode ausblenden */
+.mission-note-page { display: block !important; opacity: 1 !important; transform: none !important; }
+
+/* --- RETRO DESIGN: Stapel mit Büroklammer --- */
+body.theme-retro .notes-stack {
+    display: grid; /* Erlaubt das exakte Übereinanderlegen */
+    grid-template-areas: "stack";
+    position: relative;
+    margin-bottom: 25px;
+    cursor: pointer; /* Signalisiert Klickbarkeit */
+}
+
+/* Die Büroklammer als SVG oben auf dem Stapel */
+body.theme-retro .paperclip {
+    display: block;
+    position: absolute;
+    top: -15px; left: 50px;
+    width: 25px; height: 60px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 60'%3E%3Cpath d='M10 40 V12 a4 4 0 0 1 8 0 v32 a6 6 0 0 1-12 0 V10 a8 8 0 0 1 16 0 v32' fill='none' stroke='%23889' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    z-index: 10;
+    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+}
+
+body.theme-retro .mission-note-page {
+    grid-area: stack; /* Beide Seiten liegen im selben CSS Grid Bereich */
     background-color: #fdf5e6; 
     background-image: repeating-linear-gradient(transparent, transparent 23px, #a6bccc 24px);
     background-size: 100% 24px;
     background-position: 0 4px; 
-    
     padding: 15px 15px 15px 45px; 
     border-radius: 2px 6px 4px 2px;
-    box-shadow: 3px 5px 12px rgba(0,0,0,0.6); 
-    transform: rotate(-1.5deg); 
-    position: relative;
-    margin-bottom: 25px;
     border: 1px solid #d3cbb8;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* Sanfte Animation beim Tauschen */
 }
 
-body.theme-retro .mission-note-wrapper::before {
-    content: '';
+/* Der rote Rand des College-Blocks */
+body.theme-retro .mission-note-page::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 30px; width: 1px; background-color: rgba(220, 50, 50, 0.4);
+}
+
+/* Dynamische Z-Indizes und Drehungen für den vorderen / hinteren Zettel */
+body.theme-retro .front-note {
+    z-index: 2;
+    transform: rotate(-1.5deg);
+    box-shadow: 3px 5px 12px rgba(0,0,0,0.6);
+    opacity: 1;
+}
+body.theme-retro .back-note {
+    z-index: 1;
+    /* Ragt leicht rechts und unten heraus */
+    transform: rotate(2deg) translate(8px, 6px);
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.5);
+    /* Leicht abgedunkelt, da er im Schatten liegt */
+    filter: brightness(0.85); 
+}
+
+/* Handschrift für Seitenzahlen */
+body.theme-retro .page-number {
+    display: block;
     position: absolute;
-    top: 0; bottom: 0; left: 30px;
-    width: 1px;
-    background-color: rgba(220, 50, 50, 0.4);
+    bottom: 5px; right: 10px;
+    font-family: 'Caveat', cursive;
+    font-size: 18px;
+    color: #0b1f65;
+    opacity: 0.6;
 }
 
-body.theme-retro #mTitle {
+body.theme-retro #mTitle, body.theme-retro .wiki-title {
+    display: block;
     font-family: 'Caveat', cursive;
     font-size: 28px;
     color: #0b1f65; 
     text-shadow: none;
-    margin-bottom: 8px;
-    margin-top: 0;
+    margin-bottom: 8px; margin-top: 0;
     transform: rotate(-1deg); 
     line-height: 1.2;
 }
 
-body.theme-retro #mStory {
+body.theme-retro #mStory, body.theme-retro .wiki-info-note {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    font-weight: bold;
-    color: #222; 
-    line-height: 24px; 
-    border: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
-    text-shadow: none;
-    letter-spacing: -0.5px;
-    font-style: normal; /* Hebt das italic vom Classic-Mode auf */
+    font-size: 14px; font-weight: bold; color: #222; 
+    line-height: 24px; /* Exakt auf der Linie */
+    border: none; padding-bottom: 0; margin-bottom: 0;
+    text-shadow: none; letter-spacing: -0.5px; font-style: normal;
 }
 
 /* ==========================================================================
    7. PAYLOAD & FRACHT (Auf dem Notizzettel)
    ========================================================================== */
+.note-manifest { display: grid; grid-template-columns: 1fr 1fr; margin-top: 15px; padding-top: 12px; border-top: 1px dashed #444; font-size: 14px; color: #eee; }
+.note-manifest strong { color: #888; display: block; font-size: 11px; text-transform: uppercase; margin-bottom: 2px; }
+.note-manifest span { font-size: 16px; font-weight: bold; color: #fff; }
 
-/* Classic Mode (Modern & Clean) */
-.note-manifest {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 15px;
-    padding-top: 12px;
-    border-top: 1px dashed #444;
-    font-size: 14px;
-    color: #eee;
-}
-.note-manifest strong {
-    color: #888;
-    display: block;
-    font-size: 11px;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-}
-.note-manifest span {
-    font-size: 16px;
-    font-weight: bold;
-    color: #fff;
-}
-
-/* Retro Mode (Schreibmaschine auf dem College-Block) */
-body.theme-retro .note-manifest {
-    display: block;
-    margin-top: 24px; /* Überspringt exakt eine blaue Schreib-Linie (24px) als Absatz */
-    padding-top: 0;
-    border-top: none;
-}
-
-body.theme-retro .note-manifest div {
-    line-height: 24px; /* Text sitzt exakt auf der blauen Linie! */
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
-    font-weight: bold;
-    color: #222; /* Schwarze Tinte */
-}
-
-/* Rote Tinte für die Labels wie beim zweifarbigen Farbband */
-body.theme-retro .note-manifest strong {
-    display: inline;
-    font-size: 14px;
-    color: #d93829; 
-    margin-right: 5px;
-    text-transform: uppercase;
-}
-
-body.theme-retro .note-manifest span {
-    font-size: 14px;
-    font-weight: bold;
-    color: #222;
-}
+body.theme-retro .note-manifest { display: block; margin-top: 24px; padding-top: 0; border-top: none; }
+body.theme-retro .note-manifest div { line-height: 24px; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; color: #222; }
+body.theme-retro .note-manifest strong { display: inline; font-size: 14px; color: #d93829; margin-right: 5px; text-transform: uppercase; }
+body.theme-retro .note-manifest span { font-size: 14px; font-weight: bold; color: #222; }
 
 /* ==========================================================================
    8. PANEL SCHALTER (METAR & AIP)
    ========================================================================== */
-
-.switch-row {
-    display: flex;
-    gap: 15px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed #444; /* Trennlinie zur Pisten-Info */
-}
-
-/* Modern Mode (Kleine Pillen-Buttons) */
-.retro-switch-container {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    background: #333;
-    padding: 6px 12px;
-    border-radius: 20px;
-    transition: background-color 0.2s;
-}
+.switch-row { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #444; }
+.retro-switch-container { display: flex; align-items: center; gap: 6px; cursor: pointer; background: #333; padding: 6px 12px; border-radius: 20px; transition: background-color 0.2s; }
 .retro-switch-container:hover { background: #555; }
-.retro-switch { display: none; } /* Die Mechanik bleibt im Modern Mode versteckt */
+.retro-switch { display: none; } 
 .retro-switch-label { font-size: 11px; font-weight: bold; color: #fff; text-transform: uppercase; }
 
-/* Retro Mode (Mechanische Push-Buttons mit Label) */
-body.theme-retro .switch-row {
-    border-top: 1px solid #4a4e59; /* Passt sich dem Instrumenten-Rand an */
-}
-
-body.theme-retro .retro-switch-container {
-    background: transparent;
-    padding: 0;
-    border-radius: 0;
-}
+body.theme-retro .switch-row { border-top: 1px solid #4a4e59; }
+body.theme-retro .retro-switch-container { background: transparent; padding: 0; border-radius: 0; }
 body.theme-retro .retro-switch-container:hover { background: transparent; }
 
-/* Der rote, mechanische Knopf */
 body.theme-retro .retro-switch {
-    display: block;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, #d93829, #8a1a12); /* Roter Plastik-Glanz */
-    border: 2px solid #111; /* Schwarze Fassung */
+    display: block; width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #d93829, #8a1a12); border: 2px solid #111; 
     box-shadow: 0 3px 5px rgba(0,0,0,0.8), inset 0 1px 2px rgba(255,255,255,0.4);
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-/* Das weiße Beschriftungsschildchen */
 body.theme-retro .retro-switch-label {
-    background: #e4e4e4; 
-    color: #111;
-    font-family: 'Arial', sans-serif;
-    font-size: 10px;
-    font-weight: 900;
-    padding: 2px 5px;
-    border-radius: 2px;
-    border: 1px solid #888;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.6);
-    letter-spacing: 0.5px;
+    background: #e4e4e4; color: #111; font-family: 'Arial', sans-serif; font-size: 10px; font-weight: 900;
+    padding: 2px 5px; border-radius: 2px; border: 1px solid #888; box-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px;
 }
 
-/* Der mechanische Klick-Effekt! */
 body.theme-retro .retro-switch-container:active .retro-switch {
-    transform: translateY(3px); /* Knopf drückt sich ein */
-    box-shadow: 0 0 2px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.7);
+    transform: translateY(3px); box-shadow: 0 0 2px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.7);
 }
-
