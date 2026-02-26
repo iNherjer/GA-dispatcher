@@ -80,10 +80,14 @@ window.onload = () => {
         }
     }
 
-    renderLog();
-    setDrumCounter('tasDrum', 160);
-    setDrumCounter('gphDrum', 14);
+        renderLog();
+    
+    // Gibt dem Browser 100ms Zeit, das CSS zu laden, bevor die Trommeln einrasten
+    setTimeout(() => {
+        refreshAllDrums();
+    }, 100);
 };
+
 
 // API Key speichern
 function saveApiKey() {
