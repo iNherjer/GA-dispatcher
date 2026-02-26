@@ -63,12 +63,12 @@ function setDrumCounter(elementId, valueStr) {
         return;
     }
 
-    // Im Retro Mode: Trommel-Mechanik bauen
+    // Im Retro Mode: Trommel-Animation bauen (flach und sauber)
     let numericValue = valueStr.toString().replace(/[^0-9]/g, '');
     if (numericValue === "") numericValue = "0"; 
     
     const digits = numericValue.split('');
-    const digitHeight = 22; 
+    const digitHeight = 22; // Muss zur CSS-Höhe passen
 
     let windowEl = container.querySelector('.drum-window');
     if (!windowEl) {
@@ -79,6 +79,7 @@ function setDrumCounter(elementId, valueStr) {
     const existingStrips = windowEl.querySelectorAll('.drum-strip');
     const neededStrips = digits.length;
 
+    // Streifen hinzufügen
     if (existingStrips.length < neededStrips) {
         for (let i = 0; i < (neededStrips - existingStrips.length); i++) {
             const strip = document.createElement('div');
@@ -87,12 +88,14 @@ function setDrumCounter(elementId, valueStr) {
             windowEl.appendChild(strip);
         }
     } 
+    // Streifen entfernen
     else if (existingStrips.length > neededStrips) {
         for (let i = neededStrips; i < existingStrips.length; i++) {
             windowEl.removeChild(existingStrips[i]);
         }
     }
 
+    // Positionen animieren
     const finalStrips = windowEl.querySelectorAll('.drum-strip');
     digits.forEach((digit, index) => {
         const targetDigit = parseInt(digit);
@@ -101,13 +104,13 @@ function setDrumCounter(elementId, valueStr) {
     });
 }
 
-// NEU: Reagiert auf Slider-Änderungen live
+// Reagiert auf Slider-Änderungen live
 function handleSliderChange(type, val) {
     setDrumCounter(type + 'Drum', val);
     recalculatePerformance(); // Berechnet live neu!
 }
 
-// NEU: Berechnet Zeit und Sprit neu, falls eine Mission aktiv ist
+// Berechnet Zeit und Sprit neu, falls eine Mission aktiv ist
 function recalculatePerformance() {
     if (!currentMissionData) return;
     
@@ -413,12 +416,30 @@ async function generateMission() {
     document.getElementById("wikiDescText").innerText = "Lade Region-Info...";
 
     const indicator = document.getElementById('searchIndicator');
+    
+    // ==========================================
+    // METER ANIMATION STARTEN (SUCHEN)
+    // ==========================================
+    const needle = document.getElementById('meterNeedle');
+    const led = document.getElementById('meterLed');
+    if (led) led.classList.remove('led-active'); // Lampe aus
+    
+    if (window.meterInterval) clearInterval(window.meterInterval);
+    window.meterInterval = setInterval(() => {
+        // Nadel zuckt wild zwischen -20° und +40° hin und her
+        const randomAngle = Math.floor(Math.random() * 60) - 20; 
+        if (needle) needle.style.transform = `translateX(-50%) rotate(${randomAngle}deg)`;
+    }, 120);
+    // ==========================================
+
     currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
     const start = await getAirportData(currentStartICAO);
     
     if(!start) { 
         alert("Startplatz unbekannt!"); 
         resetBtn(btn); 
+        if(window.meterInterval) clearInterval(window.meterInterval);
+        if (needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`;
         return; 
     }
     
@@ -489,6 +510,8 @@ async function generateMission() {
     if(!dest) { 
         indicator.innerText = "Fehler: Kein passendes Ziel gefunden."; 
         resetBtn(btn); 
+        if(window.meterInterval) clearInterval(window.meterInterval);
+        if (needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`;
         return; 
     }
     
@@ -516,7 +539,12 @@ async function generateMission() {
         cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
     }
     
-    // UPDATE: Mission Data speichert nun auch das Heading für den Theme-Wechsel!
+    const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
+    const totalMinutes = Math.round((totalDist / selectedTas) * 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`;
+
     currentMissionData = { 
         start: currentStartICAO, 
         dest: currentDestICAO, 
@@ -534,12 +562,10 @@ async function generateMission() {
     document.getElementById("mDepName").innerText = start.n;
     document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
     
-    // Trommeln drehen (Live Update Berechnung wird danach gerufen)
     setDrumCounter('headingDrum', nav.brng);
     setDrumCounter('distDrum', totalDist);
     document.getElementById('headingArrow').innerText = getArrow(nav.brng);
     
-    // Zeit und Sprit berechnen (über die neue Live-Funktion)
     recalculatePerformance();
 
     document.getElementById("destIcon").innerText = isPOI ? "🎯" : "🛬";
@@ -570,6 +596,15 @@ async function generateMission() {
         
         indicator.innerText = `Briefing komplett.`;
         resetBtn(btn);
+        
+        // ==========================================
+        // METER ANIMATION STOPPEN (ERFOLG)
+        // ==========================================
+        if(window.meterInterval) clearInterval(window.meterInterval);
+        if(needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`; // Fällt ganz nach links
+        if(led) led.classList.add('led-active'); // Grünes Lämpchen AN
+        // ==========================================
+
     }, 800); 
 }
 
