@@ -15,6 +15,7 @@
     <meta name="theme-color" content="#080808">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -85,7 +86,7 @@
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="handleSliderChange('tas', this.value)">
     </div>
     
-        <div class="action-bar">
+    <div class="action-bar">
         <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
         
         <div class="analog-meter" id="searchMeter" title="Signalstärke">
@@ -97,10 +98,10 @@
             <div class="meter-led" id="meterLed"></div>
         </div>
     </div>
-
+    
     <div id="map"></div>
 
-        <div id="briefingBox" class="briefing">
+    <div id="briefingBox" class="briefing">
         
         <div class="mission-note-wrapper">
             <h2 id="mTitle"></h2>
@@ -108,7 +109,6 @@
         </div>
         
         <div class="flightplan-container" style="display:flex; flex-direction:column;">
-
             
             <div class="aero-info-box" id="boxDep">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
@@ -175,7 +175,7 @@
 
 </div>
 
-<div class="version-info">Version 88.0 (Live Dynamic Drums)</div>
+<div class="version-info">Version 89.0 (Full Cockpit Edition)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
