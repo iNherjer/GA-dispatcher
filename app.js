@@ -317,26 +317,32 @@ async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
     domEl.innerText = "Keine Daten gefunden"; domEl.style.color = "#888";
 }
 
-// NEU: Die magische KI-Verbindung (Optimierter Prompt für realistische GA-Flüge)
+// NEU: Die magische KI-Verbindung (Optimierter Prompt mit POI/Trainings-Logik)
 async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, cargoText) {
     const apiKey = document.getElementById('apiKeyInput').value.trim();
-    if (!apiKey) return null; // Kein Key = Sofortiger Fallback auf Datenbank
+    if (!apiKey) return null;
 
-    // Hier geben wir der KI ihre strengen Leitplanken!
+    // Dynamischer Prompt: Unterscheidet strikt zwischen A-nach-B und POI-Rundflug!
     const prompt = `Du bist ein Dispatcher für die allgemeine Luftfahrt (General Aviation).
-    Erstelle ein realistisches Briefing für diesen Flug:
+    Erstelle ein realistisches Einsatzbriefing:
     Start: ${startName}
-    Ziel: ${destName} ${isPOI ? '(Rundflug / POI)' : '(Flugplatz)'}
-    Distanz: ${dist} NM
+    Ziel/Fokus: ${destName} ${isPOI ? '(POI / Wendepunkt)' : '(Zielflughafen)'}
+    Distanz (Gesamt): ${dist} NM
     Zuladung: ${paxText}, ${cargoText} Fracht.
 
     WICHTIGE REGELN:
     1. Antworte IMMER auf Deutsch!
-    2. Nutze ausschließlich extrem realistische Themen der Zivilluftfahrt (z.B. Sightseeing, Vereinsausflug, Luftbild/LiDAR-Vermessung, Pipeline- oder Strommasten-Inspektion, Geschäftsreise, dringender Ersatzteil-Transport, Immobilien-Besichtigung). Keine Sci-Fi- oder Actionfilm-Themen!
-    3. Beziehe eine kurze echte geografische oder kulturelle Besonderheit der Start- oder Zielregion mit ein, damit es authentisch wirkt.
-    4. Schreibe knapp und professionell im Ton eines echten Dispatcher-Briefings auf dem Klemmbrett.
+    2. Schreibe knapp und professionell im Ton eines echten Dispatcher-Briefings auf dem Klemmbrett. Keine Sci-Fi- oder Action-Motive.
+    3. Baue echte geografische oder historische Fakten zur Region ein.
+    ${isPOI ? 
+    `4. RUNDFLUG-REGELN: Dies ist ein Rundflug! Start und Landung ist ${startName}. Am POI (${destName}) wird NICHTS gelandet oder ausgeladen! 
+    5. AUFGABE: Nutze klassische Rundflug-Motive (Sightseeing-Gäste, Fotoflug, LiDAR-Vermessung, Wildtierzählung). 
+    6. TRAININGS-FALLBACK: Wenn der POI völlig unspektakulär ist, deklariere den Flug als TRAININGSFLUG. Der Pilot soll über diesem Gebiet bestimmte Manöver üben (z.B. Steilkurven, Notlandeübungen, Navigation ohne GPS).` 
+    : 
+    `4. ROUTEN-REGELN: Dies ist ein normaler Streckenflug von ${startName} nach ${destName}. 
+    5. AUFGABE: Typische GA-Aufgaben (z.B. Geschäftsreise, dringender Ersatzteil-Transport, Vereinsausflug, Flugzeug-Überführung).`}
 
-    Antworte AUSSCHLIESSLICH als JSON. Keine Markdown-Zeichen (kein \`\`\`json).
+    Antworte AUSSCHLIESSLICH als JSON. Keine Markdown-Formatierung (kein \`\`\`json).
     Struktur: {"title": "Kurzer, knackiger Titel", "story": "Das Briefing (max 3-4 Sätze)"}`;
 
     try {
@@ -357,14 +363,15 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
         return {
             t: parsed.title,
             s: parsed.story,
-            i: "📋", // Neutrales Klemmbrett-Icon statt dem Roboter!
+            i: "📋",
             cat: "std"
         };
     } catch (e) {
         console.warn("Gemini API fehlgeschlagen. Nutze lokale Fallback-Datenbank.", e);
-        return null; // Löst den Fallback aus
+        return null;
     }
 }
+
 
 /* =========================================================
    5. HAUPT-LOGIK: AUFTRAG GENERIEREN
