@@ -685,14 +685,22 @@ function updateMap(lat1, lon1, lat2, lon2, s, d) {
     ];
     
     polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
+    
+    // Karte erst grob auf die Route ausrichten
     map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
 
+    // UPDATE: Minimaler Zoom für Lufträume erzwungen
     setTimeout(() => {
-        if (map.getZoom() < 9) {
-            map.setZoom(9);
+        // Stufe 10 ist ideal für VFR-Lufträume (früher stand hier 9)
+        if (map.getZoom() < 10) {
+            map.setZoom(10);
+            // Zentriere die Karte sicherheitshalber auf den Startflughafen,
+            // wenn reingezoomt wird, damit man weiß, wo es losgeht.
+            map.panTo([lat1, lon1]); 
         }
     }, 50);
 }
+
 
 /* =========================================================
    7. EXTERNE LINKS & LOGBUCH
