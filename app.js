@@ -50,7 +50,7 @@ let globalAirports = null;
 let runwayCache = {};
 
 window.onload = () => {
-    // 1. Theme-Logik (Retro ist jetzt Standard!)
+    // 1. Theme-Logik
     const savedTheme = localStorage.getItem('ga_theme') || 'retro'; 
     const themeToggleBtn = document.getElementById('themeToggle');
     if (savedTheme === 'retro') {
@@ -76,27 +76,26 @@ window.onload = () => {
         if (aiEnabled === 'false') {
             aiToggleBtn.checked = false;
         } else {
-            aiToggleBtn.checked = true; // Standard ist AN
+            aiToggleBtn.checked = true;
         }
     }
 
-            renderLog();
-    
-    // Gibt dem Browser 100ms Zeit, das CSS zu laden, bevor die Trommeln einrasten
+    renderLog();
+
+    // UPDATE: Mehr Zeit für den Browser zum Laden der CSS-Strukturen (250ms)
     setTimeout(() => {
-        refreshAllDrums();
-    }, 200);
+        const startTas = document.getElementById('tasSlider').value;
+        const startGph = document.getElementById('gphSlider').value;
+        setDrumCounter('tasDrum', startTas);
+        setDrumCounter('gphDrum', startGph);
+    }, 250);
 };
 
-
-
-// API Key speichern
 function saveApiKey() {
     const key = document.getElementById('apiKeyInput').value.trim();
     localStorage.setItem('ga_gemini_key', key);
 }
 
-// KI-Notausschalter speichern
 function saveAiToggle() {
     const aiToggleBtn = document.getElementById('aiToggle');
     if(aiToggleBtn) {
@@ -348,17 +347,14 @@ async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
     domEl.innerText = "Keine Daten gefunden"; domEl.style.color = "#888";
 }
 
-// NEU: Die magische KI-Verbindung (Optimierter Prompt mit POI/Trainings-Logik & Notausschalter)
 async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, cargoText) {
-    // 1. Check: Ist der KI-Schalter überhaupt an?
     const aiToggleBtn = document.getElementById('aiToggle');
     const isAiEnabled = aiToggleBtn ? aiToggleBtn.checked : true;
-    if (!isAiEnabled) return null; // Schalter AUS = Lokaler Fallback
+    if (!isAiEnabled) return null; 
 
-    // 2. Check: Ist ein Key da?
     const apiKeyInput = document.getElementById('apiKeyInput');
     const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
-    if (!apiKey) return null; // Kein Key = Lokaler Fallback
+    if (!apiKey) return null; 
 
     const prompt = `Du bist ein Dispatcher für die allgemeine Luftfahrt (General Aviation).
     Erstelle ein realistisches Einsatzbriefing:
@@ -458,8 +454,8 @@ async function generateMission() {
     const targetType = document.getElementById("targetType").value;
     const dirPref = document.getElementById("dirPref").value;
     const maxSeats = parseInt(document.getElementById("maxSeats").value);
-    const selectedTas = document.getElementById("tasSlider").value;
-    const selectedGph = document.getElementById("gphSlider").value;
+    const selectedTas = parseInt(document.getElementById("tasSlider").value) || 160;
+    const selectedGph = parseInt(document.getElementById("gphSlider").value) || 14;
     
     let targetDest = document.getElementById("destLoc").value.toUpperCase();
     let dataSource = targetDest ? "Manuell" : "Generiert";
@@ -524,9 +520,6 @@ async function generateMission() {
     let paxText = `${randomPax} PAX`;
     let cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
     
-    // ==========================================
-    // KI GENERIERUNG MIT FALLBACK
-    // ==========================================
     indicator.innerText = `Kontaktiere KI-Dispatcher...`;
     let m = await fetchGeminiMission(start.n, dest.n, totalDist, isPOI, paxText, cargoText);
 
@@ -553,12 +546,13 @@ async function generateMission() {
     const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
     const totalMinutes = Math.round((totalDist / selectedTas) * 60);
 
-    // NEU: Dispatcher-Vermerk an lokale Missionen anhängen
+    // UPDATE: Sichere Übergabe des Textes (Keine Manipulation der Datenbank)
+    let displayStory = m.s;
     if (dataSource !== "Gemini AI") {
         const hrs = Math.floor(totalMinutes / 60);
         const mins = totalMinutes % 60;
         const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min.`;
-        m.s += `\n\n[ NAV-INFO: Strecke ${totalDist} NM | ETE ca. ${timeStr} ]`;
+        displayStory += `\n\n[ NAV-INFO: Strecke ${totalDist} NM | ETE ca. ${timeStr} ]`;
     }
 
     currentMissionData = { 
@@ -567,7 +561,7 @@ async function generateMission() {
     };
     
     document.getElementById("mTitle").innerHTML = `${m.i ? m.i + ' ' : ''}${m.t}`;
-    document.getElementById("mStory").innerText = m.s;
+    document.getElementById("mStory").innerText = displayStory; // Hier wird der sichere Text eingefügt
     document.getElementById("mDepICAO").innerText = currentStartICAO;
     document.getElementById("mDepName").innerText = start.n;
     document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
