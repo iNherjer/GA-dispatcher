@@ -301,13 +301,16 @@ body.theme-retro .notes-stack {
 body.theme-retro .paperclip {
     display: block;
     position: absolute;
-    top: -15px; left: 50px;
+    top: -18px;  /* Ein kleines bisschen höher */
+    left: 20px;  /* Viel weiter nach links geschoben (vorher 50px) */
     width: 25px; height: 60px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 60'%3E%3Cpath d='M10 40 V12 a4 4 0 0 1 8 0 v32 a6 6 0 0 1-12 0 V10 a8 8 0 0 1 16 0 v32' fill='none' stroke='%23889' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     z-index: 10;
     filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+    transform: rotate(-15deg); /* Leicht gedreht, damit sie nicht den Text verdeckt */
 }
+
 
 body.theme-retro .mission-note-page {
     grid-area: stack; /* Beide Seiten liegen im selben CSS Grid Bereich */
