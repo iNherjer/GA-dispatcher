@@ -3,7 +3,7 @@
    ========================================================= */
 function toggleTheme() {
     const toggle = document.getElementById('themeToggle');
-    if(toggle.checked) {
+    if(toggle && toggle.checked) {
         document.body.classList.add('theme-retro');
         localStorage.setItem('ga_theme', 'retro');
     } else {
@@ -35,7 +35,9 @@ function updateDynamicColors() {
     const titleColor = isRetro ? 'var(--piper-white)' : 'var(--blue)';
     const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--green)';
     
-    document.getElementById('mainTitle').style.color = isRetro ? '' : titleColor;
+    const mainTitle = document.getElementById('mainTitle');
+    if (mainTitle) mainTitle.style.color = isRetro ? '' : titleColor;
+    
     document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = isRetro ? '' : primColor);
     document.querySelectorAll('.theme-green-text').forEach(el => el.style.color = hlColor);
 }
@@ -48,29 +50,53 @@ let globalAirports = null;
 let runwayCache = {};
 
 window.onload = () => {
-    const savedTheme = localStorage.getItem('ga_theme');
+    // 1. Theme-Logik (Retro ist jetzt Standard!)
+    const savedTheme = localStorage.getItem('ga_theme') || 'retro'; 
+    const themeToggleBtn = document.getElementById('themeToggle');
     if (savedTheme === 'retro') {
         document.body.classList.add('theme-retro');
-        document.getElementById('themeToggle').checked = true;
+        if(themeToggleBtn) themeToggleBtn.checked = true;
+    } else {
+        document.body.classList.remove('theme-retro');
+        if(themeToggleBtn) themeToggleBtn.checked = false;
     }
     updateDynamicColors();
 
+    // 2. Letztes Ziel laden
     const lastDest = localStorage.getItem('last_icao_dest');
     if (lastDest) document.getElementById('startLoc').value = lastDest;
     
-    // NEU: API Key laden
+    // 3. API Key & KI-Schalter laden
     const savedKey = localStorage.getItem('ga_gemini_key');
     if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+
+    const aiEnabled = localStorage.getItem('ga_ai_enabled');
+    const aiToggleBtn = document.getElementById('aiToggle');
+    if(aiToggleBtn) {
+        if (aiEnabled === 'false') {
+            aiToggleBtn.checked = false;
+        } else {
+            aiToggleBtn.checked = true; // Standard ist AN
+        }
+    }
 
     renderLog();
     setDrumCounter('tasDrum', 160);
     setDrumCounter('gphDrum', 14);
 };
 
-// NEU: API Key speichern
+// API Key speichern
 function saveApiKey() {
     const key = document.getElementById('apiKeyInput').value.trim();
     localStorage.setItem('ga_gemini_key', key);
+}
+
+// KI-Notausschalter speichern
+function saveAiToggle() {
+    const aiToggleBtn = document.getElementById('aiToggle');
+    if(aiToggleBtn) {
+        localStorage.setItem('ga_ai_enabled', aiToggleBtn.checked);
+    }
 }
 
 /* =========================================================
@@ -317,12 +343,18 @@ async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
     domEl.innerText = "Keine Daten gefunden"; domEl.style.color = "#888";
 }
 
-// NEU: Die magische KI-Verbindung (Optimierter Prompt mit POI/Trainings-Logik)
+// NEU: Die magische KI-Verbindung (Optimierter Prompt mit POI/Trainings-Logik & Notausschalter)
 async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, cargoText) {
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    if (!apiKey) return null;
+    // 1. Check: Ist der KI-Schalter überhaupt an?
+    const aiToggleBtn = document.getElementById('aiToggle');
+    const isAiEnabled = aiToggleBtn ? aiToggleBtn.checked : true;
+    if (!isAiEnabled) return null; // Schalter AUS = Lokaler Fallback
 
-    // Dynamischer Prompt: Unterscheidet strikt zwischen A-nach-B und POI-Rundflug!
+    // 2. Check: Ist ein Key da?
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
+    if (!apiKey) return null; // Kein Key = Lokaler Fallback
+
     const prompt = `Du bist ein Dispatcher für die allgemeine Luftfahrt (General Aviation).
     Erstelle ein realistisches Einsatzbriefing:
     Start: ${startName}
@@ -372,7 +404,6 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
     }
 }
 
-
 /* =========================================================
    5. HAUPT-LOGIK: AUFTRAG GENERIEREN
    ========================================================= */
@@ -399,7 +430,7 @@ async function generateMission() {
     
     const needle = document.getElementById('meterNeedle');
     const led = document.getElementById('meterLed');
-    if (led) led.classList.remove('led-green', 'led-blue'); // Macht beide Lampen aus
+    if (led) led.classList.remove('led-green', 'led-blue');
     
     if (window.meterInterval) clearInterval(window.meterInterval);
     window.meterInterval = setInterval(() => {
@@ -495,10 +526,8 @@ async function generateMission() {
     let m = await fetchGeminiMission(start.n, dest.n, totalDist, isPOI, paxText, cargoText);
 
     if (m) {
-        // KI war erfolgreich!
         dataSource = "Gemini AI";
     } else {
-        // KI fehlgeschlagen oder kein Key -> LOKALER FALLBACK
         indicator.innerText = `Lade Auftrag aus lokaler Datenbank...`;
         if (isPOI) {
             m = generateDynamicPOIMission(dest.n, maxSeats);
@@ -524,7 +553,7 @@ async function generateMission() {
         mission: m.t, dist: totalDist, ac: selectedAC, heading: nav.brng
     };
     
-    document.getElementById("mTitle").innerHTML = `${m.i} ${m.t}`;
+    document.getElementById("mTitle").innerHTML = `${m.i ? m.i + ' ' : ''}${m.t}`;
     document.getElementById("mStory").innerText = m.s;
     document.getElementById("mDepICAO").innerText = currentStartICAO;
     document.getElementById("mDepName").innerText = start.n;
@@ -563,13 +592,11 @@ async function generateMission() {
         
         if(window.meterInterval) clearInterval(window.meterInterval);
         if(needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`; 
-        
-        // NEU: Logik für die Lampenfarbe!
         if (led) {
             if (dataSource === "Gemini AI") {
-                led.classList.add('led-blue'); // KI = Blaues Leuchten
+                led.classList.add('led-blue');
             } else {
-                led.classList.add('led-green'); // Fallback/Lokal = Grünes Leuchten
+                led.classList.add('led-green');
             }
         }
     }, 800); 

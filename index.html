@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="theme-retro">
 
 <div class="container">
 
@@ -187,11 +187,17 @@
     </div>
 
     <div class="api-settings">
-        <label>🤖 KI-Dispatcher (Gemini API Key)</label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="margin: 0;">🤖 KI-Dispatcher (Gemini API)</label>
+            <label class="switch" style="transform: scale(0.7); margin: 0; transform-origin: right;">
+                <input type="checkbox" id="aiToggle" onchange="saveAiToggle()" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
         <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()">
         
         <div class="api-hint">
-            <strong>Tipp:</strong> Mehr abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen um dynamische Missionen generieren zu lassen <br>
+            <strong>Tipp:</strong> Mehr Abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen, um dynamische Missionen generieren zu lassen. <br>
             <span style="opacity: 0.7;">🔒 Sicher: Der Key wird ausschließlich lokal in deinem Browser gespeichert.</span>
         </div>
     </div>
@@ -199,7 +205,7 @@
     <div class="theme-switch-wrapper">
         <span class="switch-label">Modern</span>
         <label class="switch">
-            <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+            <input type="checkbox" id="themeToggle" onchange="toggleTheme()" checked>
             <span class="slider"></span>
         </label>
         <span class="switch-label" style="color: #d93829;">Analog</span>
