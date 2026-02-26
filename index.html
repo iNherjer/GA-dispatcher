@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-
     <title>GA Dispatcher (Analog Edition)</title>
     
     <link rel="icon" type="image/png" href="IconDRK.PNG">
@@ -73,7 +72,7 @@
     <div class="slider-container">
         <div class="slider-header">
             <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label>
-            <span id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;"></span>
+            <span id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">14</span>
         </div>
         <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="handleSliderChange('gph', this.value)">
     </div>
@@ -81,7 +80,7 @@
     <div class="slider-container">
         <div class="slider-header">
             <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label>
-            <span id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;"></span>
+            <span id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">160</span>
         </div>
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="handleSliderChange('tas', this.value)">
     </div>
@@ -111,9 +110,12 @@
                 <div class="page-number">Seite 1</div>
                 <h2 id="mTitle"></h2>
                 <p id="mStory" class="story"></p>
+                
                 <div class="note-manifest">
                     <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
                     <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
+                    <div><strong>STRECKE:</strong> <span id="mDistNote"></span></div>
+                    <div><strong>ETE CA:</strong> <span id="mETENote"></span></div>
                 </div>
             </div>
 
@@ -187,6 +189,11 @@
         </div>
     </div>
 
+    <div class="logbook">
+        <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
+        <div id="logContent"></div>
+    </div>
+
     <div class="api-settings">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <label style="margin: 0;">🤖 KI-Dispatcher (Gemini API)</label>
@@ -198,7 +205,7 @@
         <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()">
         
         <div class="api-hint">
-            <strong>Tipp:</strong> Mehr Abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen, um dynamische Missionen generieren zu lassen. <br>
+            <strong>Tipp:</strong> Mehr Abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen um dynamische Missionen generieren zu lassen. <br>
             <span style="opacity: 0.7;">🔒 Sicher: Der Key wird ausschließlich lokal in deinem Browser gespeichert.</span>
         </div>
     </div>
@@ -214,7 +221,7 @@
 
 </div>
 
-<div class="version-info">Version 91.0 (Interactive Clipboard)</div>
+<div class="version-info">Version 92.0 (Ultimate Dispatcher)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
