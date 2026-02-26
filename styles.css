@@ -527,3 +527,62 @@ body.theme-retro #mStory {
     letter-spacing: -0.5px;
     font-style: normal; /* Hebt das italic vom Classic-Mode auf */
 }
+
+/* ==========================================================================
+   7. PAYLOAD & FRACHT (Auf dem Notizzettel)
+   ========================================================================== */
+
+/* Classic Mode (Modern & Clean) */
+.note-manifest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px dashed #444;
+    font-size: 14px;
+    color: #eee;
+}
+.note-manifest strong {
+    color: #888;
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.note-manifest span {
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+}
+
+/* Retro Mode (Schreibmaschine auf dem College-Block) */
+body.theme-retro .note-manifest {
+    display: block;
+    margin-top: 24px; /* Überspringt exakt eine blaue Schreib-Linie (24px) als Absatz */
+    padding-top: 0;
+    border-top: none;
+}
+
+body.theme-retro .note-manifest div {
+    line-height: 24px; /* Text sitzt exakt auf der blauen Linie! */
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    font-weight: bold;
+    color: #222; /* Schwarze Tinte */
+}
+
+/* Rote Tinte für die Labels wie beim zweifarbigen Farbband */
+body.theme-retro .note-manifest strong {
+    display: inline;
+    font-size: 14px;
+    color: #d93829; 
+    margin-right: 5px;
+    text-transform: uppercase;
+}
+
+body.theme-retro .note-manifest span {
+    font-size: 14px;
+    font-weight: bold;
+    color: #222;
+}
+
