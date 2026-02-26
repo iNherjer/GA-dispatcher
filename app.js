@@ -21,7 +21,9 @@ function updateDynamicColors() {
     const titleColor = isRetro ? 'var(--piper-white)' : 'var(--blue)';
     const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--green)';
     
-    document.getElementById('mainTitle').style.color = titleColor;
+    // Im Retro Mode kümmert sich das CSS der Handschrift um die Farbe
+    document.getElementById('mainTitle').style.color = isRetro ? '' : titleColor;
+    
     document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = isRetro ? '' : primColor);
     document.querySelectorAll('.theme-green-text').forEach(el => el.style.color = hlColor);
 }
@@ -63,7 +65,7 @@ function setDrumCounter(elementId, valueStr) {
         return;
     }
 
-    // Im Retro Mode: Trommel-Animation bauen (flach und sauber)
+    // Im Retro Mode: Flache, saubere Trommel-Animation bauen
     let numericValue = valueStr.toString().replace(/[^0-9]/g, '');
     if (numericValue === "") numericValue = "0"; 
     
@@ -107,7 +109,7 @@ function setDrumCounter(elementId, valueStr) {
 // Reagiert auf Slider-Änderungen live
 function handleSliderChange(type, val) {
     setDrumCounter(type + 'Drum', val);
-    recalculatePerformance(); // Berechnet live neu!
+    recalculatePerformance(); 
 }
 
 // Berechnet Zeit und Sprit neu, falls eine Mission aktiv ist
@@ -143,7 +145,6 @@ function applyPreset(t, g, s, n) {
     document.getElementById('gphSlider').value=g; 
     document.getElementById('maxSeats').value=s; selectedAC=n;
     
-    // Ruft live die Aktualisierung für Drums UND Berechnungen auf
     handleSliderChange('tas', t);
     handleSliderChange('gph', g);
 }
@@ -535,7 +536,18 @@ async function generateMission() {
         currentDestICAO = dest.icao;
         if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
         
-        payloadText = (m.cat === "trn") ? "0 PAX" : `${Math.floor(Math.random()*maxSeats)} PAX`;
+        // ==========================================
+        // NEU: PAX LOGIK UPDATE (Keine 0 Passagiere mehr)
+        // ==========================================
+        if (m.cat === "trn" || m.cat === "cargo") {
+            payloadText = "0 PAX";
+        } else {
+            // Garantiert mindestens 1 Passagier, maximal Sitzplätze minus Pilot
+            const maxPax = Math.max(1, maxSeats - 1);
+            const randomPax = Math.floor(Math.random() * maxPax) + 1;
+            payloadText = `${randomPax} PAX`;
+        }
+        
         cargoText = `${Math.floor(Math.random()*300)+20} lbs`;
     }
     
@@ -686,21 +698,16 @@ function updateMap(lat1, lon1, lat2, lon2, s, d) {
     
     polyline = L.polyline([[lat1, lon1], [lat2, lon2]], { color: '#ff4444', weight: 4, dashArray: '8,8' }).addTo(map);
     
-    // Karte erst grob auf die Route ausrichten
     map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
 
-    // UPDATE: Minimaler Zoom für Lufträume erzwungen
+    // UPDATE: Karte für Lufträume ranzoomen und zentrieren
     setTimeout(() => {
-        // Stufe 10 ist ideal für VFR-Lufträume (früher stand hier 9)
         if (map.getZoom() < 10) {
             map.setZoom(10);
-            // Zentriere die Karte sicherheitshalber auf den Startflughafen,
-            // wenn reingezoomt wird, damit man weiß, wo es losgeht.
             map.panTo([lat1, lon1]); 
         }
     }, 50);
 }
-
 
 /* =========================================================
    7. EXTERNE LINKS & LOGBUCH
