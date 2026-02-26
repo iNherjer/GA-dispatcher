@@ -101,7 +101,7 @@
     
     <div id="map"></div>
 
-       <div id="briefingBox" class="briefing">
+    <div id="briefingBox" class="briefing">
         
         <div class="mission-note-wrapper">
             <h2 id="mTitle"></h2>
@@ -121,6 +121,17 @@
                 </div>
                 <div><span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
                 <div class="rwy-info">Piste: <span id="mDepRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
+                
+                <div class="switch-row">
+                    <div class="retro-switch-container" onclick="openMetar('dep')">
+                        <div class="retro-switch"></div>
+                        <span class="retro-switch-label">METAR</span>
+                    </div>
+                    <div class="retro-switch-container" onclick="openAIP('dep')">
+                        <div class="retro-switch"></div>
+                        <span class="retro-switch-label">AIP</span>
+                    </div>
+                </div>
             </div>
 
             <div class="aero-info-box" id="boxRoute">
@@ -146,19 +157,25 @@
                 <div class="wiki-info" id="wikiDescContainer">
                     📖 <span id="wikiDescText">Lade Region/Wikipedia-Info...</span>
                 </div>
+
+                <div class="switch-row" id="destSwitchRow">
+                    <div class="retro-switch-container" onclick="openMetar('dest')">
+                        <div class="retro-switch"></div>
+                        <span class="retro-switch-label">METAR</span>
+                    </div>
+                    <div class="retro-switch-container" onclick="openAIP('dest')">
+                        <div class="retro-switch"></div>
+                        <span class="retro-switch-label">AIP</span>
+                    </div>
+                </div>
             </div>
 
         </div>
-        
-        <div class="action-row">
-            <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
-            <button class="btn-action" onclick="openAIP('dest')" id="btnAipDest">📄 AIP DEST</button>
-            <button class="btn-action btn-metar" onclick="openMetar('dep')">☁️ METAR DEP</button>
-            <button class="btn-action btn-metar" onclick="openMetar('dest')" id="btnMetarDest">☁️ METAR DEST</button>
-            <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
+
+        <div style="margin-top: 15px;">
+            <button class="btn-log" style="width: 100%;" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
         </div>
     </div>
-
 
     <div class="logbook">
         <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
@@ -176,7 +193,7 @@
 
 </div>
 
-<div class="version-info">Version 89.0 (Full Cockpit Edition)</div>
+<div class="version-info">Version 90.0 (Full Cockpit Edition)</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
