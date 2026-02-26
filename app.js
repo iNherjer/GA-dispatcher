@@ -50,7 +50,6 @@ let globalAirports = null;
 let runwayCache = {};
 
 window.onload = () => {
-    // 1. Theme-Logik
     const savedTheme = localStorage.getItem('ga_theme') || 'retro'; 
     const themeToggleBtn = document.getElementById('themeToggle');
     if (savedTheme === 'retro') {
@@ -62,11 +61,9 @@ window.onload = () => {
     }
     updateDynamicColors();
 
-    // 2. Letztes Ziel laden
     const lastDest = localStorage.getItem('last_icao_dest');
     if (lastDest) document.getElementById('startLoc').value = lastDest;
     
-    // 3. API Key & KI-Schalter laden
     const savedKey = localStorage.getItem('ga_gemini_key');
     if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
 
@@ -76,19 +73,18 @@ window.onload = () => {
         if (aiEnabled === 'false') {
             aiToggleBtn.checked = false;
         } else {
-            aiToggleBtn.checked = true;
+            aiToggleBtn.checked = true; 
         }
     }
 
     renderLog();
 
-    // UPDATE: Mehr Zeit für den Browser zum Laden der CSS-Strukturen (250ms)
-    setTimeout(() => {
-        const startTas = document.getElementById('tasSlider').value;
-        const startGph = document.getElementById('gphSlider').value;
-        setDrumCounter('tasDrum', startTas);
-        setDrumCounter('gphDrum', startGph);
-    }, 250);
+    // UPDATE: Zwingt den Browser zu warten, bis das CSS gezeichnet ist
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            refreshAllDrums();
+        }, 50);
+    });
 };
 
 function saveApiKey() {
@@ -514,7 +510,6 @@ async function generateMission() {
     let totalDist = isPOI ? nav.dist * 2 : nav.dist;
     currentDestICAO = isPOI ? currentStartICAO : dest.icao;
     
-    // --- PAYLOAD VORBEREITEN FÜR KI ---
     const maxPax = Math.max(1, maxSeats - 1);
     const randomPax = Math.floor(Math.random() * maxPax) + 1;
     let paxText = `${randomPax} PAX`;
@@ -546,14 +541,10 @@ async function generateMission() {
     const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
     const totalMinutes = Math.round((totalDist / selectedTas) * 60);
 
-    // UPDATE: Sichere Übergabe des Textes (Keine Manipulation der Datenbank)
-    let displayStory = m.s;
-    if (dataSource !== "Gemini AI") {
-        const hrs = Math.floor(totalMinutes / 60);
-        const mins = totalMinutes % 60;
-        const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min.`;
-        displayStory += `\n\n[ NAV-INFO: Strecke ${totalDist} NM | ETE ca. ${timeStr} ]`;
-    }
+    // ZEIT BERECHNEN (Für das Manifest auf dem Notizzettel)
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min.`;
 
     currentMissionData = { 
         start: currentStartICAO, dest: currentDestICAO, poiName: isPOI ? dest.n : null,
@@ -561,7 +552,7 @@ async function generateMission() {
     };
     
     document.getElementById("mTitle").innerHTML = `${m.i ? m.i + ' ' : ''}${m.t}`;
-    document.getElementById("mStory").innerText = displayStory; // Hier wird der sichere Text eingefügt
+    document.getElementById("mStory").innerText = m.s;
     document.getElementById("mDepICAO").innerText = currentStartICAO;
     document.getElementById("mDepName").innerText = start.n;
     document.getElementById("mDepCoords").innerText = `${start.lat.toFixed(4)}, ${start.lon.toFixed(4)}`;
@@ -577,8 +568,11 @@ async function generateMission() {
     document.getElementById("mDestName").innerText = dest.n;
     document.getElementById("mDestCoords").innerText = `${dest.lat.toFixed(4)}, ${dest.lon.toFixed(4)}`;
     
+    // NEU: Die 4 Werte auf dem Notizzettel füttern
     document.getElementById("mPay").innerText = paxText;
     document.getElementById("mWeight").innerText = cargoText;
+    document.getElementById("mDistNote").innerText = `${totalDist} NM`;
+    document.getElementById("mETENote").innerText = timeStr;
     
     document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
     const destSwitchRow = document.getElementById("destSwitchRow");
