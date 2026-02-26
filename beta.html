@@ -85,8 +85,19 @@
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="handleSliderChange('tas', this.value)">
     </div>
     
-    <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
-    
+        <div class="action-bar">
+        <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
+        
+        <div class="analog-meter" id="searchMeter" title="Signalstärke">
+            <div class="meter-face">
+                <div class="meter-scale"></div>
+                <div class="meter-label">SIG</div>
+            </div>
+            <div class="meter-needle" id="meterNeedle"></div>
+            <div class="meter-led" id="meterLed"></div>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <div id="briefingBox" class="briefing">
