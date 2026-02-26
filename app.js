@@ -588,10 +588,11 @@ async function generateMission() {
     document.getElementById("mPay").innerText = payloadText;
     document.getElementById("mWeight").innerText = cargoText;
     
-    document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
+        document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
     document.getElementById("wikiDescContainer").style.display = "block"; 
-    document.getElementById("btnAipDest").style.display = isPOI ? "none" : "block";
-    document.getElementById("btnMetarDest").style.display = isPOI ? "none" : "block";
+    // NEU: Versteckt die Ziel-Schalterreihe, wenn es ein POI ist
+    const destSwitchRow = document.getElementById("destSwitchRow");
+    if(destSwitchRow) destSwitchRow.style.display = isPOI ? "none" : "flex";
 
     document.getElementById("briefingBox").style.display = "block";
     updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
