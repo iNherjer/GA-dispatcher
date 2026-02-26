@@ -552,6 +552,14 @@ async function generateMission() {
     const fuel = Math.ceil((totalDist / selectedTas * selectedGph) + (0.75 * selectedGph));
     const totalMinutes = Math.round((totalDist / selectedTas) * 60);
 
+    // NEU: Dispatcher-Vermerk an lokale Missionen anhängen
+    if (dataSource !== "Gemini AI") {
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min.`;
+        m.s += `\n\n[ NAV-INFO: Strecke ${totalDist} NM | ETE ca. ${timeStr} ]`;
+    }
+
     currentMissionData = { 
         start: currentStartICAO, dest: currentDestICAO, poiName: isPOI ? dest.n : null,
         mission: m.t, dist: totalDist, ac: selectedAC, heading: nav.brng
