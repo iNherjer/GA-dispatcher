@@ -2,9 +2,8 @@
    1. BASIS / CLASSIC DESIGN (Modern & Clean)
    ========================================================================== */
    
-/* Import für den 60er US-Car Font (Chrome Badge Look) */
+/* Import für Caveat (Handschrift) und Oleo Script (60s Chrome) */
 @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Oleo+Script:wght@400;700&display=swap');
-
 
 :root { 
     --blue: #4da6ff; 
@@ -73,7 +72,6 @@ input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width:
 .custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
 
 .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; transition: all 0.3s; }
-.story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
 
 .aero-info-box { background: #1e252b; padding: 14px 12px; border-radius: 8px; border-left: 4px solid var(--warn); margin-bottom: 12px; transition: all 0.3s; }
 .box-title { font-weight: bold; text-transform: uppercase; font-size: 15px; }
@@ -180,7 +178,6 @@ body.theme-retro .top-right { top: 12px; right: 12px; transform: rotate(15deg); 
 body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20deg); }
 body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
 
-/* 60er Jahre US-Car Font: Oleo Script (Verchromt/Emblem-Look) */
 body.theme-retro h1 { 
     font-family: 'Oleo Script', cursive; 
     font-size: 38px; 
@@ -207,11 +204,10 @@ body.theme-retro label {
     letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
 }
 
-/* Schreibmaschinen-Schrift für die Inputs (ATC Flight Strips mit SVG Abreißkante) */
 body.theme-retro input, body.theme-retro select { 
     background-color: #f0eada; 
     border: 1px solid #c2bba8;
-    border-right: none; /* Kein Rand rechts wegen der Abreißkante */
+    border-right: none; 
     color: #111; 
     text-shadow: none;
     font-family: 'Courier New', Courier, monospace;
@@ -223,14 +219,12 @@ body.theme-retro input, body.theme-retro select {
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative;
     padding-right: 20px; 
-    /* Das eingebettete SVG Bild für das zerrissene Papier */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='40' viewBox='0 0 15 40'%3E%3Cpath fill='%23f0eada' d='M0 0h15L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6H0z'/%3E%3Cpath fill='none' stroke='%23c2bba8' stroke-width='1.5' stroke-linecap='round' d='M15 0L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6' opacity='0.7'/%3E%3C/svg%3E");
     background-repeat: repeat-y;
     background-position: right top;
     background-size: auto 100%;
 }
 
-/* Rotation und Marker für die Lotsen-Zettel */
 body.theme-retro #startLoc { transform: rotate(-1.5deg); border-left: 6px solid #d93829; }
 body.theme-retro #destLoc { transform: rotate(1deg); border-left: 6px solid #d93829; }
 body.theme-retro #targetType { transform: rotate(-0.5deg); border-left: 6px solid #4da6ff; }
@@ -239,7 +233,6 @@ body.theme-retro #regionFilter { transform: rotate(-1deg); border-left: 6px soli
 body.theme-retro #dirPref { transform: rotate(0.5deg); border-left: 6px solid #f2c12e; }
 body.theme-retro #maxSeats { transform: rotate(-1.5deg); border-left: 6px solid #f2c12e; }
 
-/* Beim Anklicken wird der Zettel gerade */
 body.theme-retro input:focus, body.theme-retro select:focus { 
     outline: none; 
     transform: scale(1.02) rotate(0deg) !important; 
@@ -266,7 +259,7 @@ body.theme-retro .btn-main {
     background: linear-gradient(to bottom, #d93829, #8a1a12); color: #fff; 
     border: 2px solid #222; border-bottom: 5px solid #111; border-right: 4px solid #111;
     border-radius: 6px; font-family: 'Arial', sans-serif; font-weight: 900; letter-spacing: 1px;
-    box-shadow: 0 5px 10px rgba(0,0,0,0.6); margin-top: 10px;
+    box-shadow: 0 5px 10px rgba(0,0,0,0.6);
 }
 body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
 
@@ -279,9 +272,7 @@ body.theme-retro #map {
 }
 
 body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
-body.theme-retro .story { color: #ccc; border-bottom: 2px solid #444; font-family: 'Georgia', serif; }
 
-/* Der verwitterte weiße Balken hinter den Instrumenten */
 body.theme-retro .flightplan-container {
     position: relative;
     z-index: 1;
@@ -344,37 +335,32 @@ body.theme-retro .log-entry { background: #1a1c1e; border-left: 4px solid var(--
 /* ==========================================================================
    4. MECHANISCHE TROMMELZÄHLWERKE (Flat & Clean)
    ========================================================================== */
-
-/* Container für Zahl + Einheitstext */
 .drum-readout-container {
     display: inline-flex;
     align-items: center;
     gap: 4px;
 }
 
-/* Das Fenster, durch das man schaut (Komplett flach!) */
 body.theme-retro .drum-window {
     display: inline-flex;
-    gap: 1px; /* Winziger Abstand zwischen den Zahlen */
-    background-color: #111; /* Einfache, dunkle Box */
+    gap: 1px; 
+    background-color: #111; 
     border-radius: 3px;
     height: 22px; 
-    overflow: hidden; /* Schneidet die Zahlen oben/unten sauber ab */
+    overflow: hidden; 
     position: relative;
     padding: 0 2px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); /* Nur ein leichter Schatten für Tiefe */
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); 
 }
 
-/* Ein einzelner vertikaler Zahlenstreifen (0-9) */
 body.theme-retro .drum-strip {
     display: flex;
     flex-direction: column;
     transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); 
     will-change: transform;
-    background-color: transparent; /* WICHTIG: Das hier behebt den Bug mit der grauen 0! */
+    background-color: transparent; 
 }
 
-/* Die einzelne Ziffer auf dem Streifen */
 body.theme-retro .drum-digit {
     height: 22px;
     line-height: 22px;
@@ -384,10 +370,9 @@ body.theme-retro .drum-digit {
     color: var(--piper-white);
     text-align: center;
     width: 12px; 
-    background-color: transparent; /* Sauber und ohne Glitches */
+    background-color: transparent; 
 }
 
-/* Highlight-Farbe (Gelb) für bestimmte Werte */
 body.theme-retro .highlight .drum-digit,
 body.theme-retro .theme-green-text .drum-digit {
     color: var(--piper-yellow);
@@ -396,23 +381,19 @@ body.theme-retro .theme-green-text .drum-digit {
 /* ==========================================================================
    5. ACTION BAR & ANALOGES S-METER (Funk-Pegel)
    ========================================================================== */
-
-/* Container für Button und Instrument nebeneinander */
 .action-bar {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-    margin-top: 15px; /* Ersetzt das alte margin-top vom Button */
+    margin-top: 15px; 
 }
 
-/* Button flexibel machen, damit er den restlichen Platz füllt */
 .action-bar .btn-main {
     flex-grow: 1;
     margin-top: 0 !important; 
 }
 
-/* Modernes Design Fallback (Schlicht) */
 .analog-meter {
     width: 65px; height: 45px;
     background: #111; border: 1px solid #444; border-radius: 6px;
@@ -424,17 +405,15 @@ body.theme-retro .theme-green-text .drum-digit {
 .meter-led.led-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .meter-label { display: none; }
 
-/* --- RETRO DESIGN: Das alte Radio-Instrument --- */
 body.theme-retro .analog-meter {
     width: 75px; 
     height: 50px;
-    background: #1e1f22; /* Dunkles Blechgehäuse */
-    border: 3px solid #4a4e59; /* Dicker grauer Instrumenten-Rand (Bezel) */
+    background: #1e1f22; 
+    border: 3px solid #4a4e59; 
     border-radius: 6px;
     box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5);
 }
 
-/* Das gelbliche Papier-Ziffernblatt */
 body.theme-retro .meter-face {
     position: absolute;
     top: 5px; left: 5px; right: 5px; bottom: 3px;
@@ -444,7 +423,6 @@ body.theme-retro .meter-face {
     border: none;
 }
 
-/* Der gebogene Bogen der Skala */
 body.theme-retro .meter-scale {
     position: absolute;
     bottom: 0; left: 10%; width: 80%; height: 90%;
@@ -454,42 +432,36 @@ body.theme-retro .meter-scale {
     border-right: 2px solid transparent;
 }
 
-/* Die rote Nadel */
 body.theme-retro .meter-needle {
     background: #d93829;
     height: 38px;
     bottom: 2px;
     box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    /* Eine etwas sanftere Transition für realistisches Nadel-Zucken */
     transition: transform 0.12s cubic-bezier(0.25, 1, 0.5, 1);
     z-index: 2;
 }
 
-/* Die mechanische Nabe der Nadel */
 body.theme-retro .analog-meter::after {
     content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
     width: 10px; height: 6px; background: #222; border-radius: 50% 50% 0 0;
     border: 1px solid #000; z-index: 3;
 }
 
-/* Die LED im Retro-Mode (Glas-Look) */
 body.theme-retro .meter-led {
     width: 6px; height: 6px;
     top: 6px; right: 8px;
-    background: #002200; /* Ausgeschaltet: Dunkelgrün */
+    background: #002200; 
     border: 1px solid #000;
     box-shadow: inset 0 1px 1px rgba(255,255,255,0.2);
     z-index: 3;
 }
 
-/* LED an (Erfolgreich gefunden) */
 body.theme-retro .meter-led.led-active {
-    background: #00ff41; /* Giftiges Phosphor-Grün */
+    background: #00ff41; 
     box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff;
     border-color: #fff;
 }
 
-/* Kleiner Aufdruck */
 body.theme-retro .meter-label {
     display: block; position: absolute; bottom: 2px; left: 4px;
     font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif;
@@ -498,8 +470,6 @@ body.theme-retro .meter-label {
 /* ==========================================================================
    6. DER NOTIZZETTEL (Mission Briefing)
    ========================================================================== */
-
-/* Modernes Design: Standardwerte wiederherstellen */
 #mTitle {
     margin-top: 0;
     font-size: 19px;
@@ -508,25 +478,23 @@ body.theme-retro .meter-label {
 .mission-note-wrapper {
     margin-bottom: 15px;
 }
+.story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
 
-/* --- RETRO DESIGN: Gealterter Linien-Notizblock --- */
 body.theme-retro .mission-note-wrapper {
-    background-color: #fdf5e6; /* Gealtertes Papier / Beige */
-    /* Erzeugt blaue Schreiblinien! */
+    background-color: #fdf5e6; 
     background-image: repeating-linear-gradient(transparent, transparent 23px, #a6bccc 24px);
     background-size: 100% 24px;
     background-position: 0 4px; 
     
-    padding: 15px 15px 15px 45px; /* Links viel Platz für den roten Rand */
+    padding: 15px 15px 15px 45px; 
     border-radius: 2px 6px 4px 2px;
-    box-shadow: 3px 5px 12px rgba(0,0,0,0.6); /* Wirft einen Schatten aufs Panel */
-    transform: rotate(-1.5deg); /* Leicht schräg ins Cockpit geworfen */
+    box-shadow: 3px 5px 12px rgba(0,0,0,0.6); 
+    transform: rotate(-1.5deg); 
     position: relative;
     margin-bottom: 25px;
     border: 1px solid #d3cbb8;
 }
 
-/* Der typische rote Rand links auf College-Blöcken */
 body.theme-retro .mission-note-wrapper::before {
     content: '';
     position: absolute;
@@ -535,30 +503,27 @@ body.theme-retro .mission-note-wrapper::before {
     background-color: rgba(220, 50, 50, 0.4);
 }
 
-/* Die Haupt-Überschrift (Handgeschrieben mit Kuli) */
 body.theme-retro #mTitle {
     font-family: 'Caveat', cursive;
     font-size: 28px;
-    color: #0b1f65; /* Kugelschreiber-Dunkelblau */
+    color: #0b1f65; 
     text-shadow: none;
     margin-bottom: 8px;
     margin-top: 0;
-    transform: rotate(-1deg); /* Extra krumm geschrieben */
+    transform: rotate(-1deg); 
     line-height: 1.2;
 }
 
-/* Die Einsatzbeschreibung (Alte Schreibmaschine) */
 body.theme-retro #mStory {
     font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
     font-weight: bold;
-    color: #222; /* Tiefschwarz/Grau von alter Tinte */
-    line-height: 24px; /* Exakt so hoch wie die Hintergrund-Linien! */
+    color: #222; 
+    line-height: 24px; 
     border: none;
     padding-bottom: 0;
     margin-bottom: 0;
     text-shadow: none;
     letter-spacing: -0.5px;
+    font-style: normal; /* Hebt das italic vom Classic-Mode auf */
 }
-
-
