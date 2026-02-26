@@ -1,5 +1,5 @@
 /* =========================================================
-   1. THEME TOGGLE LOGIK (Modern vs Analog)
+   1. THEME TOGGLE & NOTIZEN TOGGLE
    ========================================================= */
 function toggleTheme() {
     const toggle = document.getElementById('themeToggle');
@@ -14,6 +14,24 @@ function toggleTheme() {
     refreshAllDrums();
 }
 
+// NEU: Die Funktion, die die Notizzettel blättert!
+function toggleNotes() {
+    const page1 = document.getElementById('notePage1');
+    const page2 = document.getElementById('notePage2');
+    
+    if (!page1 || !page2) return;
+    
+    if(page1.classList.contains('front-note')) {
+        // Seite 2 nach vorne holen
+        page1.classList.replace('front-note', 'back-note');
+        page2.classList.replace('back-note', 'front-note');
+    } else {
+        // Seite 1 nach vorne holen
+        page1.classList.replace('back-note', 'front-note');
+        page2.classList.replace('front-note', 'back-note');
+    }
+}
+
 function updateDynamicColors() {
     const isRetro = document.body.classList.contains('theme-retro');
     
@@ -21,7 +39,6 @@ function updateDynamicColors() {
     const titleColor = isRetro ? 'var(--piper-white)' : 'var(--blue)';
     const hlColor = isRetro ? 'var(--piper-yellow)' : 'var(--green)';
     
-    // Im Retro Mode kümmert sich das CSS der Handschrift um die Farbe
     document.getElementById('mainTitle').style.color = isRetro ? '' : titleColor;
     
     document.querySelectorAll('.theme-color-text').forEach(el => el.style.color = isRetro ? '' : primColor);
@@ -58,19 +75,17 @@ function setDrumCounter(elementId, valueStr) {
     const container = document.getElementById(elementId);
     if (!container) return;
 
-    // Im Modern Mode: Einfach Text anzeigen
     if (!document.body.classList.contains('theme-retro')) {
         container.innerHTML = `<span class="theme-color-text" style="font-weight:bold;">${valueStr}</span>`;
         updateDynamicColors(); 
         return;
     }
 
-    // Im Retro Mode: Flache, saubere Trommel-Animation bauen
     let numericValue = valueStr.toString().replace(/[^0-9]/g, '');
     if (numericValue === "") numericValue = "0"; 
     
     const digits = numericValue.split('');
-    const digitHeight = 22; // Muss zur CSS-Höhe passen
+    const digitHeight = 22; 
 
     let windowEl = container.querySelector('.drum-window');
     if (!windowEl) {
@@ -81,7 +96,6 @@ function setDrumCounter(elementId, valueStr) {
     const existingStrips = windowEl.querySelectorAll('.drum-strip');
     const neededStrips = digits.length;
 
-    // Streifen hinzufügen
     if (existingStrips.length < neededStrips) {
         for (let i = 0; i < (neededStrips - existingStrips.length); i++) {
             const strip = document.createElement('div');
@@ -90,14 +104,12 @@ function setDrumCounter(elementId, valueStr) {
             windowEl.appendChild(strip);
         }
     } 
-    // Streifen entfernen
     else if (existingStrips.length > neededStrips) {
         for (let i = neededStrips; i < existingStrips.length; i++) {
             windowEl.removeChild(existingStrips[i]);
         }
     }
 
-    // Positionen animieren
     const finalStrips = windowEl.querySelectorAll('.drum-strip');
     digits.forEach((digit, index) => {
         const targetDigit = parseInt(digit);
@@ -106,13 +118,11 @@ function setDrumCounter(elementId, valueStr) {
     });
 }
 
-// Reagiert auf Slider-Änderungen live
 function handleSliderChange(type, val) {
     setDrumCounter(type + 'Drum', val);
     recalculatePerformance(); 
 }
 
-// Berechnet Zeit und Sprit neu, falls eine Mission aktiv ist
 function recalculatePerformance() {
     if (!currentMissionData) return;
     
@@ -338,10 +348,9 @@ async function fetchAreaDescription(lat, lon, elementId, exactTitle = null) {
                 const pageId = Object.keys(pages)[0];
                 
                 if (pageId !== "-1" && pages[pageId].extract) {
-                    const isRetro = document.body.classList.contains('theme-retro');
-                    const hColor = isRetro ? 'var(--piper-yellow)' : 'var(--blue)';
-                    let prefix = exactTitle ? "" : `<b style="color:${hColor}">Region (${titleToFetch}):</b> `;
-                    document.getElementById(elementId).innerHTML = prefix + pages[pageId].extract;
+                    // Kein farbiges Highlighting mehr auf dem Briefing-Zettel (sieht als Text besser aus)
+                    let prefix = exactTitle ? "" : `Region (${titleToFetch}):\n`;
+                    document.getElementById(elementId).innerText = prefix + pages[pageId].extract;
                     return;
                 }
             }
@@ -410,6 +419,14 @@ async function generateMission() {
     btn.innerText = "Sucht Route & Daten...";
     document.getElementById("briefingBox").style.display = "none";
     
+    // Sicherstellen, dass nach dem Generieren "Seite 1" oben liegt
+    const page1 = document.getElementById('notePage1');
+    const page2 = document.getElementById('notePage2');
+    if(page1 && page2) {
+        page1.classList.replace('back-note', 'front-note');
+        page2.classList.replace('front-note', 'back-note');
+    }
+    
     document.getElementById("mDepRwy").innerText = "Sucht Pisten-Infos...";
     document.getElementById("mDepRwy").style.color = "#fff";
     document.getElementById("mDestRwy").innerText = "Sucht Pisten-Infos...";
@@ -418,20 +435,15 @@ async function generateMission() {
 
     const indicator = document.getElementById('searchIndicator');
     
-    // ==========================================
-    // METER ANIMATION STARTEN (SUCHEN)
-    // ==========================================
     const needle = document.getElementById('meterNeedle');
     const led = document.getElementById('meterLed');
-    if (led) led.classList.remove('led-active'); // Lampe aus
+    if (led) led.classList.remove('led-active');
     
     if (window.meterInterval) clearInterval(window.meterInterval);
     window.meterInterval = setInterval(() => {
-        // Nadel zuckt wild zwischen -20° und +40° hin und her
         const randomAngle = Math.floor(Math.random() * 60) - 20; 
         if (needle) needle.style.transform = `translateX(-50%) rotate(${randomAngle}deg)`;
     }, 120);
-    // ==========================================
 
     currentStartICAO = document.getElementById("startLoc").value.toUpperCase();
     const start = await getAirportData(currentStartICAO);
@@ -536,13 +548,9 @@ async function generateMission() {
         currentDestICAO = dest.icao;
         if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
         
-        // ==========================================
-        // NEU: PAX LOGIK UPDATE (Keine 0 Passagiere mehr)
-        // ==========================================
         if (m.cat === "trn" || m.cat === "cargo") {
             payloadText = "0 PAX";
         } else {
-            // Garantiert mindestens 1 Passagier, maximal Sitzplätze minus Pilot
             const maxPax = Math.max(1, maxSeats - 1);
             const randomPax = Math.floor(Math.random() * maxPax) + 1;
             payloadText = `${randomPax} PAX`;
@@ -588,9 +596,7 @@ async function generateMission() {
     document.getElementById("mPay").innerText = payloadText;
     document.getElementById("mWeight").innerText = cargoText;
     
-        document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
-    document.getElementById("wikiDescContainer").style.display = "block"; 
-    // NEU: Versteckt die Ziel-Schalterreihe, wenn es ein POI ist
+    document.getElementById("destRwyContainer").style.display = isPOI ? "none" : "block";
     const destSwitchRow = document.getElementById("destSwitchRow");
     if(destSwitchRow) destSwitchRow.style.display = isPOI ? "none" : "flex";
 
@@ -610,13 +616,9 @@ async function generateMission() {
         indicator.innerText = `Briefing komplett.`;
         resetBtn(btn);
         
-        // ==========================================
-        // METER ANIMATION STOPPEN (ERFOLG)
-        // ==========================================
         if(window.meterInterval) clearInterval(window.meterInterval);
-        if(needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`; // Fällt ganz nach links
-        if(led) led.classList.add('led-active'); // Grünes Lämpchen AN
-        // ==========================================
+        if(needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`; 
+        if(led) led.classList.add('led-active'); 
 
     }, 800); 
 }
@@ -701,7 +703,6 @@ function updateMap(lat1, lon1, lat2, lon2, s, d) {
     
     map.fitBounds(L.latLngBounds([lat1, lon1], [lat2, lon2]), { padding: [40, 40] });
 
-    // UPDATE: Karte für Lufträume ranzoomen und zentrieren
     setTimeout(() => {
         if (map.getZoom() < 10) {
             map.setZoom(10);
