@@ -3,7 +3,8 @@
    ========================================================================== */
    
 /* Import für den 60er US-Car Font (Chrome Badge Look) */
-@import url('https://fonts.googleapis.com/css2?family=Oleo+Script:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Oleo+Script:wght@400;700&display=swap');
+
 
 :root { 
     --blue: #4da6ff; 
@@ -493,4 +494,71 @@ body.theme-retro .meter-label {
     display: block; position: absolute; bottom: 2px; left: 4px;
     font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif;
 }
+
+/* ==========================================================================
+   6. DER NOTIZZETTEL (Mission Briefing)
+   ========================================================================== */
+
+/* Modernes Design: Standardwerte wiederherstellen */
+#mTitle {
+    margin-top: 0;
+    font-size: 19px;
+    color: var(--blue);
+}
+.mission-note-wrapper {
+    margin-bottom: 15px;
+}
+
+/* --- RETRO DESIGN: Gealterter Linien-Notizblock --- */
+body.theme-retro .mission-note-wrapper {
+    background-color: #fdf5e6; /* Gealtertes Papier / Beige */
+    /* Erzeugt blaue Schreiblinien! */
+    background-image: repeating-linear-gradient(transparent, transparent 23px, #a6bccc 24px);
+    background-size: 100% 24px;
+    background-position: 0 4px; 
+    
+    padding: 15px 15px 15px 45px; /* Links viel Platz für den roten Rand */
+    border-radius: 2px 6px 4px 2px;
+    box-shadow: 3px 5px 12px rgba(0,0,0,0.6); /* Wirft einen Schatten aufs Panel */
+    transform: rotate(-1.5deg); /* Leicht schräg ins Cockpit geworfen */
+    position: relative;
+    margin-bottom: 25px;
+    border: 1px solid #d3cbb8;
+}
+
+/* Der typische rote Rand links auf College-Blöcken */
+body.theme-retro .mission-note-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 30px;
+    width: 1px;
+    background-color: rgba(220, 50, 50, 0.4);
+}
+
+/* Die Haupt-Überschrift (Handgeschrieben mit Kuli) */
+body.theme-retro #mTitle {
+    font-family: 'Caveat', cursive;
+    font-size: 28px;
+    color: #0b1f65; /* Kugelschreiber-Dunkelblau */
+    text-shadow: none;
+    margin-bottom: 8px;
+    margin-top: 0;
+    transform: rotate(-1deg); /* Extra krumm geschrieben */
+    line-height: 1.2;
+}
+
+/* Die Einsatzbeschreibung (Alte Schreibmaschine) */
+body.theme-retro #mStory {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    font-weight: bold;
+    color: #222; /* Tiefschwarz/Grau von alter Tinte */
+    line-height: 24px; /* Exakt so hoch wie die Hintergrund-Linien! */
+    border: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    text-shadow: none;
+    letter-spacing: -0.5px;
+}
+
 
