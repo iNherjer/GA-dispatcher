@@ -1,0 +1,633 @@
+/* ==========================================================================
+   1. BASIS / CLASSIC DESIGN (Modern & Clean)
+   ========================================================================== */
+   
+/* Import für Caveat (Handschrift) und Oleo Script (60s Chrome) */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Oleo+Script:wght@400;700&display=swap');
+
+:root { 
+    --blue: #4da6ff; 
+    --bg-dark: #080808; 
+    --card: #1e1e1e; 
+    --text: #e0e0e0; 
+    --warn: #ffcc00; 
+    --red: #ff4444; 
+    --green: #44ff44; 
+}
+
+body { 
+    font-family: 'Segoe UI', Roboto, sans-serif; 
+    background-color: var(--bg-dark); 
+    color: var(--text); 
+    margin: 0; padding: 20px 10px; 
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+    
+    background-image: url('bg.jpg'); 
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.container { 
+    position: relative;
+    background-color: rgba(30, 30, 30, 0.90); 
+    padding: 30px 20px 20px 20px; border-radius: 16px; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 15px rgba(77, 166, 255, 0.15); 
+    max-width: 480px; width: 100%; border: 1px solid #333; box-sizing: border-box; 
+    backdrop-filter: blur(8px); 
+    transition: all 0.3s;
+}
+
+body.fullscreen-active .container {
+    backdrop-filter: none !important;
+    transform: none !important;
+}
+
+h1 { font-size: 20px; text-align: center; color: var(--blue); margin: 0 0 10px 0; text-transform: uppercase; border-bottom: 2px solid var(--blue); padding-bottom: 10px; transition: all 0.3s; }
+#searchIndicator { font-size: 12px; color: var(--blue); text-align: center; margin-bottom: 15px; font-style: italic; height: 15px; }
+label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
+input, select { width: 100%; padding: 12px; background-color: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px; margin-bottom: 8px; transition: all 0.3s; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+.preset-row { display: flex; gap: 5px; margin-bottom: 12px; margin-top: 5px; }
+.btn-preset { flex: 1; padding: 8px 4px; font-size: 11px; background: #333; color: var(--blue); border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+.btn-preset:hover { background: #444; }
+
+.slider-container { margin-bottom: 10px; background: #252525; padding: 10px; border-radius: 8px; border: 1px solid #333; transition: all 0.3s; }
+.slider-header { display: flex; justify-content: space-between; font-size: 13px; }
+input[type=range] { width: 100%; appearance: none; height: 5px; background: #444; border-radius: 5px; margin: 12px 0; }
+input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #2a2a2a; }
+
+.btn-main { width: 100%; padding: 16px; background-color: var(--blue); color: #000; border: none; border-radius: 8px; font-size: 16px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+.btn-main:disabled { background-color: #333 !important; color: #888 !important; cursor: wait !important; border: 1px solid #555; }
+
+#map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; transition: filter 0.3s; }
+.map-fullscreen { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; margin: 0 !important; border-radius: 0 !important; filter: none !important; }
+
+.custom-pin { display: flex; justify-content: center; align-items: center; }
+.custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+
+.briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; transition: all 0.3s; }
+
+.aero-info-box { background: #1e252b; padding: 14px 12px; border-radius: 8px; border-left: 4px solid var(--warn); margin-bottom: 12px; transition: all 0.3s; }
+.box-title { font-weight: bold; text-transform: uppercase; font-size: 15px; }
+
+.copy-box { cursor: pointer; transition: color 0.2s; display: inline-block; background: #333; padding: 3px 8px; border-radius: 4px; margin-top: 4px; font-size: 13px; }
+.copy-box:hover { color: var(--green); background: #444; }
+.copy-box::after { content: ' 📋'; font-size: 11px; opacity: 0.5; }
+
+.route-label { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; }
+.route-data { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 16px; font-weight: bold; color: #fff; line-height: 1.4; }
+
+.rwy-info { font-size: 14px; color: #aaa; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #444; }
+
+.stat-item { font-size: 16px; }
+.stat-label { color: #888; display: block; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
+.highlight { color: #fff; font-weight: bold; font-size: 16px; }
+
+.btn-log { background: var(--green); color: #000; grid-column: span 2; margin-top: 10px; padding: 16px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-size: 14px;}
+.btn-log:hover { background: #33cc33; }
+
+.logbook { margin-top: 25px; border-top: 2px solid #333; padding-top: 15px; width: 100%; transition: all 0.3s; }
+.log-entry { background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--blue); font-size: 12px; }
+
+.leaflet-control-layers-list { color: #000; font-size: 12px; }
+.version-info { text-align: center; font-size: 11px; color: #555; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+.screw { display: none; }
+
+/* ==========================================================================
+   2. MECHANISCHER KIPPSCHALTER (TOGGLE)
+   ========================================================================== */
+.theme-switch-wrapper {
+    display: flex; justify-content: center; align-items: center; gap: 15px;
+    margin-top: 35px; padding-top: 20px; border-top: 1px dashed #444;
+}
+.switch-label { font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.switch { position: relative; display: inline-block; width: 26px; height: 40px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { 
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
+    background-color: #111; border-radius: 4px; border: 2px solid #333; 
+    box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); transition: .3s; 
+}
+.slider:before { 
+    position: absolute; content: ""; height: 20px; width: 12px; left: 5px; bottom: 2px; 
+    background: linear-gradient(to right, #777, #fff, #777); 
+    border-radius: 3px; border-bottom: 2px solid #333; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.8); transition: .3s; 
+}
+input:checked + .slider:before { 
+    transform: translateY(-14px); border-bottom: none; border-top: 2px solid #333; 
+    box-shadow: 0 -4px 6px rgba(0,0,0,0.8); 
+}
+
+/* ==========================================================================
+   3. 60er JAHRE ANALOG COCKPIT DESIGN ("SIXPACK" VIBE)
+   ========================================================================== */
+body.theme-retro {
+    --piper-white: #f4f4f4;
+    --piper-yellow: #f2c12e;
+    --piper-red: #d93829;
+    --piper-bg: #222428;
+    font-family: 'Arial', sans-serif; 
+}
+
+body.theme-retro .container {
+    background: linear-gradient(135deg, #2a2d34, #18191c);
+    padding: 35px 25px 25px 25px; 
+    border-radius: 8px; backdrop-filter: none; -webkit-backdrop-filter: none;
+    border: 2px solid #444; border-bottom: 4px solid #111; border-right: 4px solid #111;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+}
+
+body.theme-retro .screw {
+    display: block; position: absolute; width: 14px; height: 14px; 
+    background: linear-gradient(135deg, #aaa, #444); border-radius: 50%; 
+    box-shadow: inset 0 0 3px #000, 0 1px 2px rgba(255,255,255,0.1);
+}
+body.theme-retro .screw::after { content: ''; position: absolute; top: 6px; left: 2px; width: 10px; height: 2px; background: #222; }
+body.theme-retro .top-left { top: 12px; left: 12px; transform: rotate(45deg); }
+body.theme-retro .top-right { top: 12px; right: 12px; transform: rotate(15deg); }
+body.theme-retro .bottom-left { bottom: 12px; left: 12px; transform: rotate(-20deg); }
+body.theme-retro .bottom-right { bottom: 12px; right: 12px; transform: rotate(70deg); }
+
+body.theme-retro h1 { 
+    font-family: 'Oleo Script', cursive; font-size: 38px; color: #f4f4f4; 
+    text-shadow: -1px -1px 0 #aaa, 1px 1px 0 #555, 2px 2px 0 #444, 3px 3px 5px rgba(0,0,0,0.8);
+    font-weight: 400; letter-spacing: 1px; border-bottom: none; padding-bottom: 0; 
+    margin-bottom: 15px; transform: rotate(-2deg);
+}
+
+body.theme-retro #searchIndicator { color: var(--piper-yellow); font-weight: bold; }
+
+body.theme-retro label { 
+    background: #111; color: #ddd; border: 1px solid #000; padding: 3px 6px; border-radius: 2px; margin-bottom: 5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2); letter-spacing: 1.5px; display: inline-block; font-family: monospace; font-size: 11px;
+}
+
+body.theme-retro input, body.theme-retro select { 
+    background-color: #f0eada; border: 1px solid #c2bba8; border-right: none; color: #111; text-shadow: none;
+    font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 14px; border-radius: 2px 0 0 2px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3); letter-spacing: -0.5px; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative; padding-right: 20px; 
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='40' viewBox='0 0 15 40'%3E%3Cpath fill='%23f0eada' d='M0 0h15L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6H0z'/%3E%3Cpath fill='none' stroke='%23c2bba8' stroke-width='1.5' stroke-linecap='round' d='M15 0L12 4l3 5-4 3 4 6-3 4 3 7-4 5 3 6' opacity='0.7'/%3E%3C/svg%3E");
+    background-repeat: repeat-y; background-position: right top; background-size: auto 100%;
+}
+
+body.theme-retro #startLoc { transform: rotate(-1.5deg); border-left: 6px solid #d93829; }
+body.theme-retro #destLoc { transform: rotate(1deg); border-left: 6px solid #d93829; }
+body.theme-retro #targetType { transform: rotate(-0.5deg); border-left: 6px solid #4da6ff; }
+body.theme-retro #distRange { transform: rotate(1.5deg); border-left: 6px solid #4da6ff; }
+body.theme-retro #regionFilter { transform: rotate(-1deg); border-left: 6px solid #f2c12e; }
+body.theme-retro #dirPref { transform: rotate(0.5deg); border-left: 6px solid #f2c12e; }
+body.theme-retro #maxSeats { transform: rotate(-1.5deg); border-left: 6px solid #f2c12e; }
+
+body.theme-retro input:focus, body.theme-retro select:focus { outline: none; transform: scale(1.02) rotate(0deg) !important; box-shadow: 4px 4px 12px rgba(0,0,0,0.5); z-index: 10; }
+
+body.theme-retro .btn-preset { 
+    background: linear-gradient(to bottom, #d4d4d4, #888); color: #111; 
+    border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111;
+    font-family: 'Arial', sans-serif; font-weight: 900; border-radius: 4px;
+}
+body.theme-retro .btn-preset:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; border-right: 1px solid #111; }
+
+body.theme-retro .slider-container { background: transparent; border: none; padding: 0; margin-top: 15px;}
+body.theme-retro input[type=range] { height: 8px; background: #111; border: 2px inset #444; border-radius: 10px; transform: none; box-shadow:none;}
+body.theme-retro input[type=range]::-webkit-slider-thumb { height: 24px; width: 12px; border-radius: 2px; background: linear-gradient(to right, #ccc, #fff, #ccc); border: 1px solid #000; box-shadow: 0 3px 5px rgba(0,0,0,0.8); }
+
+body.theme-retro .btn-main { 
+    background: linear-gradient(to bottom, #d93829, #8a1a12); color: #fff; 
+    border: 2px solid #222; border-bottom: 5px solid #111; border-right: 4px solid #111;
+    border-radius: 6px; font-family: 'Arial', sans-serif; font-weight: 900; letter-spacing: 1px; box-shadow: 0 5px 10px rgba(0,0,0,0.6);
+}
+body.theme-retro .btn-main:active { transform: translate(2px, 3px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
+
+body.theme-retro #map { border: 4px solid #e0d8c8; border-radius: 4px; background: #e0d8c8; filter: sepia(0.2) brightness(1.05) contrast(0.95); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+body.theme-retro .briefing { background-color: transparent; border: none; box-shadow: none; padding: 5px; }
+
+body.theme-retro .flightplan-container { position: relative; z-index: 1; }
+body.theme-retro .flightplan-container::before {
+    content: ''; position: absolute; top: 25px; bottom: 25px; left: 50%; transform: translateX(-50%); width: 14px;
+    background-color: #e4e4e4;
+    background-image: linear-gradient(transparent 15%, #2a2d34 16%, transparent 18%), linear-gradient(transparent 42%, #2a2d34 44%, #2a2d34 46%, transparent 48%), linear-gradient(transparent 78%, #2a2d34 79%, transparent 81%);
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4); border-radius: 2px; z-index: 0;
+}
+
+body.theme-retro .aero-info-box { 
+    background: #2b2d31; border-radius: 12px; border: 4px solid #5a5f6a; 
+    box-shadow: inset 0 5px 15px rgba(0,0,0,0.4), 0 5px 10px rgba(0,0,0,0.8); 
+    margin-bottom: 15px; position: relative; z-index: 2; 
+}
+body.theme-retro .aero-info-box::before, body.theme-retro .aero-info-box::after { content: ''; position: absolute; width: 6px; height: 6px; background: #777; border-radius: 50%; box-shadow: inset 0 0 2px #000; }
+body.theme-retro .aero-info-box::before { top: 5px; left: 5px; }
+body.theme-retro .aero-info-box::after { bottom: 5px; right: 5px; }
+
+body.theme-retro .route-data { color: var(--piper-white); text-shadow: none; font-size: 18px; }
+body.theme-retro .copy-box { background: #222; border: 2px inset #444; color: #fff; }
+body.theme-retro .copy-box:hover { color: var(--piper-yellow); }
+
+body.theme-retro .btn-log { 
+    background: linear-gradient(to bottom, #f2c12e, #a88212); color: #111; 
+    border: 2px solid #222; border-bottom: 4px solid #111; border-right: 3px solid #111; font-family: 'Arial', sans-serif; font-weight: 900;
+}
+body.theme-retro .btn-log:active { transform: translate(2px, 2px); border-bottom: 2px solid #111; border-right: 2px solid #111; }
+
+body.theme-retro .theme-switch-wrapper { border-top: 2px dashed #444; }
+body.theme-retro .logbook { border-top: 3px solid #444; }
+body.theme-retro .log-entry { background: #1a1c1e; border-left: 4px solid var(--piper-yellow); border-radius: 2px; font-family: 'Courier New', monospace;}
+
+/* ==========================================================================
+   4. MECHANISCHE TROMMELZÄHLWERKE (Flat & Clean)
+   ========================================================================== */
+.drum-readout-container { display: inline-flex; align-items: center; gap: 4px; }
+body.theme-retro .drum-window {
+    display: inline-flex; gap: 1px; background-color: #111; border-radius: 3px; height: 22px; 
+    overflow: hidden; position: relative; padding: 0 2px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); 
+}
+body.theme-retro .drum-strip { display: flex; flex-direction: column; transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); will-change: transform; background-color: transparent; }
+body.theme-retro .drum-digit { height: 22px; line-height: 22px; font-family: 'Courier New', monospace; font-weight: bold; font-size: 17px; color: var(--piper-white); text-align: center; width: 12px; background-color: transparent; }
+body.theme-retro .highlight .drum-digit, body.theme-retro .theme-green-text .drum-digit { color: var(--piper-yellow); }
+
+/* ==========================================================================
+   5. ACTION BAR & ANALOGES S-METER
+   ========================================================================== */
+.action-bar { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 15px; }
+.action-bar .btn-main { flex-grow: 1; margin-top: 0 !important; }
+
+.analog-meter { display: none; width: 65px; height: 45px; background: #111; border: 1px solid #444; border-radius: 6px; position: relative; overflow: hidden; flex-shrink: 0; }
+.meter-face { position: absolute; inset: 4px; border-top: 2px dashed #555; border-radius: 50% 50% 0 0; }
+.meter-needle { position: absolute; bottom: -2px; left: 50%; width: 2px; height: 40px; background: var(--blue); transform-origin: bottom center; transform: translateX(-50%) rotate(-45deg); transition: transform 0.1s; }
+.meter-led { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #222; }
+.meter-led.led-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.meter-led.led-blue { background: #4da6ff; box-shadow: 0 0 6px #4da6ff; }
+.meter-label { display: none; }
+
+body.theme-retro .analog-meter { display: block; width: 75px; height: 50px; background: #1e1f22; border: 3px solid #4a4e59; border-radius: 6px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5); }
+body.theme-retro .meter-face { position: absolute; top: 5px; left: 5px; right: 5px; bottom: 3px; background-color: #f0eada; border-radius: 2px 2px 0 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); border: none; }
+body.theme-retro .meter-scale { position: absolute; bottom: 0; left: 10%; width: 80%; height: 90%; border-radius: 50% 50% 0 0; border-top: 2px solid #555; border-left: 2px solid transparent; border-right: 2px solid transparent; }
+body.theme-retro .meter-needle { background: #d93829; height: 38px; bottom: 2px; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); transition: transform 0.12s cubic-bezier(0.25, 1, 0.5, 1); z-index: 2; }
+body.theme-retro .analog-meter::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 10px; height: 6px; background: #222; border-radius: 50% 50% 0 0; border: 1px solid #000; z-index: 3; }
+body.theme-retro .meter-led { width: 6px; height: 6px; top: 6px; right: 8px; background: #002200; border: 1px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); z-index: 3; }
+/* LED grün (Lokaler Datenbank-Fallback) */
+body.theme-retro .meter-led.led-green {
+    background: #00ff41; 
+    box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff;
+    border-color: #fff;
+}
+/* LED blau (Erfolgreicher KI-Empfang) */
+body.theme-retro .meter-led.led-blue {
+    background: #2b8cff; 
+    box-shadow: 0 0 8px #2b8cff, inset 0 1px 2px #fff;
+    border-color: #fff;
+}
+body.theme-retro .meter-label { display: block; position: absolute; bottom: 2px; left: 4px; font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif; }
+
+/* ==========================================================================
+   6. DER NOTIZZETTEL-STAPEL (Interaktive Blätter)
+   ========================================================================== */
+#mTitle { margin-top: 0; font-size: 19px; color: var(--blue); }
+.story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
+.wiki-title { display: none; } /* Nur in Retro sichtbar */
+.wiki-info-note { font-size: 14px; color: #ccc; font-style: italic; line-height: 1.5; }
+
+/* Modern Mode (Normale Reihenfolge, kein Stapel) */
+.notes-stack { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+.paperclip, .page-number { display: none; } /* Im Modern Mode ausblenden */
+.mission-note-page { display: block !important; opacity: 1 !important; transform: none !important; }
+
+/* --- RETRO DESIGN: Stapel mit Büroklammer --- */
+body.theme-retro .notes-stack {
+    display: grid; /* Erlaubt das exakte Übereinanderlegen */
+    grid-template-areas: "stack";
+    position: relative;
+    margin-bottom: 25px;
+    cursor: pointer; /* Signalisiert Klickbarkeit */
+}
+
+/* Die Büroklammer als SVG oben auf dem Stapel */
+body.theme-retro .paperclip {
+    display: block;
+    position: absolute;
+    top: -18px;  /* Ein kleines bisschen höher */
+    left: 20px;  /* Viel weiter nach links geschoben (vorher 50px) */
+    width: 25px; height: 60px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 60'%3E%3Cpath d='M10 40 V12 a4 4 0 0 1 8 0 v32 a6 6 0 0 1-12 0 V10 a8 8 0 0 1 16 0 v32' fill='none' stroke='%23889' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    z-index: 10;
+    filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+    transform: rotate(-15deg); /* Leicht gedreht, damit sie nicht den Text verdeckt */
+}
+
+
+body.theme-retro .mission-note-page {
+    grid-area: stack; /* Beide Seiten liegen im selben CSS Grid Bereich */
+    background-color: #fdf5e6; 
+    background-image: repeating-linear-gradient(transparent, transparent 23px, #a6bccc 24px);
+    background-size: 100% 24px;
+    background-position: 0 4px; 
+    padding: 15px 15px 15px 45px; 
+    border-radius: 2px 6px 4px 2px;
+    border: 1px solid #d3cbb8;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* Sanfte Animation beim Tauschen */
+}
+
+/* Der rote Rand des College-Blocks */
+body.theme-retro .mission-note-page::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 30px; width: 1px; background-color: rgba(220, 50, 50, 0.4);
+}
+
+/* Dynamische Z-Indizes und Drehungen für den vorderen / hinteren Zettel */
+body.theme-retro .front-note {
+    z-index: 2;
+    transform: rotate(-1.5deg);
+    box-shadow: 3px 5px 12px rgba(0,0,0,0.6);
+    opacity: 1;
+}
+body.theme-retro .back-note {
+    z-index: 1;
+    /* Ragt leicht rechts und unten heraus */
+    transform: rotate(2deg) translate(8px, 6px);
+    box-shadow: 2px 3px 8px rgba(0,0,0,0.5);
+    /* Leicht abgedunkelt, da er im Schatten liegt */
+    filter: brightness(0.85); 
+}
+
+/* Handschrift für Seitenzahlen */
+body.theme-retro .page-number {
+    display: block;
+    position: absolute;
+    bottom: 5px; right: 10px;
+    font-family: 'Caveat', cursive;
+    font-size: 18px;
+    color: #0b1f65;
+    opacity: 0.6;
+}
+
+body.theme-retro #mTitle, body.theme-retro .wiki-title {
+    display: block;
+    font-family: 'Caveat', cursive;
+    font-size: 28px;
+    color: #0b1f65; 
+    text-shadow: none;
+    margin-bottom: 8px; margin-top: 0;
+    transform: rotate(-1deg); 
+    line-height: 1.2;
+}
+
+body.theme-retro #mStory, body.theme-retro .wiki-info-note {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px; font-weight: bold; color: #222; 
+    line-height: 24px; /* Exakt auf der Linie */
+    border: none; padding-bottom: 0; margin-bottom: 0;
+    text-shadow: none; letter-spacing: -0.5px; font-style: normal;
+}
+
+/* ==========================================================================
+   7. PAYLOAD & FRACHT (Auf dem Notizzettel)
+   ========================================================================== */
+.note-manifest { display: grid; grid-template-columns: 1fr 1fr; margin-top: 15px; padding-top: 12px; border-top: 1px dashed #444; font-size: 14px; color: #eee; }
+.note-manifest strong { color: #888; display: block; font-size: 11px; text-transform: uppercase; margin-bottom: 2px; }
+.note-manifest span { font-size: 16px; font-weight: bold; color: #fff; }
+
+body.theme-retro .note-manifest { display: block; margin-top: 24px; padding-top: 0; border-top: none; }
+body.theme-retro .note-manifest div { line-height: 24px; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; color: #222; }
+body.theme-retro .note-manifest strong { display: inline; font-size: 14px; color: #d93829; margin-right: 5px; text-transform: uppercase; }
+body.theme-retro .note-manifest span { font-size: 14px; font-weight: bold; color: #222; }
+
+/* ==========================================================================
+   8. PANEL SCHALTER (METAR & AIP)
+   ========================================================================== */
+.switch-row { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #444; }
+.retro-switch-container { display: flex; align-items: center; gap: 6px; cursor: pointer; background: #333; padding: 6px 12px; border-radius: 20px; transition: background-color 0.2s; }
+.retro-switch-container:hover { background: #555; }
+.retro-switch { display: none; } 
+.retro-switch-label { font-size: 11px; font-weight: bold; color: #fff; text-transform: uppercase; }
+
+body.theme-retro .switch-row { border-top: 1px solid #4a4e59; }
+body.theme-retro .retro-switch-container { background: transparent; padding: 0; border-radius: 0; }
+body.theme-retro .retro-switch-container:hover { background: transparent; }
+
+body.theme-retro .retro-switch {
+    display: block; width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #d93829, #8a1a12); border: 2px solid #111; 
+    box-shadow: 0 3px 5px rgba(0,0,0,0.8), inset 0 1px 2px rgba(255,255,255,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+body.theme-retro .retro-switch-label {
+    background: #e4e4e4; color: #111; font-family: 'Arial', sans-serif; font-size: 10px; font-weight: 900;
+    padding: 2px 5px; border-radius: 2px; border: 1px solid #888; box-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px;
+}
+
+body.theme-retro .retro-switch-container:active .retro-switch {
+    transform: translateY(3px); box-shadow: 0 0 2px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.7);
+}
+
+/* ==========================================================================
+   9. KI DISPATCHER SETTINGS
+   ========================================================================== */
+.api-settings {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px dashed #444;
+}
+.api-settings label {
+    color: var(--blue);
+}
+body.theme-retro .api-settings label {
+    color: var(--piper-yellow);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+body.theme-retro .api-settings input {
+    background-image: none; /* Kein Abreißzettel für das Passwortfeld */
+    border-radius: 4px;
+    border-right: 1px solid #c2bba8;
+    padding-right: 12px;
+    font-family: monospace;
+}
+
+/* Styling für den Erklärtext und Link */
+.api-hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.api-hint a {
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--blue);
+    transition: color 0.2s;
+}
+.api-hint a:hover {
+    color: var(--green);
+    border-bottom-color: var(--green);
+}
+
+/* Retro Mode: Schreibmaschinen-Zusatz */
+body.theme-retro .api-hint {
+    font-family: 'Courier New', Courier, monospace;
+    color: #a39c87; /* Verblichenes Tinten-Grau */
+    font-weight: bold;
+    letter-spacing: -0.5px;
+}
+body.theme-retro .api-hint a {
+    color: var(--piper-yellow);
+    border-bottom: 1px solid var(--piper-yellow);
+}
+body.theme-retro .api-hint a:hover {
+    color: var(--piper-white);
+    border-bottom-color: var(--piper-white);
+}
+
+/* ==========================================================================
+   10. HANGAR PINNWAND (MAINTENANCE BOARD)
+   ========================================================================== */
+.pinboard-overlay {
+    display: none; /* Standardmäßig versteckt */
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    flex-direction: column;
+}
+.pinboard-overlay.active { display: flex; }
+
+.pinboard-header {
+    background: #1a1a1a; padding: 10px 15px; 
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 2px solid #333;
+}
+.pb-btn { 
+    background: #444; color: #fff; border: 1px solid #222; 
+    padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace;
+}
+.pb-btn.add { background: var(--green); color: #000; font-weight: bold; }
+
+.pinboard-scroll-area {
+    flex: 1; overflow: auto; /* Erlaubt pannen/scrollen auf Mobile */
+    display: flex; justify-content: center; align-items: center;
+}
+
+.pinboard-content {
+    /* Die Maße deines Bildes (ca. 3:2 Format) */
+    width: 900px; height: 600px; 
+    background-image: url('board.png');
+    background-size: cover;
+    background-position: center;
+    position: relative; /* Wichtig für die Post-its */
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    border-radius: 4px;
+}
+
+/* --- DIE POST-ITS --- */
+.post-it {
+    position: absolute;
+    width: 140px; min-height: 100px;
+    background: #fdfd86;
+    box-shadow: 2px 3px 5px rgba(0,0,0,0.4);
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 14px;
+    color: #111;
+    padding: 15px 10px 10px 10px;
+    cursor: grab;
+    user-select: none;
+    line-height: 1.2;
+}
+.post-it:active { cursor: grabbing; box-shadow: 4px 5px 8px rgba(0,0,0,0.5); }
+.post-it-del {
+    position: absolute; top: -8px; right: -8px;
+    background: #d93829; color: white; width: 20px; height: 20px;
+    border-radius: 50%; text-align: center; line-height: 20px;
+    font-size: 12px; cursor: pointer; font-family: sans-serif;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}
+.post-it-pin {
+    position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
+    width: 8px; height: 8px; border-radius: 50%; background: #444;
+    box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5);
+}
+
+/* Macht das Verschieben des Cockpits butterweich */
+.container {
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* --- PC LAYOUT (Ab 1300px Breite links Cockpit, rechts Pinnwand) --- */
+@media (min-width: 1300px) {
+    /* Schiebt das Hauptfenster um 350 Pixel nach links */
+    body.pinboard-open .container {
+        transform: translateX(-350px);
+    }
+    
+    /* Die Pinnwand rückt in den frei gewordenen Platz nach links auf */
+    .pinboard-overlay.active {
+        background: transparent;
+        left: calc(50% - 80px); /* Nahtlos an das verschobene Cockpit angedockt */
+        right: 20px; 
+        top: 20px; 
+        bottom: 20px;
+    }
+    .pinboard-scroll-area { align-items: flex-start; justify-content: flex-start; }
+    
+    /* Je nach Bildschirmgröße kann man das Board noch etwas skalieren */
+    .pinboard-content { transform: scale(0.95); transform-origin: top left; }
+}
+
+/* ==========================================================================
+   11. KARTENTISCH (MAP TABLE) & SCHIEBE-LOGIK
+   ========================================================================== */
+
+/* Wenn Kartentisch offen ist, schiebt sich das Cockpit nach RECHTS */
+body.maptable-open .container {
+    transform: translateX(350px);
+}
+
+.maptable-content {
+    /* Format passend zu map.jpg */
+    width: 1000px; height: 600px; 
+    background-image: url('map.jpg');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Die digitale Karte wird direkt auf das alte Papier gedruckt */
+#map {
+    width: 72%;  /* Etwas schmaler gemacht (vorher 78%) */
+    height: 86%; /* Ein gutes Stück höher gemacht (vorher 78%) */
+    display: block;
+    border-radius: 3px;
+    filter: sepia(0.35) contrast(0.95);
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.6), 0 0 5px rgba(0,0,0,0.4);
+    border: 1px solid rgba(0,0,0,0.3);
+}
+@media (min-width: 1300px) {
+    /* Kartentisch rastet auf der LINKEN Seite ein */
+    #mapTableOverlay.active {
+        background: transparent;
+        right: calc(50% - 90px); 
+        left: 20px; 
+        top: 20px; 
+        bottom: 20px;
+    }
+    #mapTableOverlay .pinboard-scroll-area { 
+        align-items: flex-start; justify-content: flex-end; 
+    }
+    .maptable-content { transform: scale(0.9); transform-origin: top right; }
+}
