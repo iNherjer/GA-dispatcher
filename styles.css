@@ -605,3 +605,74 @@ body.theme-retro .note-manifest span {
     color: #222;
 }
 
+/* ==========================================================================
+   8. PANEL SCHALTER (METAR & AIP)
+   ========================================================================== */
+
+.switch-row {
+    display: flex;
+    gap: 15px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed #444; /* Trennlinie zur Pisten-Info */
+}
+
+/* Modern Mode (Kleine Pillen-Buttons) */
+.retro-switch-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    background: #333;
+    padding: 6px 12px;
+    border-radius: 20px;
+    transition: background-color 0.2s;
+}
+.retro-switch-container:hover { background: #555; }
+.retro-switch { display: none; } /* Die Mechanik bleibt im Modern Mode versteckt */
+.retro-switch-label { font-size: 11px; font-weight: bold; color: #fff; text-transform: uppercase; }
+
+/* Retro Mode (Mechanische Push-Buttons mit Label) */
+body.theme-retro .switch-row {
+    border-top: 1px solid #4a4e59; /* Passt sich dem Instrumenten-Rand an */
+}
+
+body.theme-retro .retro-switch-container {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+body.theme-retro .retro-switch-container:hover { background: transparent; }
+
+/* Der rote, mechanische Knopf */
+body.theme-retro .retro-switch {
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #d93829, #8a1a12); /* Roter Plastik-Glanz */
+    border: 2px solid #111; /* Schwarze Fassung */
+    box-shadow: 0 3px 5px rgba(0,0,0,0.8), inset 0 1px 2px rgba(255,255,255,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+/* Das weiße Beschriftungsschildchen */
+body.theme-retro .retro-switch-label {
+    background: #e4e4e4; 
+    color: #111;
+    font-family: 'Arial', sans-serif;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 5px;
+    border-radius: 2px;
+    border: 1px solid #888;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+    letter-spacing: 0.5px;
+}
+
+/* Der mechanische Klick-Effekt! */
+body.theme-retro .retro-switch-container:active .retro-switch {
+    transform: translateY(3px); /* Knopf drückt sich ein */
+    box-shadow: 0 0 2px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.7);
+}
+
