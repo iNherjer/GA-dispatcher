@@ -101,11 +101,16 @@
     
     <div id="map"></div>
 
-    <div id="briefingBox" class="briefing">
+       <div id="briefingBox" class="briefing">
         
         <div class="mission-note-wrapper">
             <h2 id="mTitle"></h2>
             <p id="mStory" class="story"></p>
+            
+            <div class="note-manifest">
+                <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
+                <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
+            </div>
         </div>
         
         <div class="flightplan-container" style="display:flex; flex-direction:column;">
@@ -144,11 +149,6 @@
             </div>
 
         </div>
-
-        <div class="grid-2" style="margin-top:5px; padding: 0 5px;">
-            <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Payload</span><span id="mPay" class="highlight"></span></div>
-            <div class="stat-item"><span class="stat-label" style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">Fracht</span><span id="mWeight" class="highlight"></span></div>
-        </div>
         
         <div class="action-row">
             <button class="btn-action" onclick="openAIP('dep')">📄 AIP DEP</button>
@@ -158,6 +158,7 @@
             <button class="btn-log" onclick="logCurrentFlight()">✈️ Flug loggen & Startplatz setzen</button>
         </div>
     </div>
+
 
     <div class="logbook">
         <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
@@ -184,4 +185,3 @@
 
 </body>
 </html>
-
