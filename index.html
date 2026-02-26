@@ -186,9 +186,14 @@
         </div>
     </div>
 
-    <div class="logbook">
-        <h3 class="theme-title-text">Flugbuch <button style="font-size:10px; background:none; border:1px solid #555; color:#888; cursor:pointer; padding:2px 5px;" onclick="clearLog()">Clear</button></h3>
-        <div id="logContent"></div>
+    <div class="api-settings">
+        <label>🤖 KI-Dispatcher (Gemini API Key)</label>
+        <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()">
+        
+        <div class="api-hint">
+            <strong>Tipp:</strong> Mehr abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen um dynamische Missionen generieren zu lassen <br>
+            <span style="opacity: 0.7;">🔒 Sicher: Der Key wird ausschließlich lokal in deinem Browser gespeichert.</span>
+        </div>
     </div>
 
     <div class="theme-switch-wrapper">

@@ -263,7 +263,8 @@ body.theme-retro .highlight .drum-digit, body.theme-retro .theme-green-text .dru
 .meter-face { position: absolute; inset: 4px; border-top: 2px dashed #555; border-radius: 50% 50% 0 0; }
 .meter-needle { position: absolute; bottom: -2px; left: 50%; width: 2px; height: 40px; background: var(--blue); transform-origin: bottom center; transform: translateX(-50%) rotate(-45deg); transition: transform 0.1s; }
 .meter-led { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #222; }
-.meter-led.led-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.meter-led.led-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.meter-led.led-blue { background: #4da6ff; box-shadow: 0 0 6px #4da6ff; }
 .meter-label { display: none; }
 
 body.theme-retro .analog-meter { display: block; width: 75px; height: 50px; background: #1e1f22; border: 3px solid #4a4e59; border-radius: 6px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5); }
@@ -272,7 +273,18 @@ body.theme-retro .meter-scale { position: absolute; bottom: 0; left: 10%; width:
 body.theme-retro .meter-needle { background: #d93829; height: 38px; bottom: 2px; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); transition: transform 0.12s cubic-bezier(0.25, 1, 0.5, 1); z-index: 2; }
 body.theme-retro .analog-meter::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 10px; height: 6px; background: #222; border-radius: 50% 50% 0 0; border: 1px solid #000; z-index: 3; }
 body.theme-retro .meter-led { width: 6px; height: 6px; top: 6px; right: 8px; background: #002200; border: 1px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); z-index: 3; }
-body.theme-retro .meter-led.led-active { background: #00ff41; box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff; border-color: #fff; }
+/* LED grün (Lokaler Datenbank-Fallback) */
+body.theme-retro .meter-led.led-green {
+    background: #00ff41; 
+    box-shadow: 0 0 6px #00ff41, inset 0 1px 2px #fff;
+    border-color: #fff;
+}
+/* LED blau (Erfolgreicher KI-Empfang) */
+body.theme-retro .meter-led.led-blue {
+    background: #2b8cff; 
+    box-shadow: 0 0 8px #2b8cff, inset 0 1px 2px #fff;
+    border-color: #fff;
+}
 body.theme-retro .meter-label { display: block; position: absolute; bottom: 2px; left: 4px; font-size: 8px; font-weight: bold; color: #888; font-family: Arial, sans-serif; }
 
 /* ==========================================================================
@@ -415,4 +427,64 @@ body.theme-retro .retro-switch-label {
 
 body.theme-retro .retro-switch-container:active .retro-switch {
     transform: translateY(3px); box-shadow: 0 0 2px rgba(0,0,0,0.8), inset 0 2px 4px rgba(0,0,0,0.7);
+}
+
+/* ==========================================================================
+   9. KI DISPATCHER SETTINGS
+   ========================================================================== */
+.api-settings {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px dashed #444;
+}
+.api-settings label {
+    color: var(--blue);
+}
+body.theme-retro .api-settings label {
+    color: var(--piper-yellow);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+body.theme-retro .api-settings input {
+    background-image: none; /* Kein Abreißzettel für das Passwortfeld */
+    border-radius: 4px;
+    border-right: 1px solid #c2bba8;
+    padding-right: 12px;
+    font-family: monospace;
+}
+
+/* Styling für den Erklärtext und Link */
+.api-hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.api-hint a {
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--blue);
+    transition: color 0.2s;
+}
+.api-hint a:hover {
+    color: var(--green);
+    border-bottom-color: var(--green);
+}
+
+/* Retro Mode: Schreibmaschinen-Zusatz */
+body.theme-retro .api-hint {
+    font-family: 'Courier New', Courier, monospace;
+    color: #a39c87; /* Verblichenes Tinten-Grau */
+    font-weight: bold;
+    letter-spacing: -0.5px;
+}
+body.theme-retro .api-hint a {
+    color: var(--piper-yellow);
+    border-bottom: 1px solid var(--piper-yellow);
+}
+body.theme-retro .api-hint a:hover {
+    color: var(--piper-white);
+    border-bottom-color: var(--piper-white);
 }
