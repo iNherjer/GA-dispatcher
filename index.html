@@ -8,20 +8,20 @@
     <link rel="icon" type="image/png" href="IconDRK.PNG">
     <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" sizes="32x32" href="IconDRK.PNG" media="(prefers-color-scheme: dark)">
-    
-    <link rel="apple-touch-icon" href="IconDRK.PNG">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#080808">
-
+    <link rel="apple-touch-icon" href="IconDRK.PNG">
+    <link rel="apple-touch-icon" sizes="180x180" href="IconDRK.PNG">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="theme-retro">
 
 <div class="container">
+    <div class="glareshield"></div>
 
-    <div class="screw top-left"></div>
+    <div class="screw top-left" onclick="cyclePanelColor()" title="Panel-Lackierung ändern" style="cursor: pointer; z-index: 20;"></div>
     <div class="screw top-right"></div>
     <div class="screw bottom-left"></div>
     <div class="screw bottom-right"></div>
@@ -30,8 +30,8 @@
     <div id="searchIndicator">System bereit.</div>
     
     <div class="grid-2">
-        <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
-        <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()"></div>
+        <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase()" onchange="updateMapFromInputs()"></div>
+        <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase()" onchange="updateMapFromInputs()"></div>
     </div>
     
     <div class="grid-2">
@@ -71,7 +71,7 @@
 
     <div class="slider-container">
         <div class="slider-header">
-            <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">GPH</label>
+            <label class="slider-label">GPH</label>
             <span id="gphDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">14</span>
         </div>
         <input type="range" id="gphSlider" min="5" max="35" value="14" oninput="handleSliderChange('gph', this.value)">
@@ -79,7 +79,7 @@
 
     <div class="slider-container">
         <div class="slider-header">
-            <label style="background:transparent; border:none; box-shadow:none; padding:0; color:#888;">TAS (kts)</label>
+            <label class="slider-label">TAS (kts)</label>
             <span id="tasDrum" class="drum-readout-container theme-color-text" style="font-weight:bold;">160</span>
         </div>
         <input type="range" id="tasSlider" min="80" max="260" value="160" step="5" oninput="handleSliderChange('tas', this.value)">
@@ -87,6 +87,10 @@
     
     <div class="action-bar">
         <button class="btn-main" id="generateBtn" onclick="generateMission()">Auftrag generieren</button>
+        
+        <div class="emergency-reset" onclick="resetApp()" title="Briefing verwerfen & Reset">
+            <div class="emergency-reset-inner">↻</div>
+        </div>
         
         <div class="analog-meter" id="searchMeter" title="Signalstärke">
             <div class="meter-face">
@@ -98,27 +102,35 @@
         </div>
     </div>
     
-    <div id="map"></div>
+    <div style="display:flex; gap: 10px; margin-top: 15px; margin-bottom: 5px;">
+        <button class="btn-preset" style="flex:1; background-color: #444; color: #fff; border-color: #222;" onclick="toggleMapTable()">🗺️ Kartentisch</button>
+        <button class="btn-preset" style="flex:1; background-color: #444; color: #fff; border-color: #222;" onclick="togglePinboard()">📋 Pinnwand</button>
+    </div>
 
     <div id="briefingBox" class="briefing">
-        
         <div class="notes-stack" id="notesStack">
-            
             <div class="paperclip" onclick="toggleNotes()"></div>
-            
             <div class="mission-note-page front-note" id="notePage1" onclick="toggleNotes()">
                 <div class="page-number">Seite 1</div>
                 <h2 id="mTitle"></h2>
                 <p id="mStory" class="story"></p>
                 
-                <div class="note-manifest">
-                    <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
-                    <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
-                    <div><strong>STRECKE:</strong> <span id="mDistNote"></span></div>
-                    <div><strong>ETE CA:</strong> <span id="mETENote"></span></div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 15px; border-top: 1px dashed #444; padding-top: 12px;">
+                    <div class="note-manifest" style="margin-top: 0; padding-top: 0; border-top: none; flex-grow: 1;">
+                        <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
+                        <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
+                        <div><strong>STRECKE:</strong> <span id="mDistNote"></span></div>
+                        <div><strong>KURS:</strong> <span id="mHeadingNote"></span></div>
+                        <div><strong>ETE CA:</strong> <span id="mETENote"></span></div>
+                    </div>
+                    
+                    <div class="briefing-photo-attachment" onclick="toggleMapTable(); event.stopPropagation();" title="Kartentisch öffnen" style="margin: 0 0 0 15px; flex-shrink: 0;">
+                        <div class="photo-pin"></div>
+                        <div class="photo-img" id="miniMap"></div>
+                        <div class="photo-caption">Route Map</div>
+                    </div>
                 </div>
             </div>
-
             <div class="mission-note-page back-note" id="notePage2" onclick="toggleNotes()">
                 <div class="page-number">Seite 2</div>
                 <h2 class="wiki-title">Ziel-Info</h2>
@@ -126,26 +138,21 @@
                     📖 <span id="wikiDescText">Warte auf Daten...</span>
                 </div>
             </div>
-            
         </div>
         
         <div class="flightplan-container" style="display:flex; flex-direction:column;">
-            
             <div class="aero-info-box" id="boxDep">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span class="box-title theme-green-text">🛫 <span id="mDepICAO"></span> | <span id="mDepName" style="color:#fff; text-shadow:none;"></span></span>
                 </div>
                 <div><span id="mDepCoords" class="copy-box" onclick="copyCoords('mDepCoords')"></span></div>
                 <div class="rwy-info">Piste: <span id="mDepRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
-                
                 <div class="switch-row">
                     <div class="retro-switch-container" onclick="openMetar('dep')">
-                        <div class="retro-switch"></div>
-                        <span class="retro-switch-label">METAR</span>
+                        <div class="retro-switch"></div><span class="retro-switch-label">METAR</span>
                     </div>
                     <div class="retro-switch-container" onclick="openAIP('dep')">
-                        <div class="retro-switch"></div>
-                        <span class="retro-switch-label">AIP</span>
+                        <div class="retro-switch"></div><span class="retro-switch-label">AIP</span>
                     </div>
                 </div>
             </div>
@@ -153,11 +160,11 @@
             <div class="aero-info-box" id="boxRoute">
                 <div class="route-label" style="background:transparent; border:none; box-shadow:none; padding:0;">✈️ Flugplan & Performance</div>
                 <div class="route-data">
-                    <div class="drum-readout-container">Kurs: <span id="headingDrum"></span> <span id="headingArrow"></span></div>
                     <div class="drum-readout-container">Dist: <span id="distDrum"></span> <span>NM</span></div>
                     <div class="drum-readout-container">Zeit: <span id="timeDrum"></span> <span>Min</span></div>
                     <div class="drum-readout-container">Fuel: <span id="fuelDrum"></span> <span>Gal</span></div>
                 </div>
+                <div id="waypointList" class="waypoint-list"></div>
             </div>
 
             <div class="aero-info-box" id="boxDest">
@@ -167,21 +174,16 @@
                     </span>
                 </div>
                 <div><span id="mDestCoords" class="copy-box" onclick="copyCoords('mDestCoords')"></span></div>
-                
                 <div class="rwy-info" id="destRwyContainer">Piste: <span id="mDestRwy" style="color:#fff; font-weight:bold;">Sucht Pisten-Infos...</span></div>
-                
                 <div class="switch-row" id="destSwitchRow">
                     <div class="retro-switch-container" onclick="openMetar('dest')">
-                        <div class="retro-switch"></div>
-                        <span class="retro-switch-label">METAR</span>
+                        <div class="retro-switch"></div><span class="retro-switch-label">METAR</span>
                     </div>
                     <div class="retro-switch-container" onclick="openAIP('dest')">
-                        <div class="retro-switch"></div>
-                        <span class="retro-switch-label">AIP</span>
+                        <div class="retro-switch"></div><span class="retro-switch-label">AIP</span>
                     </div>
                 </div>
             </div>
-
         </div>
 
         <div style="margin-top: 15px;">
@@ -197,13 +199,25 @@
     <div class="api-settings">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <label style="margin: 0;">🤖 KI-Dispatcher (Gemini API)</label>
-            <label class="switch" style="transform: scale(0.7); margin: 0; transform-origin: right;">
-                <input type="checkbox" id="aiToggle" onchange="saveAiToggle()" checked>
-                <span class="slider"></span>
-            </label>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="analog-meter api-fuel-meter" title="API Quota (Täglich)">
+                    <div class="meter-face">
+                        <div class="meter-scale api-scale"></div>
+                        <div class="meter-label" style="width: 100%; left: 0; text-align: center;">
+                            <span style="position:absolute; left: 4px; color: #d93829;">E</span>
+                            <span style="color: #888;">FUEL</span>
+                            <span style="position:absolute; right: 4px; color: #00ff41;">F</span>
+                        </div>
+                    </div>
+                    <div class="meter-needle" id="apiNeedle"></div>
+                </div>
+                <label class="switch" style="transform: scale(0.7); margin: 0; transform-origin: right;">
+                    <input type="checkbox" id="aiToggle" onchange="saveAiToggle()" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
         </div>
         <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()">
-        
         <div class="api-hint">
             <strong>Tipp:</strong> Mehr Abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen um dynamische Missionen generieren zu lassen. <br>
             <span style="opacity: 0.7;">🔒 Sicher: Der Key wird ausschließlich lokal in deinem Browser gespeichert.</span>
@@ -218,10 +232,39 @@
         </label>
         <span class="switch-label" style="color: #d93829;">Analog</span>
     </div>
-
 </div>
 
-<div class="version-info">Version 92.0 (Ultimate Dispatcher)</div>
+<div class="version-info">Version 95.0 (Dual-AI Fuel Edition)</div>
+
+<div id="pinboardOverlay" class="pinboard-overlay">
+    <div class="pinboard-header">
+        <span style="color: #fff; font-weight: bold; font-family: monospace;">AIRCRAFT STATUS LOG</span>
+        <div>
+            <button class="pb-btn add" onclick="addNote()">➕ Zettel anpinnen</button>
+            <button class="pb-btn close" onclick="togglePinboard()">❌ Schließen</button>
+        </div>
+    </div>
+    <div class="pinboard-scroll-area">
+        <div id="pinboard" class="pinboard-content"></div>
+    </div>
+</div>
+
+<div id="mapTableOverlay" class="pinboard-overlay">
+    <div class="pinboard-header">
+        <span style="color: #fff; font-weight: bold; font-family: monospace;">NAV STATION (KARTENTISCH)</span>
+        <div>
+            <button class="pb-btn" id="measureBtn" onclick="toggleMeasureMode()">📏 Messen (Aus)</button>
+            <button class="pb-btn" onclick="clearMeasure()">🗑️ Zirkel löschen</button>
+            <button class="pb-btn" onclick="resetMainRoute()">🔄 Route Reset</button>
+            <button class="pb-btn close" onclick="toggleMapTable()">❌ Schließen</button>
+        </div>
+    </div>
+    <div class="pinboard-scroll-area">
+        <div class="maptable-content">
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="datenbank.js"></script>
