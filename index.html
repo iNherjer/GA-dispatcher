@@ -111,6 +111,8 @@
         <div class="notes-stack" id="notesStack">
             <div class="paperclip" onclick="toggleNotes()"></div>
             <div class="mission-note-page front-note" id="notePage1" onclick="toggleNotes()">
+                <div class="briefing-save-pin" onclick="pinCurrentFlight(); event.stopPropagation();" title="Flug ans Hangar-Board heften">📌</div>
+                <div class="briefing-export-pin" onclick="exportMission(); event.stopPropagation();" title="Flug als Code kopieren">🔗</div>
                 <div class="page-number">Seite 1</div>
                 <h2 id="mTitle"></h2>
                 <p id="mStory" class="story"></p>
@@ -240,7 +242,10 @@
     <div class="pinboard-header">
         <span style="color: #fff; font-weight: bold; font-family: monospace;">AIRCRAFT STATUS LOG</span>
         <div>
-            <button class="pb-btn add" onclick="addNote()">➕ Zettel anpinnen</button>
+            <button class="pb-btn" style="background:#4da6ff; color:#fff; font-weight:bold; border:1px solid #222;" onclick="toggleTutorialNotes()">💡 Tipps an/aus</button>
+            <button class="pb-btn" style="background:#f2c12e; color:#111; font-weight:bold; border:1px solid #222;" onclick="importMission()">📥 Code laden</button>
+            <button class="pb-btn add" onclick="addNote()">➕ Zettel</button>
+            <button class="pb-btn" style="background:#d93829; color:#fff; font-weight:bold; border:1px solid #222;" onclick="clearPinboard()">🗑️ Alle löschen</button>
             <button class="pb-btn close" onclick="togglePinboard()">❌ Schließen</button>
         </div>
     </div>

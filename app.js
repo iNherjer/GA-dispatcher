@@ -67,6 +67,9 @@ function cyclePanelColor() {
    ========================================================= */
 let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
 let globalAirports = null, runwayCache = {};
+let measureMode = false, measurePoints = [], measurePolyline = null, measureMarkers = [], measureTooltip = null;
+let routeWaypoints = [], routeMarkers = [], currentSName = "", currentDName = "";
+let miniMap, miniRoutePolyline, miniMapMarkers = [];
 
 window.onload = () => {
     const savedTheme = localStorage.getItem('ga_theme') || 'retro'; 
@@ -92,7 +95,13 @@ window.onload = () => {
     if(aiToggleBtn) { aiToggleBtn.checked = (aiEnabled !== 'false'); }
 
     renderLog();
-    updateApiFuelMeter(); // API Zähler starten
+    updateApiFuelMeter(); 
+
+    // INITIALISIERUNG: Pinnwand Tutorial für neue Nutzer
+    if (!localStorage.getItem('ga_pinboard_init')) {
+        localStorage.setItem('ga_pinboard', JSON.stringify(tutorialNotes));
+        localStorage.setItem('ga_pinboard_init', 'true');
+    }
 
     const activeMission = localStorage.getItem('ga_active_mission');
     if (activeMission) {
@@ -349,7 +358,7 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
     const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
     if (!apiKey) return null; 
 
-    const prompt = `Du bist ein Dispatcher für die allgemeine Luftfahrt (General Aviation).
+    const prompt = `Du bist ein erfahrener Dispatcher für die allgemeine Luftfahrt (General Aviation).
     Erstelle ein realistisches Einsatzbriefing:
     Start: ${startName}
     Ziel/Fokus: ${destName} ${isPOI ? '(POI / Wendepunkt)' : '(Zielflughafen)'}
@@ -358,12 +367,15 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
 
     WICHTIGE REGELN:
     1. Antworte IMMER auf Deutsch!
-    2. Schreibe knapp und professionell im Ton eines echten Dispatcher-Briefings auf dem Klemmbrett.
-    3. Baue echte geografische oder historische Fakten zur Region ein.
+    2. Schreibe knapp, professionell und im rauen Ton eines echten Dispatchers.
+    3. Baue zwingend echte geografische, infrastrukturelle oder historische Fakten zur Zielregion ein.
     ${isPOI ? 
     `4. RUNDFLUG-REGELN: Start/Landung ist ${startName}. Am POI (${destName}) wird NICHTS gelandet! 
-    5. AUFGABE: Klassische Rundflug-Motive (Fotoflug, LiDAR). TRAININGS-FALLBACK: Übungsflug bei langweiligem POI.` 
-    : `4. ROUTEN-REGELN: Normaler Streckenflug von ${startName} nach ${destName}. Typische GA-Aufgaben.`}
+    5. AUFGABE: Passe den Flug an den Ort an! Nutze die volle Bandbreite: Struktur-/Trassenprüfung, Stau-Report, Abgas/Emissions-Messung, Lidar/Topo-Scan, Forst-Patrouille (Waldbrand/Wildtiere), VIP-Touren, Denkmalschutz oder Film-Drehs.
+    6. WILDCARD: In ca. 20% der Fälle darfst du komplett eskalieren und dir ein wildes, ungewöhnliches aber in der Realität der General Aviation mögliches Szenario ausdenken (z.B. entflohenes Zootier aus der Luft suchen, illegale Rave-Party im Wald scouten, UFO-Sichtung überprüfen).` 
+    : `4. ROUTEN-REGELN: Flug von ${startName} nach ${destName}.
+    5. AUFGABE: Wähle eine Mission aus diesen Bereichen: Privat/Verein ($100 Hamburger, Fly-In), Logistik/Business (AOG-Ersatzteil, Organtransport, Laborproben, VIP-Transfer, verletztes Reitpferd) ODER detailliertes Flugtraining (VOR-Navigation, Engine-Out Simulation, Short Field Landing, Steep Turns).
+    6. WILDCARD: In ca. 20% der Fälle darfst du dir einen völlig verrückten, einzigartigen Auftrag ausdenken (z.B. Rockstar flieht vor Paparazzi, eiliger Kurierflug mit streng geheimen Dokumenten, verdeckte Ermittler absetzen).`}
 
     Antworte AUSSCHLIESSLICH als JSON. Keine Markdown-Formatierung.
     Struktur: {"title": "Kurzer, knackiger Titel", "story": "Das Briefing (max 3-4 Sätze)"}`;
@@ -398,11 +410,11 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
             return { t: parsed.title, s: parsed.story, i: "📋", cat: "std", _source: "Gemini 2.5 Flash Lite" };
         } else {
             console.warn("Lite API Fehler (Code: " + resLite.status + "). Wechsle zu lokaler Datenbank.");
-            return null; // Gibt Null zurück -> Lokale Datenbank springt ein
+            return null;
         }
     } catch (e) {
         console.warn("Gemini Lite fehlgeschlagen:", e);
-        return null; // Gibt Null zurück -> Lokale Datenbank springt ein
+        return null; 
     }
 }
 
@@ -411,7 +423,6 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
    ========================================================= */
 function getQuotaDay() {
     const now = new Date();
-    // Vor 09:00 Uhr zählt noch zum Vortag
     if (now.getHours() < 9) now.setDate(now.getDate() - 1);
     return now.toISOString().split('T')[0];
 }
@@ -420,7 +431,7 @@ function getApiUsage() {
     const today = getQuotaDay();
     let data = JSON.parse(localStorage.getItem('ga_api_fuel'));
     
-    // Wenn keine Daten da sind, ein neuer Tag ist, ODER das alte Format (ohne 'flash') noch im Speicher hängt: Reset!
+    // Wenn keine Daten da sind, ein neuer Tag ist, ODER das alte Format noch im Speicher hängt
     if (!data || data.date !== today || data.flash === undefined) { 
         data = { date: today, flash: 0, lite: 0 }; 
         localStorage.setItem('ga_api_fuel', JSON.stringify(data)); 
@@ -442,12 +453,11 @@ function updateApiFuelMeter() {
     if(!needle) return;
     const data = getApiUsage();
     let used = data.flash + data.lite;
-    const maxCalls = 40; // 20x Flash + 20x Flash Lite
+    const maxCalls = 40; 
     
     if(used > maxCalls) used = maxCalls;
     let percentage = used / maxCalls;
     
-    // Nadel-Berechnung: +45° (Voll/F/Rechts) bis -45° (Leer/E/Links)
     let angle = 45 - (percentage * 90); 
     needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
 }
@@ -543,12 +553,26 @@ async function generateMission() {
 
     if (m) { dataSource = m._source; } else {
         indicator.innerText = `Lade Auftrag aus lokaler Datenbank...`;
-        dataSource = "Lokale DB"; // Setze Fallback-Quelle explizit
+        dataSource = "Lokale DB"; 
         if (isPOI) {
             m = generateDynamicPOIMission(dest.n, maxSeats); paxText = m.payloadText; cargoText = m.cargoText; dataSource = "Wikipedia GeoSearch";
         } else if (typeof missions !== 'undefined') {
-            const availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
-            m = availM[Math.floor(Math.random()*availM.length)] || missions[0];
+            let availM = missions.filter(ms => (nav.dist < 50 || ms.cat === "std"));
+            
+            // SHUFFLE-BAG SYSTEM: Bereits gespielte Missionen aussortieren
+            let history = JSON.parse(localStorage.getItem('ga_std_history')) || [];
+            let freshM = availM.filter(ms => !history.includes(ms.t));
+            
+            // Wenn der Stapel leer ist, History löschen und neu mischen!
+            if (freshM.length === 0) { freshM = availM; history = []; }
+            
+            m = freshM[Math.floor(Math.random() * freshM.length)] || missions[0];
+            
+            // Gespielte Mission merken (max. die letzten 30 merken)
+            history.push(m.t);
+            if(history.length > 30) history.shift();
+            localStorage.setItem('ga_std_history', JSON.stringify(history));
+
             if(dataSource === "Generiert") dataSource = "GitHub Airport DB";
             if (m.cat === "trn" || m.cat === "cargo") { paxText = "0 PAX"; }
         }
@@ -606,7 +630,6 @@ async function generateMission() {
             else { led.classList.add('led-red'); } 
         }
         
-        // AUTOMATISCH SPEICHERN
         setTimeout(() => saveMissionState(), 1000);
     }, 800); 
 }
@@ -614,15 +637,12 @@ async function generateMission() {
 /* =========================================================
    7. KARTE (LEAFLET, KARTENTISCH & MESS-WERKZEUG)
    ========================================================= */
-let measureMode = false, measurePoints = [], measurePolyline = null, measureMarkers = [], measureTooltip = null;
-let routeWaypoints = [], routeMarkers = [], currentSName = "", currentDName = "";
-
-const hitBoxHtml = (color) => `<div style="background-color: transparent; width: 34px; height: 34px; display:flex; justify-content:center; align-items:center;"><div style="background-color: ${color}; border: 2px solid #222; width: 14px; height: 14px; border-radius: 50%;"></div></div>`;
+const hitBoxHtml = (color) => `<div class="pin-hitbox"><div class="pin-dot" style="background-color: ${color};"></div></div>`;
 const hitBoxIcon = (color) => L.divIcon({ className: 'custom-pin', html: hitBoxHtml(color), iconSize: [34, 34], iconAnchor: [17, 17] });
 
 const startIcon = hitBoxIcon('#44ff44'), destIcon  = hitBoxIcon('#ff4444');
-const wpIcon    = L.divIcon({ className: 'custom-pin', html: `<div style="background-color: transparent; width: 34px; height: 34px; display:flex; justify-content:center; align-items:center; cursor: move;"><div style="background-color: #fdfd86; border: 2px solid #222; width: 14px; height: 14px; border-radius: 50%;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
-const measureIcon = L.divIcon({ className: 'custom-pin', html: `<div style="background-color: transparent; width: 34px; height: 34px; display:flex; justify-content:center; align-items:center; cursor: move;"><div style="background-color: #fff; border: 2px solid #222; width: 12px; height: 12px; border-radius: 50%;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+const wpIcon    = L.divIcon({ className: 'custom-pin', html: `<div class="pin-hitbox" style="cursor: move;"><div class="pin-dot" style="background-color: #fdfd86;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+const measureIcon = L.divIcon({ className: 'custom-pin', html: `<div class="pin-hitbox" style="cursor: move;"><div class="pin-dot" style="background-color: #fff; width: 12px; height: 12px; min-width: 12px; min-height: 12px;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
 
 function toggleMeasureMode() {
     measureMode = !measureMode; const btn = document.getElementById('measureBtn');
@@ -735,14 +755,57 @@ function updateRoutePerformance() {
 
 function initMapBase() {
     if(map) return;
-    const aeroMap = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { attribution: 'AeroData / Navigraph' });
-    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
+    
+    // 1. BASE MAPS (Untergrund)
     const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' });
+    // NEU: Reine 3D-Geländekarte ohne störenden Text!
+    const topoLightMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }); 
     const satMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
+    const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
 
-    map = L.map('map', { layers: [aeroMap], attributionControl: false }).setView([51.1657, 10.4515], 6);
-    const baseMaps = { "🛩️ VFR Lufträume (Aero)": aeroMap, "⛰️ Topografie (VFR)": topoMap, "🌑 Dark Mode (Clean)": darkMap, "🛰️ Satellit (Esri)": satMap };
-    L.control.layers(baseMaps).addTo(map);
+    // 2. OVERLAY MAP (VFR Infos)
+    const aeroOverlay = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { 
+        attribution: 'AeroData / Navigraph',
+        opacity: 0.65,
+        maxNativeZoom: 12 // Stoppt das Neuladen bei Stufe 12 und vergrößert ab da nur noch digital
+    });
+
+    // Da das VFR-Overlay beim Start aktiv ist, blenden wir die Topo-Karte direkt ab
+    topoMap.setOpacity(0.5);
+
+    // Startet standardmäßig mit Topo-Karte UND dem transparenten VFR-Overlay darüber
+    map = L.map('map', { layers: [topoMap, aeroOverlay], attributionControl: false }).setView([51.1657, 10.4515], 6);
+    
+    const baseMaps = { 
+        "⛰️ Topografie (Mit Text)": topoMap, 
+        "🗺️ Terrain (Ohne Text)": topoLightMap,
+        "🛰️ Satellit": satMap, 
+        "🌑 Dark Mode (Clean)": darkMap,
+        "📝 Blank Mode (Weiß)": lightMap
+    };
+    
+    const overlayMaps = {
+        "🛩️ VFR Lufträume (Overlay)": aeroOverlay
+    };
+
+    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+    // ==========================================
+    // Automatik für das Abblenden der Karte
+    // ==========================================
+    map.on('overlayadd', function(e) {
+        if (e.name === "🛩️ VFR Lufträume (Overlay)") {
+            topoMap.setOpacity(0.5); // Topo wird blass, damit die Lufträume gut lesbar sind
+        }
+    });
+
+    map.on('overlayremove', function(e) {
+        if (e.name === "🛩️ VFR Lufträume (Overlay)") {
+            topoMap.setOpacity(1.0); // Topo wird wieder 100% kräftig, wenn VFR aus ist
+        }
+    });
+    // ==========================================
     
     const fsControl = L.control({position: 'topleft'});
     fsControl.onAdd = function() {
@@ -804,15 +867,19 @@ function toggleMapTable() {
 /* =========================================================
    8. POLAROID MINIMAP
    ========================================================= */
-let miniMap, miniRoutePolyline, miniMapMarkers = [];
-
 function updateMiniMap() {
     const miniContainer = document.getElementById('miniMap');
     if (!miniContainer || miniContainer.offsetParent === null) return; 
     
     if (!miniMap) {
         miniMap = L.map('miniMap', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false });
+        
+        // Stapelt die Karten für den perfekten Aviation-Look auf dem Foto
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(miniMap);
+        L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', { 
+            opacity: 0.65, 
+            maxNativeZoom: 12 
+        }).addTo(miniMap);
     }
     
     if (routeWaypoints && routeWaypoints.length > 0) {
@@ -860,16 +927,47 @@ function renderLog() {
 function clearLog() { if(confirm("Gesamtes Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
 
 /* =========================================================
-   10. HANGAR PINNWAND (LOKAL)
+   10. HANGAR PINNWAND (LOKAL & TUTORIAL & SKALIERUNG)
    ========================================================= */
+const tutorialNotes = [
+    { id: 101, text: "👋 WILLKOMMEN!\n\nZiehe diese Zettel umher, bearbeite sie (✏️) oder lösch sie (✖).", x: 5, y: 8, rot: -2 },
+    { id: 102, text: "✈️ AUFTRÄGE\n\nStelle Start, Ziel und Distanz ein. Der Dispatcher sucht dir Missionen.", x: 28, y: 12, rot: 3 },
+    { id: 103, text: "🗺️ KARTENTISCH\n\n- Layer-Icon nutzen\n- Wegpunkte verschieben\n- Distanzen messen", x: 52, y: 6, rot: -1 },
+    { id: 104, text: "🌤️ WETTER & AIP\n\nIm Briefing-Fenster findest du Schalter für METAR/TAF und AIP.", x: 8, y: 45, rot: 1 },
+    { id: 105, text: "🎨 COCKPIT DESIGN\n\nKlicke auf die SCHRAUBE oben links, um die Lackierung zu ändern!", x: 32, y: 48, rot: -3 },
+    { id: 106, text: "🤖 GEMINI API\n\nHol dir einen AI Key und die KI generiert individuelle Aufträge!", x: 55, y: 42, rot: 2 }
+];
+
+function toggleTutorialNotes() {
+    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+    const hasTutorial = notes.some(n => n.id >= 101 && n.id <= 106);
+    
+    if (hasTutorial) {
+        // Sind sie da, blenden wir sie aus
+        notes = notes.filter(n => n.id < 101 || n.id > 106);
+    } else {
+        // Sind sie weg, holen wir sie zurück (ohne Duplikate)
+        tutorialNotes.forEach(tn => {
+            if (!notes.find(n => n.id === tn.id)) notes.push(tn);
+        });
+    }
+    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+    renderNotes();
+}
+
+function clearPinboard() {
+    if(confirm("🗑️ Möchtest du wirklich ALLE Zettel von der Pinnwand in den Müll werfen?")) {
+        localStorage.setItem('ga_pinboard', JSON.stringify([]));
+        renderNotes();
+    }
+}
+
 function togglePinboard() {
     const board = document.getElementById('pinboardOverlay');
     const mapBoard = document.getElementById('mapTableOverlay');
     if (mapBoard.classList.contains('active')) { toggleMapTable(); } 
-    
     board.classList.toggle('active');
     document.body.classList.toggle('pinboard-open'); 
-    
     if(board.classList.contains('active')) { renderNotes(); }
 }
 
@@ -877,8 +975,7 @@ function addNote() {
     const text = prompt("Was möchtest du ans schwarze Brett pinnen?");
     if(!text || text.trim() === "") return;
     let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    const rot = Math.floor(Math.random() * 9) - 4;
-    notes.push({ id: Date.now(), text: text, x: 300, y: 200, rot: rot });
+    notes.push({ id: Date.now(), text: text, x: 30 + Math.random()*15, y: 30 + Math.random()*15, rot: Math.floor(Math.random() * 9) - 4 });
     localStorage.setItem('ga_pinboard', JSON.stringify(notes));
     renderNotes();
 }
@@ -904,15 +1001,124 @@ function editNote(id) {
     }
 }
 
+function pinCurrentFlight() {
+    if (document.getElementById("briefingBox").style.display !== "block" || !currentMissionData) return;
+    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+    if (notes.filter(n => n.type === 'flight').length >= 10) {
+        alert("Das Board ist voll! Du kannst maximal 10 Flüge anheften. Bitte lösche alte Flüge von der Pinnwand (✖)."); return;
+    }
+
+    const state = {
+        mTitle: document.getElementById('mTitle').innerHTML, mStory: document.getElementById('mStory').innerText,
+        mDepICAO: document.getElementById("mDepICAO").innerText, mDepName: document.getElementById("mDepName").innerText,
+        mDepCoords: document.getElementById("mDepCoords").innerText, mDepRwy: document.getElementById("mDepRwy").innerText,
+        destIcon: document.getElementById("destIcon").innerText, mDestICAO: document.getElementById("mDestICAO").innerText,
+        mDestName: document.getElementById("mDestName").innerText, mDestCoords: document.getElementById("mDestCoords").innerText,
+        mDestRwy: document.getElementById("mDestRwy").innerText, mPay: document.getElementById("mPay").innerText,
+        mWeight: document.getElementById("mWeight").innerText, mDistNote: document.getElementById("mDistNote").innerText,
+        mHeadingNote: document.getElementById("mHeadingNote").innerText, mETENote: document.getElementById("mETENote").innerText,
+        wikiDescText: document.getElementById("wikiDescText").innerText, isPOI: document.getElementById("destRwyContainer").style.display === "none",
+        currentMissionData: currentMissionData, routeWaypoints: routeWaypoints, currentStartICAO: currentStartICAO,
+        currentDestICAO: currentDestICAO, currentSName: currentSName, currentDName: currentDName
+    };
+
+    const routeText = `${currentStartICAO} ➔ ${currentDestICAO === "POI" ? currentMissionData.poiName : currentDestICAO}`;
+    notes.push({
+        id: Date.now(), type: "flight", flightData: state,
+        text: `✈️ <b>${routeText}</b><br><span style="font-size:11px; color:#555;">${currentMissionData.mission}</span><br><span style="font-size:11px;">${state.mDistNote}</span>`,
+        x: 35 + Math.random()*15, y: 20 + Math.random()*15, rot: Math.floor(Math.random() * 9) - 4
+    });
+    
+    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+    renderNotes();
+    if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("📌 Flugauftrag erfolgreich ans schwarze Brett geheftet!");
+}
+
+function loadPinnedFlight(id) {
+    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+    const note = notes.find(n => n.id === id);
+    if (note && note.flightData) {
+        restoreMissionState(note.flightData);
+        togglePinboard(); 
+        setTimeout(() => { if (map && routeWaypoints.length >= 2) { map.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] }); updateMiniMap(); } }, 300);
+    }
+}
+
+// ==========================================
+// MISSION EXPORT & IMPORT (Community Feature)
+// ==========================================
+function exportMission() {
+    if (document.getElementById("briefingBox").style.display !== "block" || !currentMissionData) return;
+    const wps = routeWaypoints.map(wp => [parseFloat(wp.lat.toFixed(4)), parseFloat((wp.lng||wp.lon).toFixed(4))]);
+    const pack = [
+        document.getElementById('mTitle').innerHTML, document.getElementById('mStory').innerText,
+        document.getElementById("mDepICAO").innerText, document.getElementById("mDepName").innerText,
+        document.getElementById("mDepCoords").innerText, document.getElementById("mDepRwy").innerText,
+        document.getElementById("destIcon").innerText, document.getElementById("mDestICAO").innerText,
+        document.getElementById("mDestName").innerText, document.getElementById("mDestCoords").innerText,
+        document.getElementById("mDestRwy").innerText, document.getElementById("mPay").innerText,
+        document.getElementById("mWeight").innerText, document.getElementById("mDistNote").innerText,
+        document.getElementById("mHeadingNote").innerText, document.getElementById("mETENote").innerText,
+        document.getElementById("wikiDescText").innerText, document.getElementById("destRwyContainer").style.display === "none" ? 1 : 0,
+        currentMissionData, wps, currentStartICAO, currentDestICAO, currentSName, currentDName
+    ];
+
+    const code = btoa(encodeURIComponent(JSON.stringify(pack)));
+    navigator.clipboard.writeText(code).then(() => { alert("🔗 Mission Code kopiert!\n\nDu kannst ihn jetzt einfügen und an deine Fliegerkollegen schicken."); })
+    .catch(err => { prompt("Dein Browser blockiert das automatische Kopieren. Bitte kopiere den Code hier:", code); });
+}
+
+function importMission() {
+    const code = prompt("Füge hier den Mission Code ein:");
+    if (!code || code.trim() === "") return;
+    try {
+        const pack = JSON.parse(decodeURIComponent(atob(code.trim())));
+        if (!Array.isArray(pack) || pack.length < 24) throw new Error("Ungültiges oder veraltetes Format");
+        const wps = pack[19].map(p => ({ lat: p[0], lng: p[1] }));
+        const state = {
+            mTitle: pack[0], mStory: pack[1], mDepICAO: pack[2], mDepName: pack[3], mDepCoords: pack[4], mDepRwy: pack[5],
+            destIcon: pack[6], mDestICAO: pack[7], mDestName: pack[8], mDestCoords: pack[9], mDestRwy: pack[10],
+            mPay: pack[11], mWeight: pack[12], mDistNote: pack[13], mHeadingNote: pack[14], mETENote: pack[15],
+            wikiDescText: pack[16], isPOI: pack[17] === 1, currentMissionData: pack[18], routeWaypoints: wps, 
+            currentStartICAO: pack[20], currentDestICAO: pack[21], currentSName: pack[22], currentDName: pack[23]
+        };
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        if (notes.filter(n => n.type === 'flight').length >= 10) { alert("Das Board ist voll! Du kannst maximal 10 Flüge anheften. Bitte lösche alte Flüge (✖)."); return; }
+        
+        const routeText = `${state.currentStartICAO} ➔ ${state.currentDestICAO === "POI" ? state.currentMissionData.poiName : state.currentDestICAO}`;
+        notes.push({
+            id: Date.now(), type: "flight", flightData: state,
+            text: `✈️ <b>${routeText}</b><br><span style="font-size:11px; color:#555;">${state.currentMissionData.mission}</span><br><span style="font-size:11px;">${state.mDistNote}</span>`,
+            x: 40 + Math.random()*15, y: 25 + Math.random()*15, rot: Math.floor(Math.random() * 9) - 4
+        });
+        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+        renderNotes();
+        alert("📥 Flugauftrag erfolgreich empfangen und ans Brett geheftet!");
+    } catch (e) { alert("❌ Fehler: Der Code ist ungültig oder beschädigt."); }
+}
+
 function renderNotes() {
     const board = document.getElementById('pinboard');
     if (!board) return;
     board.innerHTML = ''; 
     let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
     notes.forEach(note => {
-        const div = document.createElement('div'); div.className = 'post-it';
-        div.style.left = note.x + 'px'; div.style.top = note.y + 'px'; div.style.transform = `rotate(${note.rot}deg)`;
-        div.innerHTML = `<div class="post-it-pin"></div><div class="post-it-edit" onclick="editNote(${note.id})">✏️</div><div class="post-it-del" onclick="deleteNote(${note.id})">✖</div>${note.text.replace(/\n/g, '<br>')}`;
+        const div = document.createElement('div'); 
+        div.className = note.type === 'flight' ? 'post-it flight-card' : 'post-it';
+        
+        // Kompatibilität: Wandelt alte feste Pixel in saubere Prozente um
+        let posX = note.x > 100 ? (note.x / 1000) * 100 : note.x;
+        let posY = note.y > 100 ? (note.y / 600) * 100 : note.y;
+
+        div.style.left = posX + '%'; 
+        div.style.top = posY + '%'; 
+        div.style.transform = `rotate(${note.rot}deg)`;
+        
+        if (note.type === 'flight') {
+            div.innerHTML = `<div class="post-it-pin"></div><div class="post-it-del" onclick="deleteNote(${note.id})">✖</div>${note.text}<button class="flight-load-btn" onclick="loadPinnedFlight(${note.id})">📂 Flug laden</button>`;
+        } else {
+            div.innerHTML = `<div class="post-it-pin"></div><div class="post-it-edit" onclick="editNote(${note.id})">✏️</div><div class="post-it-del" onclick="deleteNote(${note.id})">✖</div>${note.text.replace(/\n/g, '<br>')}`;
+        }
         makeDraggable(div, note.id); board.appendChild(div);
     });
 }
@@ -922,7 +1128,7 @@ function makeDraggable(element, noteId) {
     element.onmousedown = dragMouseDown; element.ontouchstart = dragMouseDown;
 
     function dragMouseDown(e) {
-        if(e.target.className === 'post-it-del' || e.target.className === 'post-it-edit') return; 
+        if(e.target.className === 'post-it-del' || e.target.className === 'post-it-edit' || e.target.className === 'flight-load-btn') return; 
         e.preventDefault();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX, clientY = e.touches ? e.touches[0].clientY : e.clientY;
         pos3 = clientX; pos4 = clientY;
@@ -935,21 +1141,30 @@ function makeDraggable(element, noteId) {
         const clientX = e.touches ? e.touches[0].clientX : e.clientX, clientY = e.touches ? e.touches[0].clientY : e.clientY;
         pos1 = pos3 - clientX; pos2 = pos4 - clientY; pos3 = clientX; pos4 = clientY;
         
+        const board = document.getElementById('pinboard');
         let newTop = element.offsetTop - pos2, newLeft = element.offsetLeft - pos1;
-        const board = document.getElementById('pinboard'), padding = 15; 
+        const padding = 10; 
         const minLeft = padding, maxLeft = board.offsetWidth - element.offsetWidth - padding;
         const minTop = padding, maxTop = board.offsetHeight - element.offsetHeight - padding;
         
         if (newLeft < minLeft) newLeft = minLeft; if (newLeft > maxLeft) newLeft = maxLeft;
         if (newTop < minTop) newTop = minTop; if (newTop > maxTop) newTop = maxTop;
         
-        element.style.top = newTop + "px"; element.style.left = newLeft + "px";
+        // FIX: Wir weisen die Position schon während des Ziehens stur in % zu!
+        // Dadurch kleben die Post-Its bombenfest an der Textur des Brettes, egal was der Monitor macht.
+        element.style.top = (newTop / board.offsetHeight * 100) + "%"; 
+        element.style.left = (newLeft / board.offsetWidth * 100) + "%";
     }
 
     function closeDragElement() {
         document.onmouseup = null; document.ontouchend = null; document.onmousemove = null; document.ontouchmove = null;
         let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
         const noteIndex = notes.findIndex(n => n.id === noteId);
-        if(noteIndex > -1) { notes[noteIndex].x = element.offsetLeft; notes[noteIndex].y = element.offsetTop; localStorage.setItem('ga_pinboard', JSON.stringify(notes)); }
+        if(noteIndex > -1) { 
+            const board = document.getElementById('pinboard');
+            notes[noteIndex].x = (element.offsetLeft / board.offsetWidth) * 100; 
+            notes[noteIndex].y = (element.offsetTop / board.offsetHeight) * 100; 
+            localStorage.setItem('ga_pinboard', JSON.stringify(notes)); 
+        }
     }
 }

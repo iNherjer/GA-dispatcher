@@ -66,8 +66,9 @@ input[type=range]::-webkit-slider-thumb { appearance: none; height: 18px; width:
 #map { height: 200px; width: 100%; border-radius: 12px; margin-top: 15px; border: 1px solid #444; display: none; background: #f4f4f4; transition: filter 0.3s; }
 .map-fullscreen { position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; margin: 0 !important; border-radius: 0 !important; filter: none !important; }
 
-.custom-pin { display: flex; justify-content: center; align-items: center; }
-.custom-pin div { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+.custom-pin { display: flex; justify-content: center; align-items: center; background: transparent !important; border: none !important; }
+.pin-hitbox { width: 34px; height: 34px; display: flex; justify-content: center; align-items: center; background: transparent; cursor: pointer; }
+.pin-dot { width: 14px; height: 14px; min-width: 14px; min-height: 14px; border-radius: 50%; border: 2px solid #222; box-shadow: 0 0 6px rgba(0,0,0,0.8); box-sizing: border-box; flex-shrink: 0; }
 
 .briefing { margin-top: 15px; padding: 15px; background-color: #252525; border-radius: 10px; border: 1px solid #444; display: none; transition: all 0.3s; }
 .aero-info-box { background: #1e252b; padding: 14px 12px; border-radius: 8px; border-left: 4px solid var(--warn); margin-bottom: 12px; transition: all 0.3s; }
@@ -290,7 +291,7 @@ body.theme-retro .api-fuel-meter { width: 75px; height: 45px; }
 body.theme-retro .api-fuel-meter .api-scale { border-left: 3px solid #d93829 !important; border-top: 3px solid #f2c12e !important; border-right: 3px solid #00ff41 !important; }
 
 /* ==========================================================================
-   10. HANGAR PINNWAND (MAINTENANCE BOARD)
+   10. HANGAR PINNWAND (MAINTENANCE BOARD) & CONTAINER SKALIERUNG
    ========================================================================== */
 .pinboard-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column; }
 .pinboard-overlay.active { display: flex; }
@@ -298,14 +299,42 @@ body.theme-retro .api-fuel-meter .api-scale { border-left: 3px solid #d93829 !im
 .pb-btn { background: #444; color: #fff; border: 1px solid #222; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace; }
 .pb-btn.add { background: var(--green); color: #000; font-weight: bold; }
 .pinboard-scroll-area { flex: 1; overflow: auto; display: flex; justify-content: center; align-items: center; }
-.pinboard-content { width: 900px; height: 600px; background-image: url('board.jpg') !important; background-size: cover; background-position: center; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: 4px; }
 
-.post-it { position: absolute; width: 140px; min-height: 100px; background: #fdfd86; box-shadow: 2px 3px 5px rgba(0,0,0,0.4); font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 14px; color: #111; padding: 15px 10px 10px 10px; cursor: grab; user-select: none; line-height: 1.2; }
+/* NEU: Das Brett als Container definieren, damit sich Post-Its daran anpassen */
+.pinboard-content { 
+    width: 900px; height: 600px; 
+    background-image: url('board.jpg') !important; background-size: cover; background-position: center; 
+    position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius: 4px; 
+    container-type: inline-size; 
+}
+
+/* NEU: Post-Its nutzen ab sofort cqw (Container Query Width) statt fester Pixel */
+.post-it { 
+    position: absolute; 
+    width: 15.5cqw !important; height: 15.5cqw !important; 
+    padding: 2.2cqw 1.1cqw 1.1cqw 1.1cqw !important; /* Top-Padding erhöht, damit der Text unter den Buttons beginnt */
+    font-size: 1.4cqw !important;
+    background: #fdfd86; box-shadow: 2px 3px 5px rgba(0,0,0,0.4); 
+    font-family: 'Courier New', Courier, monospace; font-weight: bold; 
+    color: #111; cursor: grab; user-select: none; line-height: 1.2; 
+    overflow: hidden !important; 
+}
 .post-it:active { cursor: grabbing; box-shadow: 4px 5px 8px rgba(0,0,0,0.5); }
-.post-it-del { position: absolute; top: -8px; right: -8px; background: #d93829; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px; cursor: pointer; font-family: sans-serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.5); transition: transform 0.1s; }
-.post-it-edit { position: absolute; top: -8px; left: -8px; background: #4da6ff; color: white; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 10px; cursor: pointer; font-family: sans-serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.5); transition: transform 0.1s; }
+
+/* Icons und Buttons sitzen jetzt sauber INNEN in den Ecken */
+.post-it-del { position: absolute; top: 0.4cqw !important; right: 0.4cqw !important; background: #d93829; color: white; width: 1.6cqw !important; height: 1.6cqw !important; border-radius: 50%; text-align: center; line-height: 1.6cqw !important; font-size: 0.9cqw !important; cursor: pointer; font-family: sans-serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.5); transition: transform 0.1s; z-index: 10; }
+.post-it-edit { position: absolute; top: 0.4cqw !important; left: 0.4cqw !important; background: #4da6ff; color: white; width: 1.6cqw !important; height: 1.6cqw !important; border-radius: 50%; text-align: center; line-height: 1.6cqw !important; font-size: 0.9cqw !important; cursor: pointer; font-family: sans-serif; box-shadow: 1px 1px 3px rgba(0,0,0,0.5); transition: transform 0.1s; z-index: 10; }
 .post-it-edit:hover, .post-it-del:hover { transform: scale(1.1); }
-.post-it-pin { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; border-radius: 50%; background: #444; box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5); }
+.post-it-pin { position: absolute; top: 0.5cqw !important; left: 50% !important; transform: translateX(-50%) !important; width: 1cqw !important; height: 1cqw !important; border-radius: 50%; background: #444; box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5); z-index: 10; }
+
+/* --- FLIGHT POST-ITS (GESPEICHERTE FLÜGE) --- */
+.briefing-save-pin { position: absolute; top: 12px; right: 12px; font-size: 22px; cursor: pointer; z-index: 10; transition: transform 0.2s; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
+.briefing-export-pin { position: absolute; top: 12px; right: 42px; font-size: 20px; cursor: pointer; z-index: 10; transition: transform 0.2s; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
+.briefing-save-pin:hover, .briefing-export-pin:hover { transform: scale(1.2) rotate(10deg); }
+
+.post-it.flight-card { background: #e6f7ff; border: 1px solid #b3e0ff; width: 20cqw !important; height: auto !important; min-height: 12cqw !important; }
+.flight-load-btn { background: var(--blue); color: #fff; border: 1px solid #222; padding: 0.5cqw !important; width: 100%; margin-top: 0.8cqw !important; cursor: pointer; font-weight: bold; border-radius: 3px; font-size: 1cqw !important; font-family: sans-serif; transition: background 0.2s; }
+.flight-load-btn:hover { background: #3388dd; }
 
 /* ==========================================================================
    11. KARTENTISCH (MAP TABLE)
@@ -321,39 +350,62 @@ body.map-is-fullscreen #map { width: 100% !important; height: 100% !important; m
 body.map-is-fullscreen .pinboard-header { position: absolute; top: 0; left: 0; right: 0; height: 50px; z-index: 100000; box-sizing: border-box; background: rgba(26,26,26,0.95); }
 
 /* ==========================================================================
-   12. DIE SCHUBLADEN-ANIMATION (PC LAYOUT)
+   12. DIE SCHUBLADEN-ANIMATION (PC LAYOUT DYNAMISCH - SCROLLBAR FIX)
    ========================================================================== */
 .container { position: relative; z-index: 10; transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
 
-@media (min-width: 1300px) {
-    .pinboard-overlay { display: flex !important; visibility: hidden; background: transparent; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.8); z-index: 1; opacity: 0; pointer-events: none; transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s, visibility 0.4s; }
-    #pinboardOverlay.active { visibility: visible; opacity: 1; pointer-events: all; transform: translate(0, -50%) scale(1); transform-origin: left center; }
-    #mapTableOverlay.active { visibility: visible; opacity: 1; pointer-events: all; transform: translate(0, -50%) scale(1); transform-origin: right center; }
-    .maptable-content, .pinboard-content { transition: width 0.6s ease, height 0.6s ease; }
+@media (min-width: 1250px) {
+    /* Container für die Overlays auf der rechten / linken Seite */
+    #pinboardOverlay, #mapTableOverlay { 
+        display: flex !important; flex-direction: column;
+        visibility: hidden; background: transparent; 
+        top: 0 !important; bottom: 0 !important; 
+        z-index: 1; opacity: 0; pointer-events: none; 
+        position: fixed; 
+        overflow: hidden !important; /* Verhindert das Auftauchen von Scrollbalken! */
+        transition: opacity 0.4s, visibility 0.4s; 
+        transform: none !important;
+    }
+
+    #pinboardOverlay { left: 520px !important; right: 20px !important; }
+    #mapTableOverlay { left: 20px !important; right: 520px !important; }
+
+    /* Das Hauptpanel schiebt sich zur Seite */
+    body.pinboard-open .container { transform: translateX(calc(-50vw + 260px)); }
+    body.maptable-open .container { transform: translateX(calc(50vw - 260px)); }
+
+    #pinboardOverlay.active, #mapTableOverlay.active { 
+        visibility: visible; opacity: 1; pointer-events: all; 
+    }
+
+    /* Der innere Bereich unter dem Header bekommt den gesamten Restplatz */
+    .pinboard-scroll-area {
+        flex: 1 !important;
+        overflow: hidden !important; /* Blockiert Scrollbalken im Inneren endgültig */
+        padding: 0 !important;
+        display: flex; align-items: center; justify-content: center;
+        width: 100%;
+    }
+
+    /* Die Bretter: 16:10 Format stur halten, passen sich perfekt ein */
+    .maptable-content, .pinboard-content {
+        transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        aspect-ratio: 16 / 10 !important;
+        width: 100% !important;
+        max-width: calc((100vh - 120px) * 1.6) !important; /* Koppelung an die Höhe, verhindert Abschneiden */
+        height: auto !important;
+        margin: auto !important;
+        background-size: 100% 100% !important;
+        transform: scale(0.8);
+    }
+
+    #pinboardOverlay.active .pinboard-content,
+    #mapTableOverlay.active .maptable-content {
+        transform: scale(1);
+    }
 }
 
-@media (min-width: 1300px) and (max-width: 1599px) {
-    body.pinboard-open .container { transform: translateX(-280px); } body.maptable-open .container { transform: translateX(280px); }
-    #pinboardOverlay.active { left: calc(50% - 50px); } #mapTableOverlay.active { left: auto; right: calc(50% - 50px); }
-    .maptable-content { width: 900px; height: 550px; } .pinboard-content { width: 800px; height: 550px; }
-}
-@media (min-width: 1600px) and (max-width: 1919px) {
-    body.pinboard-open .container { transform: translateX(-360px); } body.maptable-open .container { transform: translateX(360px); }
-    #pinboardOverlay.active { left: calc(50% - 100px); } #mapTableOverlay.active { left: auto; right: calc(50% - 100px); }
-    .maptable-content { width: 1100px; height: 680px; } .pinboard-content { width: 1000px; height: 680px; }
-}
-@media (min-width: 1920px) and (max-width: 2559px) {
-    body.pinboard-open .container { transform: translateX(-460px); } body.maptable-open .container { transform: translateX(460px); }
-    #pinboardOverlay.active { left: calc(50% - 180px); } #mapTableOverlay.active { left: auto; right: calc(50% - 180px); }
-    .maptable-content { width: 1350px; height: 800px; } .pinboard-content { width: 1200px; height: 800px; }
-}
-@media (min-width: 2560px) {
-    body.pinboard-open .container { transform: translateX(-600px); } body.maptable-open .container { transform: translateX(600px); }
-    #pinboardOverlay.active { left: calc(50% - 280px); } #mapTableOverlay.active { left: auto; right: calc(50% - 280px); }
-    .maptable-content { width: 1700px; height: 1000px; } .pinboard-content { width: 1500px; height: 1000px; }
-}
-
-@media (max-width: 1299px) {
+@media (max-width: 1249px) {
     body.maptable-open, body.pinboard-open { overflow: hidden !important; }
     .pinboard-overlay { background: #080808 !important; }
 }
@@ -387,19 +439,23 @@ body.theme-retro .wp-data { color: var(--piper-yellow); }
     .maptable-content { width: 100% !important; height: 100% !important; border-radius: 0 !important; }
     #map { width: 92% !important; height: 92% !important; border-radius: 6px !important; }
 
-    /* Pinnwand in alle Richtungen scrollbar machen (Pan-Canvas) */
+    /* Pinnwand NUR horizontal scrollbar machen, Höhe exakt ans Display anpassen */
     #pinboardOverlay .pinboard-scroll-area {
         display: block !important; 
-        overflow: auto !important; 
+        overflow-x: auto !important; 
+        overflow-y: hidden !important; 
         -webkit-overflow-scrolling: touch; 
-        padding: 20px !important; 
+        padding: 0 !important; 
+        height: calc(100vh - 70px) !important; /* Exakte Displayhöhe abzüglich Menüleiste */
     }
     .pinboard-content {
-        width: 900px !important; 
-        height: 600px !important; 
-        margin: 0 auto !important; 
+        height: 100% !important; /* Zieht sich bis zum oberen und unteren Bildschirmrand */
+        width: auto !important; /* Breite wird nun magisch durch das Aspect-Ratio berechnet! */
+        aspect-ratio: 16 / 10 !important; /* Zwingt das Brett stur in sein natürliches Format */
+        background-size: 100% 100% !important; /* Spannt die Grafik EXAKT auf das div, kein Abschneiden mehr */
+        margin: 0 !important; 
         max-width: none !important;
         max-height: none !important;
-        border-radius: 8px !important;
+        border-radius: 0 !important; 
     }
 }

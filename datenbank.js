@@ -101,55 +101,38 @@ const missions = [
     { t: "Glider Tow Pilot", i: "🪂", cat: "std", s: "Überführung eines Schleppflugzeugs zu einem Segelflugplatz." },
 
     // === TRAININGS-MISSIONEN ===
-    { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Übe Power-Off und Power-On Stalls inklusive Recovery." },
-    { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Fokus auf Clean-Configuration Stalls heute. Halte den Ball in der Mitte!" },
-    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven mit 45° Bankwinkel durch." },
-    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Heute üben wir Steilkurven, wobei die Höhe auf +/- 50ft genau gehalten werden muss." },
-    { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Simuliere einen Triebwerksausfall und Notlandung." },
-    { t: "Training: Engine Out", i: "🔥", cat: "trn", s: "Instructor zieht das Gas im Gegenanflug! Zeig, wie du aus der Platzrunde als Segler landest." },
-    { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit." },
-    { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Absolviere am Zielort drei Touch-and-Go Platzrunden." },
-    { t: "Training: Pattern Work", i: "🛫", cat: "trn", s: "Fokus auf extrem kurze Platzrunden. Arbeite zügig mit Klappen und Trimmung." },
-    { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Navigiere nur mit Stoppuhr und Kompass zum Ziel." },
-    { t: "Training: Dead Reckoning", i: "🧭", cat: "trn", s: "Wir folgen heute nur Flüssen und Autobahnen. Schalte das GPS im Cockpit komplett ab." },
-    { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Koordination mit Lazy Eights." },
-    { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Simuliere Ausfall der Klappen. Lande ohne Flaps." },
-    { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Übe den Forward Slip, um ohne Klappen sicher Höhe abzubauen." },
-    { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Übe den Wing-Low Anflug für sauberes Aufsetzen." },
-    { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere Kabinenbrand. Leite Notabstieg ein." },
-    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine Streckenänderung kurz vor dem Ziel." },
-    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Fliege den Anflug nur mit den Basis-Instrumenten." },
-    { t: "Flight Review (BFR)", i: "📝", cat: "trn", s: "Ein Prüfer ist an Bord. Fliege absolut nach Lehrbuch. Keine Toleranz für Fehler!" },
-    { t: "Flight Review (BFR)", i: "📝", cat: "trn", s: "Checkflug für deine Versicherung. Zeig, dass du die Maschine auch bei Crosswind im Griff hast." }
+    { t: "Training: Stall & Recovery", i: "🎓", cat: "trn", s: "Steigflug auf 4000ft AGL. Übe Power-Off (Approach) und Power-On (Departure) Stalls. Halte den Ball stur in der Mitte!" },
+    { t: "Training: Stall Practice", i: "🎓", cat: "trn", s: "Fokus auf Clean-Configuration Stalls heute. Keine Toleranz für hängende Flächen!" },
+    { t: "Training: VOR Navigation", i: "🧭", cat: "trn", s: "Schalte das GPS ab! Finde das nächste VOR auf der Karte, schneide das 180° Radial an und folge ihm mit korrektem Windvorhaltewinkel." },
+    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Das Zielgebiet eignet sich perfekt für Luftmanöver. Führe 45° Steilkurven links und rechts durch. Toleranz: max +/- 50ft Höhe!" },
+    { t: "Training: Steep Turns", i: "🔄", cat: "trn", s: "Führe Steilkurven durch und achte auf den Trimm-Einsatz, sobald du an der 30°-Marke vorbeigehst." },
+    { t: "Training: Engine Out (Sim)", i: "🔥", cat: "trn", s: "Auf halber Strecke zieht der Instructor das Gas auf Leerlauf. Trimm auf beste Gleitgeschwindigkeit und such dir ein Feld!" },
+    { t: "Training: Engine Out (Pattern)", i: "🔥", cat: "trn", s: "Instructor zieht das Gas im Gegenanflug! Zeig, wie du aus der Platzrunde als Segler sicher auf der Piste landest." },
+    { t: "Training: Pattern Drill", i: "🛫", cat: "trn", s: "Am Zielort machen wir Platzrunden-Drill. 3x Touch-and-Go. Achte exakt auf die Platzrundenhöhe und funke sauber." },
+    { t: "Training: Short Pattern", i: "🛫", cat: "trn", s: "Fokus auf extrem enge Platzrunden am Zielort. Arbeite zügig mit Klappen und Trimmung, verliere keine Zeit." },
+    { t: "Training: Short Field", i: "🛑", cat: "trn", s: "Simuliere am Zielort eine Landung auf extrem kurzer Piste. Punktlandung auf der Schwelle und maximales Bremsen gefordert." },
+    { t: "Training: Slow Flight", i: "🐢", cat: "trn", s: "Bringe die Maschine in den Bereich minimaler Steuerbarkeit. Halte Höhe und Kurs nur mit dem Gashebel." },
+    { t: "Training: Dead Reckoning", i: "🗺️", cat: "trn", s: "Koppelnavigation pur: Navigiere nur mit Karte, Stoppuhr und Kompass zum Ziel. Gleiche markante Wegpunkte visuell ab." },
+    { t: "Training: Visual Nav", i: "🧭", cat: "trn", s: "Wir folgen heute nur Flüssen und Autobahnen. Schalte das GPS im Cockpit komplett ab." },
+    { t: "Training: Lazy Eights", i: "♾️", cat: "trn", s: "Perfektioniere deine Seitenruder-Koordination mit Lazy Eights und Chandelles auf dem Weg zum Ziel." },
+    { t: "Training: No-Flap Landing", i: "🚫", cat: "trn", s: "Wir simulieren einen Ausfall der Klappen-Elektrik. Fliege den Anflug etwas schneller und nutze den Forward Slip." },
+    { t: "Training: Crosswind Mastery", i: "💨", cat: "trn", s: "Das Ziel meldet fiesen Seitenwind. Übe den 'Wing-Low' Anflug und setze exakt auf dem Luv-Rad zuerst auf." },
+    { t: "Training: Emergency Descent", i: "📉", cat: "trn", s: "Simuliere Kabinenbrand auf der Route. Leite einen sofortigen Notabstieg (Spirale) ein." },
+    { t: "Training: Diversion", i: "↪️", cat: "trn", s: "Simuliere eine plötzliche Streckenänderung kurz vor dem Ziel wegen Wetterverschlechterung." },
+    { t: "Training: Avionics Failure", i: "📟", cat: "trn", s: "Decke das Glass-Cockpit ab! Fliege den gesamten Anflug nur mit den analogen Basis-Instrumenten (Sixpack)." },
+    { t: "Flight Review (BFR)", i: "📝", cat: "trn", s: "Dein Checkflug steht an! Der Prüfer sitzt rechts. Fliege absolut nach Lehrbuch. Jede Höhe auf 10 Fuß genau." }
 ];
 
-// 3. POI MISSIONEN (Rundflüge & Landmarks)
+// 3. POI MISSIONEN (Generischer Fallback)
 const poiMissions = [
     { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Fotograf an Bord braucht die perfekte Perspektive auf das Ziel." },
-    { t: "Foto-Tour", i: "📸", cat: "poi", s: "Ein Luftbild-Kalender wird produziert. Fliege so, dass das Ziel im optimalen Licht liegt." },
     { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Fluggäste haben einen Rundflug gebucht, um das Wahrzeichen von oben zu sehen." },
-    { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Ein Heiratsantrag über dem Wahrzeichen ist geplant. Fliege besonders ruhig!" },
-    { t: "VIP-Sightseeing", i: "🍾", cat: "poi", s: "Goldene Hochzeit! Ein älteres Paar möchte seine Heimat von oben betrachten." },
     { t: "Naturwacht", i: "🚁", cat: "poi", s: "Kreise über dem Zielgebiet und dokumentiere Auffälligkeiten für die Behörden." },
-    { t: "Naturwacht", i: "🚁", cat: "poi", s: "Nach einem schweren Sturm überprüfen wir das Gebiet auf umgestürzte Bäume." },
-    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." },
-    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Das Bauamt benötigt ein 3D-Modell des Objekts. Fliege exakte Gitter-Linien darüber ab." },
-    { t: "Wildlife Research", i: "🦌", cat: "poi", s: "Biologen müssen Wildbestände zählen. Überfliege das Zielgebiet konstant auf 1000ft AGL." },
-    { t: "Wildlife Research", i: "🦌", cat: "poi", s: "Wir peilen Sender von ausgewilderten Tieren an. Halte dich vom Relief fern, um Signal zu bekommen." },
-    { t: "Castle Tour", i: "🏰", cat: "poi", s: "Touristen wollen die berühmten Schlösser sehen." },
-    { t: "Castle Tour", i: "🏰", cat: "poi", s: "Ein Historiker ist an Bord und analysiert die Festungsanlagen. Drehe langsame Kreise." },
-    { t: "Pipeline Patrol", i: "🛢️", cat: "poi", s: "Überprüfe die Trasse nahe des Ziels auf Lecks oder illegale Bauarbeiten." },
-    { t: "Pipeline Patrol", i: "🛢️", cat: "poi", s: "Fliege tiefer entlang der Infrastruktur-Trasse beim POI. Wir suchen nach Bodensenkungen." },
-    { t: "Traffic Reporting", i: "📻", cat: "poi", s: "Ein Radiosender braucht einen Verkehrsbericht von den Straßen rund um das Zielgebiet." },
-    { t: "Real Estate Survey", i: "🏡", cat: "poi", s: "Ein Immobilienmakler möchte Luftaufnahmen vom Gebiet für ein großes Portfolio." },
-    { t: "Real Estate Survey", i: "🏡", cat: "poi", s: "Wir checken potenzielle Bauplätze rund um das Wahrzeichen. Achte auf Freiflächen." },
-    { t: "Police Support", i: "🚓", cat: "poi", s: "Die Polizei sucht eine vermisste Person in der Nähe des POIs. Unterstütze aus der Luft." },
-    { t: "Police Support", i: "🚓", cat: "poi", s: "Verkehrskontrolle aus der Luft. Wir koordinieren Bodenkräfte nahe des Ziels." }
+    { t: "Luftvermessung", i: "📏", cat: "poi", s: "Fliege in präziser Höhe über das Objekt für topografische Scans." }
 ];
 
-// 4. FALLBACK POIs (Fokus D-A-CH & Schwarzwald)
+// 4. FALLBACK POIs (Fokus D-A-CH & Europa)
 const fallbackPOIs = [
-    // === LOKAL: Schwarzwald & BaWü ===
     { n: "Triberger Wasserfälle", lat: 48.127, lon: 8.227 },
     { n: "Feldberg (Gipfel)", lat: 47.873, lon: 8.004 },
     { n: "Titisee", lat: 47.896, lon: 8.148 },
@@ -164,8 +147,6 @@ const fallbackPOIs = [
     { n: "Mummelsee (Schwarzwald)", lat: 48.597, lon: 8.200 },
     { n: "Schloss Heidelberg", lat: 49.410, lon: 8.715 },
     { n: "Burg Teck", lat: 48.588, lon: 9.470 },
-    
-    // === DEUTSCHLAND NATIONAL ===
     { n: "Schloss Neuschwanstein", lat: 47.557, lon: 10.750 },
     { n: "Zugspitze (Gipfel)", lat: 47.421, lon: 10.985 },
     { n: "Watzmann (Gipfel)", lat: 47.554, lon: 12.924 },
@@ -185,8 +166,6 @@ const fallbackPOIs = [
     { n: "Elbphilharmonie Hamburg", lat: 53.541, lon: 9.984 },
     { n: "Walhalla (Regensburg)", lat: 49.031, lon: 12.212 },
     { n: "Zeche Zollverein", lat: 51.486, lon: 7.046 },
-
-    // === SCHWEIZ & ÖSTERREICH (D-A-CH) ===
     { n: "Matterhorn (CH)", lat: 45.976, lon: 7.658 },
     { n: "Jungfraujoch (CH)", lat: 46.547, lon: 7.982 },
     { n: "Rheinfall (CH)", lat: 47.677, lon: 8.615 },
@@ -194,8 +173,6 @@ const fallbackPOIs = [
     { n: "Großglockner (AT)", lat: 47.074, lon: 12.693 },
     { n: "Schloss Schönbrunn (AT)", lat: 48.184, lon: 16.312 },
     { n: "Festung Hohensalzburg (AT)", lat: 47.795, lon: 13.047 },
-    
-    // === EUROPA ===
     { n: "Mont Blanc (FR)", lat: 45.832, lon: 6.865 },
     { n: "Eiffelturm (FR)", lat: 48.858, lon: 2.294 },
     { n: "Mont Saint-Michel (FR)", lat: 48.636, lon: -1.511 },

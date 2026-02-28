@@ -24,6 +24,23 @@ function generateDynamicPOIMission(poiName, maxSeats) {
             { i: "🚁", t: `Instandhaltung: ${poiName}`, s: `Wartungstrupps benötigen einen Überblick über die schwer zugänglichen Stahlseile und Bögen von ${poiName}.`, p: "1 PAX (Ingenieur)", w: cargoUtility }
         ];
     }
+    else if (nameLower.includes("autobahn") || nameLower.includes("kreuz") || nameLower.includes("dreieck") || nameLower.includes("straße") || nameLower.includes("highway") || nameLower.includes("tunnel")) {
+        templates = [
+            { i: "🚗", t: `Stau-Report: ${poiName}`, s: `Verkehrschaos zur Rush-Hour! Fliege den Bereich um ${poiName} ab und melde Rückstaus live an den lokalen Radiosender.`, p: paxMedia, w: "Funktechnik & Reporter (190 lbs)" },
+            { i: "🛣️", t: `Trassen-Inspektion: ${poiName}`, s: `Das Straßenbauamt bittet um einen 10 km langen Abflug der Fahrbahn entlang ${poiName}. Dokumentiere massive Frostschäden.`, p: paxGov, w: cargoUtility },
+            { i: "🚓", t: `Polizei-Support: ${poiName}`, s: `Schwerer LKW-Unfall gemeldet. Die Polizei benötigt dringend hochauflösende Luftaufnahmen zur Rekonstruktion des Hergangs nahe ${poiName}.`, p: "1 PAX (Polizeifotograf)", w: "Kamera-Equipment (30 lbs)" },
+            { i: "🚚", t: `Schwerlast-Eskorte: ${poiName}`, s: `Ein extremer Schwertransport blockiert die Route bei ${poiName}. Das Planungsbüro braucht ein Auge in der Luft für Engstellen.`, p: paxGov, w: "Live-Link Antennen (50 lbs)" }
+        ];
+    }
+    else if (nameLower.includes("industrie") || nameLower.includes("werk") || nameLower.includes("fabrik") || nameLower.includes("kraftwerk") || nameLower.includes("anlage") || nameLower.includes("mine") || nameLower.includes("tagebau")) {
+        templates = [
+            { i: "🏭", t: `Industrie-Inspektion: ${poiName}`, s: `Die Werksleitung von ${poiName} benötigt detaillierte Wärmebildaufnahmen der Kühltürme und Schornsteine. Halte dich genau an die freigegebene Höhe!`, p: paxGov, w: "Infrarot-Scanner (80 lbs)" },
+            { i: "☢️", t: `Emissions-Messung: ${poiName}`, s: `Das Umweltamt will die Abgaswerte über ${poiName} überprüfen. Fliege mit den montierten Sensoren mehrfach quer durch die Abluftfahne.`, p: paxNone, w: "Luft-Sniffer & Sensoren (120 lbs)" },
+            { i: "📸", t: `PR-Flug: ${poiName}`, s: `Der Konzern braucht neue, dynamische Aufnahmen des riesigen Geländes von ${poiName} für den nächsten Jahresbericht.`, p: paxMedia, w: cargoMedia },
+            { i: "🏗️", t: `Baufortschritt: ${poiName}`, s: `Eine gigantische neue Produktionshalle entsteht bei ${poiName}. Dokumentiere den Fortschritt von oben für die Großinvestoren.`, p: paxVIP, w: "Laptops & Pläne (40 lbs)" },
+            { i: "🔥", t: `Gefahren-Abwehr: ${poiName}`, s: `Es gab eine Verpuffung in einem der Silos bei ${poiName}. Der Einsatzleiter der Feuerwehr ist an Bord und verschafft sich einen Überblick.`, p: "1 PAX (Einsatzleiter)", w: "Funk-Relais (50 lbs)" }
+        ];
+    }
     else if (nameLower.includes("burg") || nameLower.includes("schloss") || nameLower.includes("ruine") || nameLower.includes("festung") || nameLower.includes("kloster") || nameLower.includes("dom") || nameLower.includes("monument") || nameLower.includes("denkmal")) {
         templates = [
             { i: "🏰", t: `Historik-Flug: ${poiName}`, s: `Ein Historiker benötigt hochauflösende Luftaufnahmen von ${poiName}, um alte Mauerstrukturen im Umland zu erkennen. Kreise mehrmals in ruhiger Höhe.`, p: paxGov, w: cargoMedia },
@@ -71,6 +88,34 @@ function generateDynamicPOIMission(poiName, maxSeats) {
         ];
     }
 
-    const selected = rnd(templates);
-    return { i: selected.i, t: selected.t, s: selected.s, cat: "poi", payloadText: selected.p, cargoText: selected.w };
+    // =========================================
+    // SHUFFLE-BAG SYSTEM FÜR POIS 
+    // =========================================
+    let history = JSON.parse(localStorage.getItem('ga_poi_history')) || [];
+    
+    // Sortiere Missionstypen aus, die kürzlich schon dran waren (Wir extrahieren "Topo-Scan" aus "Topo-Scan: Zugspitze")
+    let freshTemplates = templates.filter(tmpl => !history.includes(tmpl.t.split(':')[0]));
+    
+    // Wenn alle aus dieser Kategorie schon in der History sind, wird neu gemischt!
+    if (freshTemplates.length === 0) { 
+        freshTemplates = templates; 
+        history = []; 
+    }
+    
+    // Zufällige Auswahl aus dem verbleibenden frischen Stapel
+    const selected = rnd(freshTemplates);
+
+    // Missionsart merken (max 6 Stück im Gedächtnis, damit Kategorien mit 4 Items rotieren können)
+    history.push(selected.t.split(':')[0]);
+    if(history.length > 6) history.shift();
+    localStorage.setItem('ga_poi_history', JSON.stringify(history));
+
+    return { 
+        i: selected.i, 
+        t: selected.t, 
+        s: selected.s, 
+        cat: "poi", 
+        payloadText: selected.p, 
+        cargoText: selected.w 
+    };
 }
