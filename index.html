@@ -353,12 +353,19 @@
                 </div>
             </div>
             <div class="mission-note-page back-note" id="notePage2" onclick="toggleNotes()">
-                <div class="page-number">Seite 2</div>
-                <h2 class="wiki-title">Ziel-Info</h2>
-                <div id="wikiDescContainer" class="wiki-info-note">
-                    📖 <span id="wikiDescText">Warte auf Daten...</span>
-                </div>
-            </div>
+    <div class="page-number">Seite 2</div>
+    <h2 class="wiki-title">Ziel-Info</h2>
+    
+    <div id="wikiImageContainer" class="briefing-photo-attachment" style="display:none; float: right; margin-left: 15px; margin-bottom: 10px; width: 140px; transform: rotate(-2deg);">
+        <div class="photo-pin" style="background: #4da6ff;"></div>
+        <div class="photo-img" id="wikiImage" style="background-image: url(''); height: 100px;"></div>
+        <div class="photo-caption" style="font-size: 14px;">Wiki-Daten</div>
+    </div>
+
+    <div id="wikiDescContainer" class="wiki-info-note">
+        📖 <span id="wikiDescText">Warte auf Daten...</span>
+    </div>
+</div>
         </div>
         
         <div class="flightplan-container" style="display:flex; flex-direction:column;">

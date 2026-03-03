@@ -606,23 +606,45 @@ async function findWikipediaPOI(lat, lon, minNM, maxNM, dirPref) {
     return null;
 }
 
-async function fetchAreaDescription(lat, lon, elementId, exactTitle = null) {
+async function fetchAreaDescription(lat, lon, elementId, exactTitle = null, icaoCode = null) {
+    // Reset Bild beim Neuladen
+    const imgContainer = document.getElementById('wikiImageContainer');
+    const imgElement = document.getElementById('wikiImage');
+    if (imgContainer) imgContainer.style.display = 'none';
+
     try {
         let titleToFetch = exactTitle;
+        
+        // Nutze unsere clevere Flughafen-Suche für exakte Treffer!
+        if (!titleToFetch && icaoCode) {
+            titleToFetch = await getWikiTitleForAirport(icaoCode, lat, lon);
+        }
+
         if (!titleToFetch) {
             const geoRes = await fetch(`https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=1&format=json&origin=*`);
             const geoData = await geoRes.json();
             if (geoData?.query?.geosearch?.length > 0) titleToFetch = geoData.query.geosearch[0].title;
             else { document.getElementById(elementId).innerText = "Keine regionalen Wikipedia-Daten gefunden."; return; }
         }
+
         if (titleToFetch) {
-            const extRes = await fetch(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=3&titles=${encodeURIComponent(titleToFetch)}&format=json&origin=*`);
+            // NEU: prop=extracts|pageimages holt Text UND das Titelbild!
+            const extRes = await fetch(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro=true&explaintext=true&exsentences=4&pithumbsize=400&titles=${encodeURIComponent(titleToFetch)}&format=json&origin=*`);
             const extData = await extRes.json();
+            
             if (extData?.query?.pages) {
                 const pageId = Object.keys(extData.query.pages)[0];
                 if (pageId !== "-1" && extData.query.pages[pageId].extract) {
-                    let prefix = exactTitle ? "" : `Region (${titleToFetch}):\n`;
-                    document.getElementById(elementId).innerText = prefix + extData.query.pages[pageId].extract; return;
+                    let prefix = exactTitle ? "" : `Region (${titleToFetch}):\n\n`;
+                    document.getElementById(elementId).innerText = prefix + extData.query.pages[pageId].extract;
+                    
+                    // BILD VERARBEITUNG
+                    const imgUrl = extData.query.pages[pageId].thumbnail?.source;
+                    if (imgUrl && imgContainer && imgElement) {
+                        imgElement.style.backgroundImage = `url('${imgUrl}')`;
+                        imgContainer.style.display = 'block';
+                    }
+                    return;
                 }
             }
         }
@@ -1225,7 +1247,7 @@ async function generateMission() {
     
     setTimeout(() => {
         if (!isPOI) fetchRunwayDetails(dest.lat, dest.lon, 'mDestRwy', currentDestICAO);
-        fetchAreaDescription(dest.lat, dest.lon, 'wikiDescText', isPOI ? dest.n : null);
+        fetchAreaDescription(dest.lat, dest.lon, 'wikiDescText', isPOI ? dest.n : null, isPOI ? null : currentDestICAO);
         indicator.innerText = `Briefing komplett.`; resetBtn(btn);
         const rBtnLed = document.getElementById('radioGenerateBtn');
         if(rBtnLed) rBtnLed.classList.add('active');
