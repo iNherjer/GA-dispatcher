@@ -203,6 +203,16 @@ body.theme-retro .highlight .drum-digit, body.theme-retro .theme-green-text .dru
 .meter-led.led-blue { background: #4da6ff; box-shadow: 0 0 6px #4da6ff; }
 .meter-led.led-red { background: var(--red); box-shadow: 0 0 6px var(--red); }
 .meter-label { display: none; }
+/* Dual-Color LED für Gemini 3.0 Flash */
+.meter-led.led-flash3 { 
+    background: linear-gradient(135deg, #4da6ff 50%, var(--green) 50%); 
+    box-shadow: -2px 0 6px #4da6ff, 2px 0 6px var(--green); 
+}
+body.theme-retro .meter-led.led-flash3 { 
+    background: linear-gradient(135deg, #2b8cff 50%, #00ff41 50%); 
+    box-shadow: -3px 0 8px #2b8cff, 3px 0 8px #00ff41, inset 0 1px 2px #fff; 
+    border-color: #fff; 
+}
 
 body.theme-retro .analog-meter { display: block; width: 75px; height: 50px; background: #1e1f22; border: 3px solid #4a4e59; border-radius: 6px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9), 0 4px 6px rgba(0,0,0,0.5); }
 body.theme-retro .meter-face { position: absolute; top: 5px; left: 5px; right: 5px; bottom: 3px; background-color: #f0eada; border-radius: 2px 2px 0 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); border: none; }
@@ -218,7 +228,7 @@ body.theme-retro .meter-label { display: block; position: absolute; bottom: 2px;
 /* ==========================================================================
    6. DER NOTIZZETTEL-STAPEL (Interaktive Blätter)
    ========================================================================== */
-#mTitle { margin-top: 0; font-size: 19px; color: var(--blue); }
+#mTitle { margin-top: 20px; font-size: 19px; color: var(--blue); }
 .story { font-style: italic; color: #bbb; font-size: 16px; line-height: 1.6; padding-bottom: 12px; margin-bottom: 15px; border-bottom: 1px solid #444; }
 .wiki-title { display: none; }
 .wiki-info-note { font-size: 14px; color: #ccc; font-style: italic; line-height: 1.5; }
@@ -234,7 +244,7 @@ body.theme-retro .mission-note-page::before { content: ''; position: absolute; t
 body.theme-retro .front-note { z-index: 2; transform: rotate(-1.5deg); box-shadow: 3px 5px 12px rgba(0,0,0,0.6); opacity: 1; }
 body.theme-retro .back-note { z-index: 1; transform: rotate(2deg) translate(8px, 6px); box-shadow: 2px 3px 8px rgba(0,0,0,0.5); filter: brightness(0.85); }
 body.theme-retro .page-number { display: block; position: absolute; bottom: 5px; right: 10px; font-family: 'Caveat', cursive; font-size: 18px; color: #0b1f65; opacity: 0.6; }
-body.theme-retro #mTitle, body.theme-retro .wiki-title { display: block; font-family: 'Caveat', cursive; font-size: 28px; color: #0b1f65; text-shadow: none; margin-bottom: 8px; margin-top: 0; transform: rotate(-1deg); line-height: 1.2; }
+body.theme-retro #mTitle, body.theme-retro .wiki-title { display: block; font-family: 'Caveat', cursive; font-size: 28px; color: #0b1f65; text-shadow: none; margin-bottom: 8px; margin-top: 25px; transform: rotate(-1deg); line-height: 1.2; }
 body.theme-retro #mStory, body.theme-retro .wiki-info-note { font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; color: #222; line-height: 24px; border: none; padding-bottom: 0; margin-bottom: 0; text-shadow: none; letter-spacing: -0.5px; font-style: normal; }
 
 .briefing-photo-attachment { position: relative; width: 130px; background: #f0eada; padding: 6px 6px 22px 6px; box-shadow: 2px 4px 8px rgba(0,0,0,0.4); transform: rotate(3deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; float: right; margin-left: 15px; margin-bottom: 10px; border: 1px solid #ccc; z-index: 5; }
@@ -640,7 +650,6 @@ body.theme-navcom .radio-disp-inner .lcd-input {
     min-width: 0;
     text-align: right;
     text-align-last: right;
-    direction: rtl;
     font-weight: bold;
 }
 

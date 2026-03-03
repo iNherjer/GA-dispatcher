@@ -31,8 +31,8 @@
     
     <div id="classicInputs">
         <div class="grid-2">
-            <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase(); syncToNavCom('startLocRadio', this.value)" onchange="updateMapFromInputs()"></div>
-            <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" oninput="this.value=this.value.toUpperCase(); syncToNavCom('destLocRadio', this.value)" onchange="updateMapFromInputs()"></div>
+            <div><label>Start</label><input type="text" id="startLoc" value="EDTW" maxlength="4" onfocus="this.select()" onclick="this.select()" oninput="this.value=this.value.toUpperCase(); syncToNavCom('startLocRadio', this.value)" onchange="updateMapFromInputs()"></div>
+            <div><label>Ziel (Opt.)</label><input type="text" id="destLoc" placeholder="Zufall" maxlength="4" onfocus="this.select()" onclick="this.select()" oninput="this.value=this.value.toUpperCase(); syncToNavCom('destLocRadio', this.value)" onchange="updateMapFromInputs()"></div>
         </div>
         
         <div class="grid-2">
@@ -138,7 +138,7 @@
                 <div class="radio-display-container">
                     <div class="radio-disp-inner">
                         <span class="lcd-label">DEP</span>
-                        <input type="text" id="startLocRadio" class="lcd-input" value="EDTW" maxlength="4" oninput="this.value=this.value.toUpperCase(); document.getElementById('startLoc').value = this.value; updateMapFromInputs();">
+                        <input type="text" id="startLocRadio" class="lcd-input" value="EDTW" maxlength="4" onfocus="this.select()" onclick="this.select()" oninput="this.value=this.value.toUpperCase(); document.getElementById('startLoc').value = this.value; updateMapFromInputs();">
                     </div>
                 </div>
                 <button class="radio-transfer-btn" onclick="swapDepDest()" title="DEP &harr; DEST tauschen">↔</button>
@@ -150,7 +150,7 @@
                 <div class="radio-display-container">
                     <div class="radio-disp-inner">
                         <span class="lcd-label">DEST</span>
-                        <input type="text" id="destLocRadio" class="lcd-input" placeholder="----" maxlength="4" oninput="this.value=this.value.toUpperCase(); document.getElementById('destLoc').value = this.value; updateMapFromInputs();">
+                        <input type="text" id="destLocRadio" class="lcd-input" placeholder="----" maxlength="4" onfocus="this.select()" onclick="this.select()" oninput="this.value=this.value.toUpperCase(); document.getElementById('destLoc').value = this.value; updateMapFromInputs();">
                     </div>
                 </div>
                 <button class="radio-transfer-btn" onclick="swapDepDest()" title="DEP &harr; DEST tauschen">↔</button>
@@ -331,19 +331,24 @@
                 <h2 id="mTitle"></h2>
                 <p id="mStory" class="story"></p>
                 
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 15px; border-top: 1px dashed #444; padding-top: 12px;">
-                    <div class="note-manifest" style="margin-top: 0; padding-top: 0; border-top: none; flex-grow: 1;">
-                        <div><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
+                <div style="margin-top: 15px; border-top: 1px dashed #444; padding-top: 12px;">
+                    <div class="note-manifest" style="margin-top: 0; padding-top: 0; border-top: none; display: block; margin-bottom: 12px;">
+                        <div style="margin-bottom: 4px;"><strong>PAYLOAD:</strong> <span id="mPay"></span></div>
                         <div><strong>FRACHT:</strong> <span id="mWeight"></span></div>
-                        <div><strong>STRECKE:</strong> <span id="mDistNote"></span></div>
-                        <div><strong>KURS:</strong> <span id="mHeadingNote"></span></div>
-                        <div><strong>ETE CA:</strong> <span id="mETENote"></span></div>
                     </div>
                     
-                    <div class="briefing-photo-attachment" onclick="toggleMapTable(); event.stopPropagation();" title="Kartentisch öffnen" style="margin: 0 0 0 15px; flex-shrink: 0;">
-                        <div class="photo-pin"></div>
-                        <div class="photo-img" id="miniMap"></div>
-                        <div class="photo-caption">Route Map</div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div class="note-manifest" style="margin-top: 0; padding-top: 0; border-top: none; flex-grow: 1; display: block;">
+                            <div><strong>STRECKE:</strong> <span id="mDistNote"></span></div>
+                            <div><strong>KURS:</strong> <span id="mHeadingNote"></span></div>
+                            <div><strong>ETE CA:</strong> <span id="mETENote"></span></div>
+                        </div>
+                        
+                        <div class="briefing-photo-attachment" onclick="toggleMapTable(); event.stopPropagation();" title="Kartentisch öffnen" style="margin: 0 0 0 15px; flex-shrink: 0;">
+                            <div class="photo-pin"></div>
+                            <div class="photo-img" id="miniMap"></div>
+                            <div class="photo-caption">Route Map</div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -668,190 +668,227 @@ async function fetchRunwayDetails(lat, lon, elementId, icaoCode) {
     domEl.innerText = "Keine Daten gefunden"; domEl.style.color = "#888";
 }
 
-async function fetchRunwayFromWikipedia(icaoCode, lat, lon) {
-    const isAirport = t => ['flugplatz','flughafen','airport','airfield','aerodrome'].some(k => t.toLowerCase().includes(k));
-    const seen = new Set();
+// Globaler Cache
+const wikiTitleCache = {};
 
-    async function tryTitle(title) {
-        if (!title || seen.has(title)) return null;
-        seen.add(title);
-        try {
-            const r = await fetchWithTimeout(
-                `https://de.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&format=json&origin=*`, 8000);
-            const d = await r.json();
-            const wt = d?.parse?.wikitext?.['*'] || '';
-            return wt ? parseRunwayFromWikitext(wt) : null;
-        } catch(e) { return null; }
-    }
+// NEU: Zentrale, smarte Titelsuche mit High-Speed Wikidata!
+async function getWikiTitleForAirport(icao, lat, lon) {
+    if (wikiTitleCache[icao]) return wikiTitleCache[icao];
 
     try {
-        const candidates = [];
-
-        // 1. Kombinierte ICAO + Flugplatz Suche (präziseste Methode)
-        if (icaoCode) {
-            const r = await fetchWithTimeout(
-                `https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(icaoCode + ' Flugplatz Flughafen')}&srlimit=5&format=json&origin=*`, 5000);
-            const d = await r.json();
-            for (const hit of (d?.query?.search || [])) {
-                if (isAirport(hit.title)) candidates.push(hit.title);
-            }
-            // Fallback: ersten Treffer nehmen auch ohne Airport-Keyword im Titel
-            if (candidates.length === 0 && d?.query?.search?.length > 0)
-                candidates.push(d.query.search[0].title);
+        // 1. ABSOLUTE PRIORITÄT: Wikidata P239 (ICAO) Suchmaschine.
+        // Das ist die "Lichtgeschwindigkeits"-Suche, die fast immer exakt 100% den richtigen Artikel trifft!
+        const wdRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=haswbstatement:P239=${icao}&format=json&origin=*`, 4000);
+        const wdData = await wdRes.json();
+        if (wdData?.query?.search?.length > 0) {
+            wikiTitleCache[icao] = wdData.query.search[0].title;
+            return wdData.query.search[0].title;
         }
 
-        // 2. Geosearch 5 km – Airport-Keyword-Treffer priorisieren
-        if (candidates.length === 0) {
-            const g = await fetchWithTimeout(
-                `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=5000&gslimit=20&format=json&origin=*`, 6000);
-            const gd = await g.json();
-            for (const hit of (gd?.query?.geosearch || [])) {
-                if (isAirport(hit.title)) candidates.push(hit.title);
-            }
+        // 2. Erweiterter Geosearch-Fallback (falls ICAO nicht in Wikidata gepflegt ist)
+        // Suchbegriffe erweitert um Segelflug und Landeplatz für kleine Plätze aus der CoreDB!
+        const isAirport = (t) => ['flugplatz', 'flughafen', 'airport', 'air base', 'aerodrome', 'segelflug', 'landeplatz', 'fliegerhorst', icao.toLowerCase()].some(kw => t.toLowerCase().includes(kw));
+        
+        const geoRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=10&format=json&origin=*`, 4000);
+        const geoData = await geoRes.json();
+        const geoResults = geoData?.query?.geosearch || [];
+        
+        let hit = geoResults.find(r => isAirport(r.title));
+        if (hit) {
+            wikiTitleCache[icao] = hit.title;
+            return hit.title;
         }
 
-        // Kandidaten der Reihe nach probieren – erster mit Pistendaten gewinnt
-        for (const title of candidates.slice(0, 4)) {
-            const result = await tryTitle(title);
-            if (result) return result;
+        // 3. Fallback: Textsuche
+        const txtRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(icao + ' Flughafen OR Flugplatz')}&srlimit=5&format=json&origin=*`, 4000);
+        const txtData = await txtRes.json();
+        const txtResults = txtData?.query?.search || [];
+        
+        hit = txtResults.find(r => isAirport(r.title));
+        if (hit) {
+            wikiTitleCache[icao] = hit.title;
+            return hit.title;
+        } else if (txtResults.length > 0 && !txtResults[0].title.includes("Terminal")) {
+            wikiTitleCache[icao] = txtResults[0].title;
+            return txtResults[0].title;
         }
-        return null;
-    } catch (e) {
-        return null;
-    }
+    } catch (e) {}
+    return null;
+}
+async function fetchRunwayFromWikipedia(icaoCode, lat, lon) {
+    if (!icaoCode) return null;
+    try {
+        const title = await getWikiTitleForAirport(icaoCode, lat, lon);
+        if (!title) return null;
+
+        const r = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&titles=${encodeURIComponent(title)}&format=json&origin=*`, 5000);
+        const d = await r.json();
+        const pages = d?.query?.pages;
+        
+        if (pages) {
+            const pageId = Object.keys(pages)[0];
+            const wikitext = pages[pageId]?.revisions?.[0]?.slots?.main?.['*'];
+            if (wikitext) return parseRunwayFromWikitext(wikitext);
+        }
+    } catch(e) {}
+    return null;
 }
 
 function parseRunwayFromWikitext(wikitext) {
     const runways = [];
-    let m;
+    
+    // 1. Text bereinigen (Killt HTML-Kommentare, wandelt geschützte HTML-Leerzeichen um)
+    const commentRegex = new RegExp('<' + '!--[\\s\\S]*?--' + '>', 'g');
+    let text = wikitext.replace(commentRegex, '');
+    text = text.replace(/<br\s*\/?>/gi, ' ');
+    text = text.replace(/&#160;/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&times;/gi, '×');
+    text = text.replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2'); // Wiki-Links auflösen
+    text = text.replace(/<[^>]+>/g, ' '); // Sämtliche HTML-Tags löschen
+    text = text.replace(/\s+/g, ' '); // Alles auf eine Zeile normieren
 
-    // Wikitext global vorverarbeiten: Markup entfernen das Regex-Matching verhindert
-    wikitext = wikitext
-        .replace(/'{3}([^']*?)'{3}/g, '$1')   // '''fett''' → plain
-        .replace(/'{2}([^']*?)'{2}/g, '$1')   // ''kursiv'' → plain
-        .replace(/&nbsp;/g, ' ')              // geschütztes Leerzeichen
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>');
+    // 2. Präzise Suchmuster
+    const HDG_PATTERN = /\b((?:0?[1-9]|[12]\d|3[0-6])[LRC]?\s*\/\s*(?:0?[1-9]|[12]\d|3[0-6])[LRC]?)\b/g;
+    const SURFACES = /\b(asphalt|beton|gras|grass|schotter|gravel|concrete|paved|unpaved|dirt|erde|sand|wasser|water|eis|ice)\b/i;
+    // Sucht z.B. "3200m", "3200 m" oder auch "3200 m x 45 m"
+    const LEN_PATTERN = /(?:(?:länge|length|len)\d*\s*=\s*([1-9][\d.,]*))|(?:([1-9][\d.,]*)\s*(?:m|Meter)\b)|(?:([1-9][\d.,]*)\s*(?:x|×)\s*\d+)/i;
 
-    // Hilfsfunktion: Wikitext-Markup bereinigen
-    const clean = s => s
-        .replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2')  // [[Link|Text]] → Text
-        .replace(/<br\s*\/?>/gi, '\n')                     // <br> → Zeilenumbruch
-        .replace(/<[^>]+>/g, '')                           // alle anderen HTML-Tags
-        .replace(/&nbsp;/g, ' ')
-        .trim();
-
-    // Pattern 1a: Infobox-Felder | Piste = / | Pisten = / | Runway = / | runway1_heading_ft = ...
-    //             Mehrere Pisten in EINEM Feld, getrennt durch <br> oder Zeilenumbrüche
-    const pisteSinglePat = /\|\s*(?:[Pp]isten?|[Rr]unways?)\s*=\s*([\s\S]*?)(?=\n\s*\||\n\}\}|$)/g;
-    while ((m = pisteSinglePat.exec(wikitext)) !== null) {
-        const raw = clean(m[1]);
-        const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-        for (const line of lines) {
-            if (/\d{2}\/\d{2}/.test(line)) runways.push(line.replace(/[()]/g, '').trim());
+    let matches = [];
+    let match;
+    while ((match = HDG_PATTERN.exec(text)) !== null) {
+        let cleanHdg = match[1].replace(/\s+/g, '');
+        let parts = cleanHdg.split('/');
+        
+        // 180-Grad Test (Ignoriert Brüche und Öffnungszeiten)
+        if (Math.abs(parseInt(parts[0], 10) - parseInt(parts[1], 10)) === 18) {
+            matches.push({ hdg: cleanHdg, index: match.index, raw: match[1] });
         }
     }
 
-    // Pattern 1b: | Piste1 = ..., | Piste2 = ..., | Runway1 = ... (nummerierte Felder)
-    const pisteNumPat = /\|\s*(?:[Pp]isten?|[Rr]unways?)(\d+)\s*=\s*([^\n|{}]{4,150})/g;
-    while ((m = pisteNumPat.exec(wikitext)) !== null) {
-        const val = clean(m[2]);
-        if (val.length > 3 && /\d{2}\/\d{2}/.test(val)) {
-            runways.push(val.replace(/[()]/g, '').trim());
+    // 3. VORWÄRTS-PRIORITÄT (Verhindert das Stehlen von Nachbar-Attributen!)
+    for (let i = 0; i < matches.length; i++) {
+        const hdg = matches[i].hdg;
+        const startIdx = matches[i].index;
+        
+        // VORWÄRTS-Fenster (Nur bis zur nächsten Piste schauen!)
+        let endIdx = Math.min(startIdx + 200, text.length);
+        if (i + 1 < matches.length) {
+            if (matches[i+1].index < endIdx) endIdx = matches[i+1].index;
         }
-    }
-
-    // Pattern 2: {{Runway|09/27|1200|Asphalt}} oder {{Runwayend|...}}
-    const rwyTpl = /\{\{\s*[Rr]unway[^}]*\|([^}]+)\}\}/g;
-    while ((m = rwyTpl.exec(wikitext)) !== null) {
-        const parts = m[1].split('|').map(s => s.trim()).filter(Boolean);
-        if (parts.length >= 1 && /\d{2}\/\d{2}/.test(parts[0])) {
-            const hdg  = parts[0];
-            const len  = parts[1] ? parts[1].replace(/[^\d]/g, '') : '';
-            const surf = parts[2] || '';
-            runways.push([hdg, len ? len + 'm' : '', surf].filter(Boolean).join(' · '));
+        let contextFwd = text.substring(startIdx, endIdx);
+        
+        // RÜCKWÄRTS-Fenster (Nur als Fallback, stoppt strikt an der vorherigen Piste!)
+        let preStartIdx = Math.max(0, startIdx - 60);
+        if (i > 0) {
+            const prevEnd = matches[i-1].index + matches[i-1].raw.length;
+            if (prevEnd > preStartIdx) preStartIdx = prevEnd;
         }
-    }
+        let contextBwd = text.substring(preStartIdx, startIdx);
 
-    // Pattern 3a: Wikitable | 09/27 || 1200 m || Asphalt  (Länge vor Belag)
-    const tablePat = /\|\s*(\d{2}[LRC]?\/\d{2}[LRC]?)\s*\|\|\s*([\d.,×x]+\s*m[^\n|]*?)\s*\|\|\s*([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-/]*)/g;
-    while ((m = tablePat.exec(wikitext)) !== null) {
-        const hdg  = m[1].trim();
-        const len  = m[2] ? m[2].trim().replace(/\(.*?\)/g, '').replace(/[×x\s]/g, '').replace(/[^\d]/g, '') : '';
-        const surf = m[3] ? m[3].trim() : '';
-        if (hdg) runways.push([hdg, len ? len + 'm' : '', surf].filter(Boolean).join(' · '));
-    }
+        let length = '';
+        let surface = '';
 
-    // Pattern 3b: Wikitable | 09/27 || Asphalt || 1200 m  (Belag vor Länge – dt. Standard)
-    const tablePatDE = /\|\s*(\d{2}[LRC]?\/\d{2}[LRC]?)\s*\|\|\s*([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-/]*)\s*\|\|\s*([\d.,×x]+[^|\n{]*m[^|\n{]*)/g;
-    while ((m = tablePatDE.exec(wikitext)) !== null) {
-        const hdg    = m[1].trim();
-        const surf   = m[2].trim();
-        const rawLen = m[3].trim().replace(/\(.*?\)/g, '').replace(/[×x\s]/g, '').replace(/[^\d]/g, '');
-        if (hdg) runways.push([hdg, rawLen ? rawLen + 'm' : '', surf].filter(Boolean).join(' · '));
-    }
-
-    // Pattern 3c: Wikitable zeilenweise – jede Zelle in eigener Zeile
-    // Format: \n| 09/27\n| Asphalt\n| 1200 m  (dt. Reihenfolge: Kennung | Belag | Länge)
-    const tablePatNL = /\n\|\s*(\d{2}[LRC]?\/\d{2}[LRC]?)\s*\n\|\s*([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-/]*)\s*\n\|\s*([\d.,]+[^\n|]*m[^\n|]*)/g;
-    while ((m = tablePatNL.exec(wikitext)) !== null) {
-        const hdg    = m[1].trim();
-        const surf   = m[2].trim();
-        const rawLen = m[3].trim().replace(/\(.*?\)/g, '').replace(/[×x\s]/g, '').replace(/[^\d]/g, '');
-        if (hdg) runways.push([hdg, rawLen ? rawLen + 'm' : '', surf].filter(Boolean).join(' · '));
-    }
-
-    // Pattern 3d: Wikitable zeilenweise – Länge vor Belag
-    // Format: \n| 09/27\n| 1200 m\n| Asphalt
-    const tablePatNLrev = /\n\|\s*(\d{2}[LRC]?\/\d{2}[LRC]?)\s*\n\|\s*([\d.,]+[^\n|]*m[^\n|]*)\n\|\s*([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-/]*)/g;
-    while ((m = tablePatNLrev.exec(wikitext)) !== null) {
-        const hdg    = m[1].trim();
-        const rawLen = m[2].trim().replace(/\(.*?\)/g, '').replace(/[×x\s]/g, '').replace(/[^\d]/g, '');
-        const surf   = m[3].trim();
-        if (hdg) runways.push([hdg, rawLen ? rawLen + 'm' : '', surf].filter(Boolean).join(' · '));
-    }
-
-    // Pattern 3e: Zeilen-basierter Wikitable-Parser (universell, spaltenreihenfolge-unabhängig)
-    // Verarbeitet jede Tabellenzeile als Block, erkennt DD/DD-Zelle und sucht Länge + Belag
-    {
-        const SURFACES = /\b(asphalt|beton|gras|grass|schotter|gravel|concrete|paved|unpaved|dirt|erde)\b/i;
-        const rowBlocks = wikitext.split(/\n\|-+[^\n]*/);
-        for (const block of rowBlocks) {
-            // Alle Zellen: inline || und zeilenweise | (nicht |-, |}, |!)
-            const cellRaw = block.split(/\|\||\n\|(?![-}|!])/).map(c => c.replace(/^\|/, '').trim()).filter(c => c.length > 0);
-            const hdgCell = cellRaw.find(c => /^\d{2}[LRC]?\/\d{2}[LRC]?$/.test(c));
-            if (!hdgCell) continue;
-            const hdg = hdgCell.trim();
-            // Länge: erste Zelle mit Zahl + m (z.B. "1.338 m × 30 m", "1338 m", "1.240 m")
-            const lenCell = cellRaw.find(c => c !== hdgCell && /\d/.test(c) && /\bm\b/.test(c));
-            const len = lenCell ? (lenCell.match(/(\d[\d.,]*)/)?.[1] || '').replace(/\./g, '').replace(/,/g, '') : '';
-            // Belag: Zelle die bekanntes Oberflächenwort enthält
-            const surfCell = cellRaw.find(c => SURFACES.test(c));
-            const surf = surfCell ? (surfCell.match(SURFACES)?.[0] || '') : '';
-            // Nur wenn mindestens Heading vorhanden
-            const entry = [hdg, len ? len + 'm' : '', surf ? surf.charAt(0).toUpperCase() + surf.slice(1) : ''].filter(Boolean).join(' · ');
-            runways.push(entry);
+        // Zuerst FWD suchen, NUR WENN nichts gefunden wird BWD suchen
+        let lenMatch = contextFwd.match(LEN_PATTERN);
+        if (!lenMatch) lenMatch = contextBwd.match(LEN_PATTERN); 
+        
+        let rawLen = lenMatch ? (lenMatch[1] || lenMatch[2] || lenMatch[3]) : null;
+        
+        if (!rawLen) {
+            // Nackte Zahlen in formatlosen Tabellen fangen
+            let isolatedNum = contextFwd.match(/(?:\||\s|^)([1-9][\d.]{2,3})(?:\s|\||$)/);
+            if (!isolatedNum) isolatedNum = contextBwd.match(/(?:\||\s|^)([1-9][\d.]{2,3})(?:\s|\||$)/);
+            if (isolatedNum) rawLen = isolatedNum[1];
         }
-    }
 
-    // Pattern 4: Freitext – "Piste 09/27, 1.575 m, Asphalt"
-    const freePat = /[Pp]iste[n]?\s+(\d{2}\/\d{2})[,;\s]+([\d.,]+)\s*m[,;\s]+([A-Za-zÄÖÜäöüß]+)/g;
-    while ((m = freePat.exec(wikitext)) !== null) {
-        const len = m[2].replace(/[.,]/g, '');
-        runways.push(`${m[1]} · ${len}m · ${m[3]}`);
+        if (rawLen) length = rawLen.replace(/[.,]/g, '') + 'm';
+
+        // Belag genauso priorisiert suchen
+        let surfMatch = contextFwd.match(SURFACES);
+        if (!surfMatch) surfMatch = contextBwd.match(SURFACES);
+        
+        if (surfMatch) surface = surfMatch[1].charAt(0).toUpperCase() + surfMatch[1].slice(1).toLowerCase();
+
+        if (length || surface || matches.length === 1) {
+            runways.push([hdg, length, surface].filter(Boolean).join(' · '));
+        }
     }
 
     if (runways.length === 0) return null;
+    
+    // 4. Intelligente Deduplizierung & Historien-Blocker
+    const uniqueRunways = [...new Set(runways)];
+    // Längste Strings zuerst prüfen (Infobox vs. unvollständiger Text)
+    uniqueRunways.sort((a, b) => b.length - a.length);
+    
+    const finalRunways = [];
+    
+    for (const rwy of uniqueRunways) {
+        const parts = rwy.split(' · ');
+        const currentHdg = parts[0];
+        
+        const currentSurfMatch = rwy.match(new RegExp(SURFACES.source, 'i'));
+        const currentSurf = currentSurfMatch ? currentSurfMatch[1].toLowerCase() : null;
 
-    // Deduplizieren: nur Einträge mit Heading-Muster, max. 5 Pisten
-    const unique = [...new Set(
-        runways
-            .map(r => r.trim().replace(/\s+/g, ' ').replace(/–/g, '·'))
-            .filter(r => r.length > 4 && /\d{2}\/\d{2}/.test(r))
-    )].slice(0, 5);
+        let isSubsetOrHistory = false;
 
-    return unique.length > 0 ? unique.join(' | ') : null;
+        for (const existing of finalRunways) {
+            const existingParts = existing.split(' · ');
+            if (existingParts[0] === currentHdg) {
+                
+                // Prüfen ob Subset
+                let allAttrMatch = true;
+                for (let j = 1; j < parts.length; j++) {
+                    if (!existing.includes(parts[j])) {
+                        allAttrMatch = false;
+                        break;
+                    }
+                }
+                
+                if (allAttrMatch) {
+                    isSubsetOrHistory = true;
+                    break;
+                }
+
+                // Historien-Blocker: Verwirft alte Umbauten bei gleicher Kennung (EDDV Hannover)
+                const existingSurfMatch = existing.match(new RegExp(SURFACES.source, 'i'));
+                const existingSurf = existingSurfMatch ? existingSurfMatch[1].toLowerCase() : null;
+
+                if (existingSurf === currentSurf || !currentSurf) {
+                    isSubsetOrHistory = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!isSubsetOrHistory) {
+            finalRunways.push(rwy);
+        }
+    }
+    
+    return finalRunways.slice(0, 5).join(' | ');
+}
+
+
+async function fetchAndCacheWikiPages(icao, lat, lon) {
+    try {
+        // Nutzt jetzt die selbe smarte Geo-Suche wie die Runway-Funktion!
+        const title = await getWikiTitleForAirport(icao, lat, lon);
+
+        if (!title) {
+            gpsState.wikiCache[icao] = ['Keine Wikipedia-Daten gefunden.'];
+            return;
+        }
+
+        const extRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=12&titles=${encodeURIComponent(title)}&format=json&origin=*`, 5000);
+        const extData = await extRes.json();
+        
+        const pageId = Object.keys(extData.query.pages)[0];
+        const txt = extData.query.pages[pageId]?.extract?.trim() || 'Keine Information verfügbar.';
+
+        gpsState.wikiCache[icao] = splitTextIntoPages(txt, 170);
+    } catch (e) {
+        gpsState.wikiCache[icao] = ['Fetch-Fehler – bitte erneut versuchen.'];
+    }
 }
 
 async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, cargoText) {
@@ -869,18 +906,24 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
     ];
     
     const aptCategories = [
-        "Kulinarischer Ausflug ($100 Hamburger/Kuchen)", "Gemütlicher Vereinsausflug / Treffen", 
-        "Business-Charter (Alltäglich)", "Eilige, aber unspektakuläre Kleinfracht", 
-        "Promi / VIP-Transport", "Tierrettung / Tiertransport", 
-        "Spezielles Flugtraining (Seitenwind, Navigation)", "Flugplatz-Logistik (Ersatzteile, Crew-Shuttle)", 
-        "Kurioses / Ungewöhnlicher Privatflug"
+        "Kulinarischer Ausflug ($100 Burger, legendäre Pizza, Steak oder BBQ am Ziel)",
+        "Kaffee & Kuchen Run (Klassischer Nachmittagsausflug zum Flugplatz-Café)",
+        "Tagesausflug mit Freunden (Wandern, Action oder einfach abhängen am Zielort)",
+        "Städtetrip (Sightseeing, Kultur, 1-2 echte Highlights der Zielstadt erkunden)",
+        "Wellness-Urlaub / Romantischer Wochenendausflug mit der Frau/dem Partner",
+        "Besuch bei einem befreundeten Fliegerverein (Stammtisch, Fly-In, Austausch)",
+        "Flugplatz-Logistik (Ersatzteil für die Vereinsmaschine holen, Mechaniker-Shuttle)",
+        "Spezielles Flugtraining (Seitenwind, Navigation, Platzrunden-Drill am fremden Platz)",
+        "Business-Charter (Alltäglicher Flug für einen Architekten, Anwalt oder Bauleiter)",
+        "Eilige, aber unspektakuläre Kleinfracht (Dokumente, Ersatzteile)",
+        "Kurioses / Verrückter, aber friedlicher Privatflug",
+        "Tierrettung / Tiertransport" // Steht jetzt nur noch 1x drin, taucht also viel seltener auf
     ];
     
     const randomTheme = isPOI 
         ? poiCategories[Math.floor(Math.random() * poiCategories.length)] 
         : aptCategories[Math.floor(Math.random() * aptCategories.length)];
 
-    // Wir extrahieren die generierte Zahl aus "3 PAX", damit die KI ein Limit hat
     const maxPaxLimit = paxText.split(' ')[0];
 
     const prompt = `Du bist ein freundlicher, entspannter Flugdienstleiter in einem lokalen Fliegerclub oder kleinen Charterunternehmen.
@@ -908,6 +951,22 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
     const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { response_mime_type: "application/json" } };
     const reqOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
 
+    // VERSUCH 1: Gemini 3.0 Flash (Primary)
+    try {
+        const resFlash3 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, reqOptions);
+        if (resFlash3.ok) {
+            const data = await resFlash3.json();
+            const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+            incrementApiUsage('flash'); 
+            return { t: parsed.title, s: parsed.story, pax: parsed.pax, cargo: parsed.cargo, i: "📋", cat: "std", _source: "Gemini 3.0 Flash" };
+        } else {
+            console.warn("Gemini 3.0 Flash API Fehler/Quota. Wechsle zu 2.5 Flash...");
+        }
+    } catch (e) {
+        console.warn("Gemini 3.0 Flash fehlgeschlagen:", e);
+    }
+
+    // VERSUCH 2: Gemini 2.5 Flash (Fallback 1)
     try {
         const resFlash = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, reqOptions);
         if (resFlash.ok) {
@@ -915,15 +974,14 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
             const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
             incrementApiUsage('flash'); 
             return { t: parsed.title, s: parsed.story, pax: parsed.pax, cargo: parsed.cargo, i: "📋", cat: "std", _source: "Gemini 2.5 Flash" };
-        } else if (resFlash.status === 429) {
-            console.warn("Flash API Quota erreicht. Wechsle zu Lite...");
         } else {
-            throw new Error('Flash API Fehler: ' + resFlash.status);
+            console.warn("Gemini 2.5 Flash API Fehler/Quota. Wechsle zu Lite...");
         }
     } catch (e) {
-        console.warn("Gemini Flash fehlgeschlagen:", e);
+        console.warn("Gemini 2.5 Flash fehlgeschlagen:", e);
     }
 
+    // VERSUCH 3: Gemini 2.5 Flash Lite (Fallback 2)
     try {
         const resLite = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, reqOptions);
         if (resLite.ok) {
@@ -1154,13 +1212,11 @@ async function generateMission() {
 
     document.getElementById("briefingBox").style.display = "block";
 
-    // Ziel-ICAO in Classic- und NavCom-Inputs eintragen (nur bei echtem Zielflughafen)
-    if (!isPOI) {
-        const destLocEl      = document.getElementById('destLoc');
-        const destLocRadioEl = document.getElementById('destLocRadio');
-        if (destLocEl)      destLocEl.value      = currentDestICAO;
-        if (destLocRadioEl) destLocRadioEl.value = currentDestICAO;
-    }
+    // Ziel-Feld (COM2 / Classic) nach dem Generieren direkt wieder leeren
+    const destLocEl      = document.getElementById('destLoc');
+    const destLocRadioEl = document.getElementById('destLocRadio');
+    if (destLocEl)      destLocEl.value      = '';
+    if (destLocRadioEl) destLocRadioEl.value = '';
 
     updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
 
@@ -1178,17 +1234,22 @@ async function generateMission() {
         if(needle) needle.style.transform = `translateX(-50%) rotate(-45deg)`; 
         
         if (led) { 
-            led.classList.remove('led-green', 'led-blue', 'led-red');
-            if (dataSource === "Gemini 2.5 Flash") { led.classList.add('led-blue'); } 
+            led.classList.remove('led-green', 'led-blue', 'led-red', 'led-flash3');
+            if (dataSource === "Gemini 3.0 Flash") { led.classList.add('led-flash3'); } 
+            else if (dataSource === "Gemini 2.5 Flash") { led.classList.add('led-blue'); } 
             else if (dataSource === "Gemini 2.5 Flash Lite") { led.classList.add('led-green'); } 
             else { led.classList.add('led-red'); } 
         }
 
         // Marker Lights: Blinken stoppen und finale Quelle anzeigen
         document.querySelectorAll('.marker-light').forEach(l => l.classList.remove('blinking', 'on'));
-        if (dataSource === "Gemini 2.5 Flash") document.getElementById('mkO').classList.add('on'); // Blau
-        else if (dataSource === "Gemini 2.5 Flash Lite") document.getElementById('mkM').classList.add('on'); // Amber
-        else document.getElementById('mkI').classList.add('on'); // Weiß (Lokal)
+        if (dataSource === "Gemini 3.0 Flash") { 
+            document.getElementById('mkO').classList.add('on'); // Blau
+            document.getElementById('mkM').classList.add('on'); // Amber (Grün gibt es beim KMA 26 nicht)
+        }
+        else if (dataSource === "Gemini 2.5 Flash") document.getElementById('mkO').classList.add('on'); 
+        else if (dataSource === "Gemini 2.5 Flash Lite") document.getElementById('mkM').classList.add('on'); 
+        else document.getElementById('mkI').classList.add('on');
         
         setTimeout(() => saveMissionState(), 1000);
         refreshGPSAfterDispatch();
@@ -2030,7 +2091,6 @@ async function renderAirportInfo(left, right, type) {
     const name = (data && data.n) ? data.n : (type==='dep' ? currentSName : currentDName) || icao;
     const lat  = data ? data.lat.toFixed(4) : '---';
     const lon  = data ? data.lon.toFixed(4) : '---';
-    const elev = data && data.elev ? data.elev + ' ft' : '---';
 
     // Linke Spalte: immer Ident + Name + Koordinaten
     left.innerHTML =
@@ -2039,18 +2099,22 @@ async function renderAirportInfo(left, right, type) {
         `<div class="kln90b-line dim" style="font-size:9px; margin-top:2px;">${lat}</div>` +
         `<div class="kln90b-line dim" style="font-size:9px;">${lon}</div>`;
 
-    // Runway-Daten: Overpass sofort parallel starten, Wikipedia im Hintergrund
+    // Runway-Daten Lade-Animation
     right.innerHTML = '<div class="kln90b-line dim kln-loading-dots" style="margin-top:8px;"><span>●</span><span>●</span><span>●</span></div>';
 
     if (!runwayCache[icao] && data) {
-        const trans = {asphalt:'Asphalt',concrete:'Beton',grass:'Gras',paved:'Asphalt',unpaved:'Unbefestigt',dirt:'Erde',gravel:'Schotter'};
-
-        // Overpass sofort (schnell, ~1-2 s) → Platzhalter
-        const ovPromise = fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(
-            `[out:json][timeout:8];way["aeroway"="runway"](around:3000,${data.lat},${data.lon});out tags;`)}`)
-            .then(r => r.json())
-            .then(ov => {
-                if (ov?.elements?.length > 0 && !runwayCache[icao]) {
+        // 1. STRIKTE WIKIPEDIA-PRIORITÄT (Kein paralleles Overpass-Rennen mehr!)
+        const wikiResult = await fetchRunwayFromWikipedia(icao, data.lat, data.lon);
+        
+        if (wikiResult) {
+            runwayCache[icao] = wikiResult;
+            if (gpsState.mode === mode) renderGPS(); // UI aktualisieren
+        } else {
+            // 2. NUR wenn Wikipedia fehlschlägt -> Overpass als letzter Ausweg
+            try {
+                const ov = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(`[out:json][timeout:8];way["aeroway"="runway"](around:3000,${data.lat},${data.lon});out tags;`)}`).then(r => r.json());
+                if (ov?.elements?.length > 0) {
+                    const trans = {asphalt:'Asphalt',concrete:'Beton',grass:'Gras',paved:'Asphalt',unpaved:'Unbefestigt',dirt:'Erde',gravel:'Schotter'};
                     const seen = new Set(), parts = [];
                     for (const e of ov.elements) {
                         if (!e.tags?.ref || seen.has(e.tags.ref)) continue;
@@ -2061,23 +2125,17 @@ async function renderAirportInfo(left, right, type) {
                     }
                     if (parts.length > 0) {
                         runwayCache[icao] = parts.join(' | ');
-                        // Anzeige sofort aktualisieren falls noch auf Runway-Seite
-                        if (gpsState.mode === mode && gpsState.subPage === 0) renderGPS();
+                        if (gpsState.mode === mode) renderGPS();
                     }
+                } else {
+                    runwayCache[icao] = "Keine Daten gefunden";
+                    if (gpsState.mode === mode) renderGPS();
                 }
-            }).catch(() => {});
-
-        // Wikipedia parallel (langsamer, dafür vollständige Daten)
-        fetchRunwayFromWikipedia(icao, data.lat, data.lon).then(wikiResult => {
-            if (wikiResult) {
-                runwayCache[icao] = wikiResult;   // überschreibt ggf. Overpass-Platzhalter
-                // Anzeige aktualisieren falls noch auf Runway- oder Wiki-Seite
+            } catch(e) {
+                runwayCache[icao] = "Keine Daten gefunden";
                 if (gpsState.mode === mode) renderGPS();
             }
-        }).catch(() => {});
-
-        // Auf Overpass warten damit erste Render-Seite nicht leer ist
-        await ovPromise;
+        }
     }
 
     const RWYS_PER_PAGE = 4;
@@ -2086,7 +2144,7 @@ async function renderAirportInfo(left, right, type) {
     const sp          = gpsState.subPage;
 
     if (sp < rwyPages) {
-        // Runway-Seite(n) – startet jetzt bei subPage 0
+        // Runway-Seite(n) anzeigen
         const slice = allRunways.slice(sp * RWYS_PER_PAGE, (sp + 1) * RWYS_PER_PAGE);
         const label = rwyPages > 1 ? `RUNWAYS (${sp+1}/${rwyPages}):` : 'RUNWAYS:';
         right.innerHTML =
@@ -2106,7 +2164,7 @@ async function renderAirportInfo(left, right, type) {
         return;
     }
 
-    // Wiki-Seite(n) – erst jetzt laden wenn wirklich gebraucht
+    // Wiki-Seite(n) – erst jetzt laden wenn wirklich gebraucht (Seite 2+)
     if (!gpsState.wikiCache[icao] && data) {
         await fetchAndCacheWikiPages(icao, data.lat, data.lon);
     }
@@ -2129,37 +2187,24 @@ async function renderAirportInfo(left, right, type) {
 }
 
 // --- Wiki-Text für einen Flugplatz holen und in Seiten aufteilen ---
+
 async function fetchAndCacheWikiPages(icao, lat, lon) {
     try {
-        // Zuerst Direktsuche nach ICAO + Flugplatz-Begriffen
-        const airportKeywords = ['Flugplatz', 'Flughafen', 'Airport', 'Aerodrome', icao];
-        let title = null;
+        let title = wikiTitleCache[icao];
 
-        // Geosearch mit größerem Radius, mehr Ergebnisse
-        const geoRes = await fetch(
-            `https://de.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${lat}|${lon}&gsradius=10000&gslimit=10&format=json&origin=*`
-        );
-        const geoData = await geoRes.json();
-        const results = geoData?.query?.geosearch || [];
-
-        // Flugplatz-Artikel bevorzugen
-        const airportArticle = results.find(r =>
-            airportKeywords.some(kw => r.title.toLowerCase().includes(kw.toLowerCase()))
-        );
-        title = airportArticle ? airportArticle.title : (results[0]?.title || null);
-
-        // Falls kein guter Treffer: Direktsuche nach ICAO
-        if (!title || (!airportArticle && results.length > 0)) {
-            try {
-                const searchRes = await fetch(
-                    `https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(icao + ' Flugplatz')}&srlimit=3&format=json&origin=*`
-                );
-                const searchData = await searchRes.json();
-                const searchHit  = searchData?.query?.search?.find(r =>
-                    airportKeywords.some(kw => r.title.toLowerCase().includes(kw.toLowerCase()))
-                );
-                if (searchHit) title = searchHit.title;
-            } catch(e2) {}
+        // Titel finden (Gleiche rasante Methode wie beim Runway-Fetch)
+        if (!title) {
+            const wdRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=haswbstatement:P239=${icao}&format=json&origin=*`, 4000);
+            const wdData = await wdRes.json();
+            
+            if (wdData?.query?.search?.length > 0) {
+                title = wdData.query.search[0].title;
+            } else {
+                const fallRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(icao + ' Flugplatz OR Flughafen')}&srlimit=1&format=json&origin=*`, 4000);
+                const fallData = await fallRes.json();
+                if (fallData?.query?.search?.length > 0) title = fallData.query.search[0].title;
+            }
+            if (title) wikiTitleCache[icao] = title;
         }
 
         if (!title) {
@@ -2167,13 +2212,12 @@ async function fetchAndCacheWikiPages(icao, lat, lon) {
             return;
         }
 
-        // Mehr Sätze holen (bis zu 12) – wir paginieren selbst
-        const extRes = await fetch(
-            `https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=12&titles=${encodeURIComponent(title)}&format=json&origin=*`
-        );
+        // Lade den fertigen, sauberen Plain-Text (Extract)
+        const extRes = await fetchWithTimeout(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&exsentences=12&titles=${encodeURIComponent(title)}&format=json&origin=*`, 5000);
         const extData = await extRes.json();
-        const pageId  = Object.keys(extData.query.pages)[0];
-        const txt     = extData.query.pages[pageId]?.extract?.trim() || 'Keine Information verfügbar.';
+        
+        const pageId = Object.keys(extData.query.pages)[0];
+        const txt = extData.query.pages[pageId]?.extract?.trim() || 'Keine Information verfügbar.';
 
         gpsState.wikiCache[icao] = splitTextIntoPages(txt, 170);
     } catch (e) {
