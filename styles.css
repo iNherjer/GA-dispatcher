@@ -432,30 +432,633 @@ body.theme-retro .wp-data { color: var(--piper-yellow); }
 .emergency-reset:active .emergency-reset-inner { transform: scale(0.9); box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); }
 
 /* ==========================================================================
-   15. MOBILE OPTIMIERUNG (SMARTPHONES)
+   15. MOBILE OPTIMIERUNG (SMARTPHONES & TABLETS)
    ========================================================================== */
-@media (max-width: 850px) {
-    #mapTableOverlay .pinboard-scroll-area { padding: 0 !important; }
-    .maptable-content { width: 100% !important; height: 100% !important; border-radius: 0 !important; }
-    #map { width: 92% !important; height: 92% !important; border-radius: 6px !important; }
 
-    /* Pinnwand NUR horizontal scrollbar machen, Höhe exakt ans Display anpassen */
+/* ── iPhone (≤767px): Karte Vollbild, Pinnwand horizontal panbar ── */
+@media (max-width: 767px) {
+    #mapTableOverlay .pinboard-scroll-area { padding: 0 !important; }
+    .maptable-content { width: 100% !important; height: 100% !important; border-radius: 0 !important; background-size: 100% 100% !important; }
+    #map { width: 100% !important; height: 100% !important; border-radius: 0 !important; border: none !important; }
+
+    /* Pinnwand: nur horizontal panbar, kein Pinch-Zoom */
+    #pinboardOverlay { touch-action: pan-x; }
     #pinboardOverlay .pinboard-scroll-area {
-        display: block !important; 
-        overflow-x: auto !important; 
-        overflow-y: hidden !important; 
-        -webkit-overflow-scrolling: touch; 
-        padding: 0 !important; 
-        height: calc(100vh - 70px) !important; /* Exakte Displayhöhe abzüglich Menüleiste */
+        display: block !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 !important;
+        height: calc(100vh - 70px) !important;
     }
     .pinboard-content {
-        height: 100% !important; /* Zieht sich bis zum oberen und unteren Bildschirmrand */
-        width: auto !important; /* Breite wird nun magisch durch das Aspect-Ratio berechnet! */
-        aspect-ratio: 16 / 10 !important; /* Zwingt das Brett stur in sein natürliches Format */
-        background-size: 100% 100% !important; /* Spannt die Grafik EXAKT auf das div, kein Abschneiden mehr */
-        margin: 0 !important; 
+        height: 100% !important;
+        width: auto !important;
+        aspect-ratio: 16 / 10 !important;
+        background-size: 100% 100% !important;
+        margin: 0 !important;
         max-width: none !important;
         max-height: none !important;
-        border-radius: 0 !important; 
+        border-radius: 0 !important;
+    }
+}
+
+/* ── iPad (768px–1249px): Bild passt ans Display – kein Scroll, kein Pinch-Zoom ── */
+@media (min-width: 768px) and (max-width: 1249px) {
+    /* Kein Browser-Scroll und kein Pinch-Zoom auf den Overlays */
+    #mapTableOverlay, #pinboardOverlay { touch-action: none; }
+
+    /* Karte: Vollbild, Hintergrundbild gestreckt auf das Div */
+    #mapTableOverlay .pinboard-scroll-area { padding: 0 !important; }
+    .maptable-content { width: 100% !important; height: 100% !important; border-radius: 0 !important; background-size: 100% 100% !important; }
+    #map { width: 92% !important; height: 92% !important; border-radius: 6px !important; }
+
+    /* Pinnwand: zentriert, passt sich komplett ans Display an – nichts abgeschnitten */
+    #pinboardOverlay .pinboard-scroll-area {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        height: calc(100vh - 70px) !important;
+    }
+    .pinboard-content {
+        /* Nimmt die kleinste passende Dimension: entweder volle Breite
+           oder so breit, dass die Höhe ins Display passt – nie abgeschnitten */
+        width: min(100vw, calc((100vh - 70px) * 16 / 10)) !important;
+        height: auto !important;
+        aspect-ratio: 16 / 10 !important;
+        background-size: 100% 100% !important;
+        margin: 0 !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+    }
+}
+
+/* ==========================================================================
+   16. RADIO STACK DESIGN (NavCom Style) & THEME LOGIK
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+#navcomInputs { display: none; }
+body.theme-navcom #navcomInputs { display: flex; }
+body.theme-navcom #classicInputs { display: none; }
+
+body.theme-navcom { 
+    --piper-white: #f4f4f4; --piper-yellow: #33ff33; --piper-red: #ff4444; 
+    font-family: 'Arial', sans-serif; 
+}
+body.theme-navcom .container {
+    --p-bg: #3c4045; --p-bt: #5d636b; --p-bl: #4f545a; --p-bb: #111214; --p-br: #111214;
+    background-color: var(--p-bg);
+    padding: 45px 25px 25px 25px; border-radius: 24px;
+    border-top: 3px solid var(--p-bt); border-left: 3px solid var(--p-bl); border-bottom: 4px solid var(--p-bb); border-right: 4px solid var(--p-br);
+    box-shadow: inset 0 4px 6px rgba(255,255,255,0.2), inset 0 -6px 12px rgba(0,0,0,0.3), 0 20px 50px rgba(0,0,0,0.9);
+}
+body.theme-navcom h1 {
+    color: #33ff33;
+    text-shadow: 0 0 6px rgba(51,255,51,0.8), 0 0 18px rgba(51,255,51,0.3);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    border: 2px solid #2a2a2a;
+    border-top: 2px solid #444;
+    border-radius: 4px;
+    background: #0a0a0a;
+    padding: 7px 16px;
+    margin-bottom: 8px;
+    box-shadow: inset 0 0 14px rgba(0,0,0,0.9), 0 3px 6px rgba(0,0,0,0.7), 0 0 1px rgba(51,255,51,0.2);
+    transform: none;
+}
+body.theme-navcom #searchIndicator { color: #aaa; font-family: monospace; }
+body.theme-navcom .theme-switch-wrapper { border-top: 2px solid #555; }
+
+/* NavCom: Oberes Audio-Panel flacher – Marker bleiben vertikal */
+body.theme-navcom .audio-panel { padding: 5px 10px !important; }
+body.theme-navcom .audio-panel-inner { gap: 10px; align-items: center; }
+body.theme-navcom .audio-panel .marker-lights { flex-direction: column; gap: 3px; padding: 3px 4px; }
+body.theme-navcom .audio-panel .marker-light { width: 18px; height: 14px; font-size: 7px; border-radius: 2px; }
+body.theme-navcom .audio-panel .audio-btn { height: 26px; font-size: 10px; padding: 2px 2px; }
+body.theme-navcom .audio-panel .audio-btn-grid { gap: 4px; }
+
+/* ============================================================
+   NavCom: Radio Stack – Authentisches Bendix/King Design
+   ============================================================ */
+
+/* Outer Rack – dunkles Aluminium-Gehäuse */
+body.theme-navcom .radio-stack {
+    gap: 2px;
+    background: #080808;
+    padding: 6px;
+    border-radius: 6px;
+    border: 5px solid #1e1e1e;
+    border-top: 5px solid #333;
+    border-bottom: 6px solid #0a0a0a;
+    box-shadow:
+        0 20px 45px rgba(0,0,0,0.97),
+        inset 0 2px 0 rgba(255,255,255,0.06),
+        inset 0 0 10px rgba(0,0,0,0.95);
+}
+
+/* Einzelne Paneele – KX 165 Frontplatten-Optik */
+body.theme-navcom .radio-module {
+    background: linear-gradient(to bottom, #161616 0%, #101010 100%);
+    border: 1px solid #777;
+    border-top: 2px solid #bbb;
+    border-bottom: 3px solid #1a1a1a;
+    border-right: 1px solid #666;
+    border-radius: 2px;
+    padding: 6px 10px 8px 10px;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.12),
+        inset 0 -1px 0 rgba(0,0,0,0.6),
+        0 2px 5px rgba(0,0,0,0.8);
+    overflow: visible;
+}
+
+/* ── Schrauben entfernen ── */
+body.theme-navcom .radio-module::before,
+body.theme-navcom .radio-module::after,
+body.theme-navcom .radio-module-right-screws::before,
+body.theme-navcom .radio-module-right-screws::after { display: none; }
+body.theme-navcom .radio-module-right-screws { display: none; }
+
+/* ── Half-Module: CSS-Grid – KX 165 Layout ──
+   Zeile 1: Display (volle Breite, weißer Rahmen)
+   Zeile 2: Transfer-Button (kleiner weißer Taster)
+   Zeile 3: Modul-Label links (weißer Rahmen) + Drehknopf rechts */
+body.theme-navcom .half-module {
+    display: grid;
+    grid-template-areas:
+        "disp disp"
+        "swap swap"
+        "lbl  knob";
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    gap: 3px 0;
+    padding: 5px 10px 6px 10px;
+    overflow: visible;
+}
+
+/* Display: volle Breite, weißer Rahmen wie im Original */
+body.theme-navcom .half-module .radio-display-container {
+    grid-area: disp;
+    width: 100%;
+    border: 2px solid #ccc;
+    border-radius: 3px;
+    padding: 4px 8px;
+    background: #050505;
+    box-shadow:
+        inset 0 0 14px rgba(0,0,0,0.97),
+        inset 0 2px 8px rgba(0,0,0,0.9);
+    box-sizing: border-box;
+}
+
+/* Inneres Display-Layout: Beschreibung links, Wert rechts */
+body.theme-navcom .radio-disp-inner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 6px;
+    width: 100%;
+}
+body.theme-navcom .radio-disp-inner .lcd-label {
+    margin-bottom: 0;
+    text-align: left;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #ff4400;
+    text-shadow: 0 0 5px rgba(255,55,0,0.8), 0 0 12px rgba(255,30,0,0.3);
+    opacity: 1;
+}
+body.theme-navcom .radio-disp-inner .lcd-input {
+    width: 100% !important;
+    min-width: 0;
+    text-align: right;
+    text-align-last: right;
+    direction: rtl;
+    font-weight: bold;
+}
+
+/* Transfer-Button (↔) – weißer Taster unterhalb des Displays */
+.radio-transfer-btn { display: none; }
+body.theme-navcom .half-module .radio-transfer-btn {
+    grid-area: swap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: start;
+    background: linear-gradient(to bottom, #e8e8e8 0%, #c0c0c0 100%);
+    color: #111;
+    border: 1px solid #888;
+    border-top: 1px solid #f4f4f4;
+    border-bottom: 2px solid #555;
+    border-radius: 2px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: -1px;
+    height: 18px;
+    width: 44px;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 1px 2px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+    transition: 0.08s;
+    user-select: none;
+}
+body.theme-navcom .half-module .radio-transfer-btn:active {
+    border-top: 1px solid #777;
+    border-bottom: 1px solid #ccc;
+    box-shadow: inset 1px 2px 3px rgba(0,0,0,0.4);
+    transform: translateY(1px);
+}
+
+/* Label: aus absoluter Position befreit → statisch im Grid, weißer Rahmen */
+body.theme-navcom .half-module .radio-label {
+    grid-area: lbl;
+    position: static;
+    border: 2px solid #ccc;
+    border-radius: 2px;
+    background: #0f0f0f;
+    color: #bbb;
+    font-size: 9px;
+    letter-spacing: 2px;
+    font-weight: 600;
+    padding: 4px 8px;
+    white-space: nowrap;
+    align-self: center;
+    top: auto; left: auto;
+}
+
+/* Knopf: rechts, leicht über den Label-Rahmen (sitzt auf dem Rahmen) */
+body.theme-navcom .half-module .radio-knob {
+    grid-area: knob;
+    margin: 0 0 0 -5px;
+    align-self: center;
+    position: relative;
+    z-index: 2;
+}
+
+/* Label für full-width Module (XPDR etc.) – bleibt absolut positioniert, weiß */
+body.theme-navcom .radio-label {
+    background: #0f0f0f;
+    color: #aaa;
+    font-size: 9px;
+    letter-spacing: 2px;
+    font-weight: 600;
+    border-left: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+    top: -7px;
+    padding: 0 6px;
+}
+
+/* Display allgemein (full-width Module: XPDR, etc.) – weiß gerahmt */
+body.theme-navcom .radio-display-container {
+    background: #050505;
+    border: 2px solid #ccc;
+    border-radius: 3px;
+    padding: 5px 8px;
+    box-shadow:
+        inset 0 0 14px rgba(0,0,0,0.97),
+        inset 0 2px 8px rgba(0,0,0,0.9);
+}
+
+/* Rote LED-Anzeige – Bendix/King Stil */
+body.theme-navcom .lcd-input {
+    color: #ff4400 !important;
+    text-shadow: 0 0 5px rgba(255,55,0,0.8), 0 0 12px rgba(255,30,0,0.3) !important;
+    font-size: 20px;
+    letter-spacing: 1px;
+    background: transparent !important;
+}
+body.theme-navcom .lcd-input:focus { background: rgba(255,60,0,0.06) !important; }
+body.theme-navcom .lcd-input option { background: #050505; color: #ff4400; }
+
+/* LCD-Beschriftungen – USE / STBY Stil */
+body.theme-navcom .lcd-label {
+    color: #aaa;
+    font-size: 9px;
+    letter-spacing: 2px;
+    opacity: 1;
+    text-shadow: none;
+}
+
+/* Drehknöpfe – groß, mit weißem Ring (KX 165 Stil) */
+body.theme-navcom .radio-knob {
+    width: 38px;
+    height: 38px;
+    border: 3px solid #d8d8d8;
+    background: #181818;
+    box-shadow:
+        3px 5px 10px rgba(0,0,0,0.85),
+        1px 1px 0 rgba(255,255,255,0.15),
+        inset 0 2px 5px rgba(255,255,255,0.12),
+        inset 0 -2px 5px rgba(0,0,0,0.8);
+    margin-left: 0;
+}
+body.theme-navcom .radio-knob::before {
+    background: repeating-conic-gradient(#3a3a3a 0% 4%, #111 4% 8%);
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+}
+body.theme-navcom .radio-knob::after {
+    width: 16px; height: 16px;
+    border: 2px solid #d0d0d0;
+    background: #111;
+    box-shadow: inset 0 1px 3px rgba(255,255,255,0.2);
+}
+
+/* Audio-Buttons – mehr 3D wie KMA 26 Taster */
+body.theme-navcom .audio-btn {
+    background: linear-gradient(to bottom, #383838 0%, #242424 100%);
+    border: 1px solid #555;
+    border-top: 2px solid #666;
+    border-bottom: 3px solid #111;
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
+    color: #ddd;
+}
+body.theme-navcom .audio-btn:active {
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #444;
+    box-shadow: inset 1px 2px 4px rgba(0,0,0,0.9);
+}
+
+/* ============================================================
+   KLN 90B GPS Module – Green Phosphor LCD
+   ============================================================ */
+.kln90b-module { display: none; }
+body.theme-navcom .kln90b-module {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 10px 8px 10px;
+}
+body.theme-navcom .kln90b-module .radio-label {
+    background: #0f0f0f;
+    color: #aaa;
+    font-size: 9px;
+    letter-spacing: 2px;
+    font-weight: 600;
+    border-left: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+    top: -7px;
+    padding: 0 6px;
+}
+
+/* Outer body wrapper */
+.kln90b-body {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+/* Display – grünes Phosphor LCD, Split links|rechts */
+.kln90b-display {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    grid-template-rows: 1fr auto;
+    background: #020a02;
+    border: 2px solid #ccc;
+    border-radius: 3px;
+    height: 120px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: #33ff33;
+    text-shadow: 0 0 4px rgba(51,255,51,0.6);
+    box-shadow:
+        inset 0 0 20px rgba(0,0,0,0.95),
+        inset 0 2px 8px rgba(0,0,0,0.9);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+/* Scanline-Overlay */
+.kln90b-display::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 2;
+}
+
+.kln90b-left, .kln90b-right {
+    padding: 5px 6px 3px 6px;
+    overflow: hidden;
+    line-height: 1.45;
+    min-height: 0;
+    word-break: break-word;
+    /* Graceful bottom fade statt hartem Abschnitt */
+    -webkit-mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+}
+.kln90b-left  { grid-column: 1; grid-row: 1; }
+.kln90b-right { grid-column: 3; grid-row: 1; }
+
+.kln90b-divider {
+    grid-column: 2; grid-row: 1;
+    background: #33ff33;
+    opacity: 0.35;
+    width: 1px;
+}
+
+.kln90b-statusbar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 7px;
+    font-size: 9px;
+    color: #33ff33;
+    opacity: 0.7;
+    border-top: 1px solid rgba(51,255,51,0.2);
+    background: rgba(0,0,0,0.3);
+}
+
+.kln90b-line { margin: 0; }
+.kln90b-line.highlight { color: #66ff66; text-shadow: 0 0 8px rgba(51,255,51,0.9); }
+.kln90b-line.dim { opacity: 0.5; }
+
+/* Mode Buttons Reihe – volle Breite */
+.kln90b-buttons {
+    display: flex;
+    gap: 3px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Encoder-Reihe: links (zurück) und rechts (vor) unterhalb der Buttons */
+.kln90b-encoder-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    margin-top: 2px;
+}
+
+/* Encoder (Drehgeber) */
+.kln90b-encoder {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #181818;
+    border: 3px solid #d8d8d8;
+    box-shadow:
+        3px 5px 10px rgba(0,0,0,0.85),
+        1px 1px 0 rgba(255,255,255,0.15),
+        inset 0 2px 5px rgba(255,255,255,0.12),
+        inset 0 -2px 5px rgba(0,0,0,0.8);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+}
+.kln90b-enc-inner {
+    position: absolute;
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(#3a3a3a 0% 4%, #111 4% 8%);
+}
+.kln90b-encoder::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #111;
+    border: 2px solid #d0d0d0;
+    box-shadow: inset 0 1px 3px rgba(255,255,255,0.2);
+    z-index: 1;
+}
+
+/* Mode Buttons – weiß, klein, kein LED */
+.kln90b-btn {
+    background: linear-gradient(to bottom, #e8e8e8 0%, #c0c0c0 100%);
+    border: 1px solid #888;
+    border-top: 1px solid #f4f4f4;
+    border-bottom: 2px solid #555;
+    border-radius: 2px;
+    color: #222;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    font-weight: bold;
+    padding: 4px 0;
+    cursor: pointer;
+    box-shadow: 1px 2px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+    user-select: none;
+    transition: 0.08s;
+    flex: 1;
+    text-align: center;
+}
+.kln90b-btn:active {
+    border-top: 1px solid #777;
+    border-bottom: 1px solid #ccc;
+    box-shadow: inset 1px 2px 3px rgba(0,0,0,0.4);
+    transform: translateY(1px);
+}
+.kln90b-btn.active {
+    background: linear-gradient(to bottom, #c8c8c8 0%, #a8a8a8 100%);
+    color: #000;
+    border-bottom: 2px solid rgba(51,255,51,0.7);
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.3), 0 0 4px rgba(51,255,51,0.3);
+}
+
+/* Radio Stack Modul Styling */
+.radio-stack { flex-direction: column; gap: 4px; background: #111; padding: 10px; border-radius: 8px; border: 4px solid #2a2a2a; box-shadow: 0 15px 35px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.8); width: 100%; box-sizing: border-box; margin-bottom: 20px;}
+.radio-row { display: flex; gap: 6px; width: 100%; }
+.radio-module { background: #1a1a1a; border: 2px solid #ccc; border-radius: 4px; padding: 10px 12px 8px 12px; position: relative; display: flex; align-items: center; justify-content: space-between; box-shadow: inset 0 2px 5px rgba(255,255,255,0.1), 0 4px 6px rgba(0,0,0,0.5); }
+.half-module { flex: 1; padding: 8px 10px 6px 10px; min-width: 0; }
+
+.radio-module::before, .radio-module::after, .radio-module-right-screws::before, .radio-module-right-screws::after { content: '⊕'; position: absolute; color: #666; font-size: 11px; }
+.radio-module::before { top: 4px; left: 4px; } .radio-module::after { bottom: 4px; left: 4px; }
+.radio-module-right-screws::before { top: 4px; right: 4px; } .radio-module-right-screws::after { bottom: 4px; right: 4px; }
+
+.radio-label { position: absolute; top: -8px; left: 20px; background: #1a1a1a; color: #ccc; font-size: 10px; font-weight: bold; padding: 0 8px; border-left: 1px solid #ccc; border-right: 1px solid #ccc; letter-spacing: 1px; white-space: nowrap;}
+.radio-display-container { background: #051405; border: 3px inset #333; border-radius: 4px; padding: 6px; display: flex; box-shadow: inset 0 0 10px rgba(0,0,0,0.9); flex: 1;}
+
+.lcd-input { background: transparent !important; border: none !important; color: #33ff33 !important; font-family: 'Share Tech Mono', monospace !important; font-size: 22px; text-align: center; text-shadow: 0 0 5px rgba(51, 255, 51, 0.6) !important; text-transform: uppercase; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.lcd-input:focus { outline: none; background: rgba(51, 255, 51, 0.1) !important; }
+.lcd-input option { background: #051405; color: #33ff33; font-family: 'Share Tech Mono', monospace; }
+.lcd-label { display: block; color: #33ff33; font-family: 'Share Tech Mono', monospace; font-size: 10px; opacity: 0.7; margin-bottom: 2px; letter-spacing: 1px; }
+
+/* Bendix/King Style Encoder (Weiße Ringe & geriffeltes Inneres) */
+.radio-knob { width: 32px; height: 32px; border-radius: 50%; background: #111; border: 2px solid #e0e0e0; box-shadow: 2px 4px 6px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2); position: relative; flex-shrink: 0; margin-left: 10px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+.radio-knob:active { transform: scale(0.95); box-shadow: 1px 2px 3px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2); }
+.radio-knob::before { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border-radius: 50%; background: repeating-conic-gradient(#333 0% 5%, #111 5% 10%); }
+.radio-knob::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #111; border: 2px solid #e0e0e0; box-shadow: inset 0 1px 2px rgba(255,255,255,0.3); }
+
+/* --- Audio / Marker Panel (KMA Style) --- */
+.audio-panel-inner { display: flex; align-items: center; width: 100%; gap: 15px; }
+.marker-lights { display: flex; flex-direction: column; gap: 6px; padding: 4px; background: #0a0a0a; border-radius: 4px; border: 1px inset #333; }
+.marker-light { width: 20px; height: 20px; border-radius: 3px; font-family: 'Share Tech Mono', monospace; font-size: 8px; font-weight: bold; color: #000; display: flex; justify-content: center; align-items: center; opacity: 0.3; transition: all 0.2s; box-shadow: inset 0 0 3px rgba(0,0,0,0.8); }
+
+/* Farben der Marker Beacons */
+.mk-outer { background: #4da6ff; } /* O - Blue */
+.mk-middle { background: #f2c12e; } /* M - Amber */
+.mk-inner { background: #fdfdfd; } /* I - White */
+
+/* Aktiver / Blinkender Zustand */
+.marker-light.on { opacity: 1; box-shadow: 0 0 10px currentColor, inset 0 0 5px #fff; color: #fff; text-shadow: 0 0 2px #000; }
+.marker-light.blinking { animation: markerBlink 0.3s infinite alternate; }
+@keyframes markerBlink { from { opacity: 0.2; } to { opacity: 1; box-shadow: 0 0 10px currentColor; color: #fff; } }
+
+/* Audio Taster */
+.audio-btn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex-grow: 1; }
+.audio-btn { background: #2a2a2a; border: 2px solid #111; border-bottom-color: #444; border-right-color: #444; border-radius: 3px; color: #ccc; font-family: 'Share Tech Mono', monospace; font-size: 11px; padding: 4px 2px; text-align: center; cursor: pointer; position: relative; box-shadow: 1px 2px 3px rgba(0,0,0,0.6); display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 32px; user-select: none; }
+.audio-btn:active { transform: translateY(1px); border-bottom-color: #111; border-right-color: #111; border-top-color: #444; border-left-color: #444; box-shadow: inset 1px 2px 3px rgba(0,0,0,0.8); }
+.audio-led { width: 12px; height: 4px; background: #111; border-radius: 1px; margin-top: 4px; border: 1px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.1); }
+
+/* Aktiver Taster (LED an) */
+.audio-btn.active .audio-led { background: #33ff33; box-shadow: 0 0 8px #33ff33, inset 0 1px 2px #fff; border-color: #fff; }
+.audio-btn.active { color: #fff; text-shadow: 0 0 3px rgba(255,255,255,0.5); }
+
+/* CMD Action Bar (NavCom DISPATCH/CLEAR) */
+.navcom-action-bar { padding: 10px 12px; justify-content: center; }
+.navcom-action-btns { display: flex; gap: 8px; width: 100%; }
+.navcom-exec-btn { flex: 1; height: 42px; font-size: 13px; color: #ff4444 !important; border-color: #444; }
+.navcom-exec-btn .audio-led { background: #111; }
+.navcom-exec-btn.active .audio-led { background: #ff4444; box-shadow: 0 0 8px #ff4444, inset 0 1px 2px #fff; border-color: #fff; }
+.navcom-clear-btn { flex: 0 0 auto; width: 70px; height: 42px; font-size: 13px; color: #f2c12e !important; border-color: #444; }
+.navcom-clear-btn .audio-led { background: #111; }
+.audio-btn.disabled { opacity: 0.4; pointer-events: none; }
+
+/* Drag Knobs Cursor */
+.drag-knob { cursor: ns-resize; } /* Zeigt Pfeile nach oben/unten an */
+
+/* KLN Loading-Animation: drei Punkte blinken nacheinander */
+@keyframes kln-dot {
+    0%, 60%, 100% { opacity: 0.15; }
+    30%            { opacity: 1;    }
+}
+.kln-loading-dots span {
+    display: inline-block;
+    animation: kln-dot 1.2s infinite;
+    font-size: 14px;
+    letter-spacing: 2px;
+}
+.kln-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.kln-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+
+/* KLN 90B: mehr Höhe auf schmalen Mobilgeräten (iPhone Portrait) */
+@media (max-width: 480px) {
+    .kln90b-display {
+        height: 145px;
+    }
+    /* Fade-Out etwas weicher, da mehr Platz vorhanden */
+    .kln90b-left, .kln90b-right {
+        -webkit-mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+        mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
     }
 }
