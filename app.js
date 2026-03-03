@@ -861,27 +861,18 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
     const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
     if (!apiKey) return null; 
 
-    // TRICK: Wir zwingen die KI jedes Mal in eine andere Richtung, 
-    // damit sie nicht immer dieselben Standard-Missionen (wie AOG oder Lidar) nimmt!
     const poiCategories = [
-        "Tourismus & Sightseeing", 
-        "Natur- & Umweltschutz (Beobachtung)", 
-        "Luftbildfotografie (Medien/Immobilien)", 
-        "Infrastruktur-Inspektion (Straßen/Brücken/Leitungen)", 
-        "Wissenschaftliche Datenerfassung", 
-        "Lokales Event / Großveranstaltung von oben",
+        "Tourismus & Sightseeing", "Natur- & Umweltschutz (Beobachtung)", 
+        "Luftbildfotografie (Medien/Immobilien)", "Infrastruktur-Inspektion (Straßen/Brücken/Leitungen)", 
+        "Wissenschaftliche Datenerfassung", "Lokales Event / Großveranstaltung von oben",
         "Kurioses / Verrückte Suchaktion"
     ];
     
     const aptCategories = [
-        "Kulinarischer Ausflug ($100 Hamburger/Kuchen)", 
-        "Gemütlicher Vereinsausflug / Treffen", 
-        "Business-Charter (Alltäglich)", 
-        "Eilige, aber unspektakuläre Kleinfracht", 
-        "Promi / VIP-Transport", 
-        "Tierrettung / Tiertransport", 
-        "Spezielles Flugtraining (Seitenwind, Navigation)", 
-        "Flugplatz-Logistik (Ersatzteile, Crew-Shuttle)", 
+        "Kulinarischer Ausflug ($100 Hamburger/Kuchen)", "Gemütlicher Vereinsausflug / Treffen", 
+        "Business-Charter (Alltäglich)", "Eilige, aber unspektakuläre Kleinfracht", 
+        "Promi / VIP-Transport", "Tierrettung / Tiertransport", 
+        "Spezielles Flugtraining (Seitenwind, Navigation)", "Flugplatz-Logistik (Ersatzteile, Crew-Shuttle)", 
         "Kurioses / Ungewöhnlicher Privatflug"
     ];
     
@@ -889,38 +880,43 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
         ? poiCategories[Math.floor(Math.random() * poiCategories.length)] 
         : aptCategories[Math.floor(Math.random() * aptCategories.length)];
 
+    // Wir extrahieren die generierte Zahl aus "3 PAX", damit die KI ein Limit hat
+    const maxPaxLimit = paxText.split(' ')[0];
+
     const prompt = `Du bist ein freundlicher, entspannter Flugdienstleiter in einem lokalen Fliegerclub oder kleinen Charterunternehmen.
     Erstelle ein realistisches Einsatzbriefing für diesen Flug:
     Start: ${startName}
     Ziel: ${destName} ${isPOI ? '(POI / Wendepunkt)' : '(Zielflughafen)'}
     Distanz (Gesamt): ${dist} NM
-    Zuladung: ${paxText}, ${cargoText} Fracht.
 
     WICHTIGE REGELN:
     1. Antworte IMMER auf Deutsch.
     2. TONFALL: Entspannt, kumpelhaft und alltäglich. Keine übertriebene Dramatik, keine Actionfilm-Rhetorik! Fliegen ist Routine und macht Spaß.
     3. THEMA VORGEGEBEN: Dein Auftrag MUSS sich zwingend um dieses Thema drehen: "${randomTheme}".
-    4. LOKALES WISSEN: Baue 1-2 echte geografische, infrastrukturelle oder kulturelle Fakten zu "${destName}" ganz natürlich in den Text ein, damit es authentisch wirkt.
-    ${isPOI ? 
-    `5. RUNDFLUG-REGELN: Start und Landung ist ${startName}. Am POI (${destName}) wird NICHT gelandet, nur gekreist/beobachtet.` 
-    : `5. ROUTEN-REGELN: Normaler Streckenflug von ${startName} nach ${destName}.`}
+    4. LOKALES WISSEN: Baue 1-2 echte geografische, infrastrukturelle oder kulturelle Fakten zu "${destName}" ganz natürlich ein.
+    ${isPOI ? `5. RUNDFLUG-REGELN: Start und Landung ist ${startName}. Am POI (${destName}) wird NICHT gelandet.` : `5. ROUTEN-REGELN: Normaler Streckenflug von ${startName} nach ${destName}.`}
+    6. PASSAGIERE & FRACHT: Erfinde passend zur Mission, WER mitfliegt (maximal ${maxPaxLimit} Personen) und WAS transportiert wird. Wenn niemand mitfliegt, schreibe '0 PAX'.
 
     Antworte AUSSCHLIESSLICH als JSON. Keine Markdown-Formatierung.
-    Struktur: {"title": "Kreativer, passender Titel (z.B. 'Kuchen-Express zum Bodensee' oder 'Brücken-Inspektion')", "story": "Das Briefing (max 3-4 Sätze, lockerer Ton)"}`;
+    Struktur: {
+        "title": "Kreativer Titel", 
+        "story": "Das Briefing (max 3-4 Sätze, lockerer Ton)",
+        "pax": "z.B. '2 PAX (Fotograf & Assistent)' oder '0 PAX'",
+        "cargo": "z.B. 'Kamera-Gimbal (80 lbs)' oder 'Reisegepäck (40 lbs)'"
+    }`;
 
     const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { response_mime_type: "application/json" } };
     const reqOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
 
-    // VERSUCH 1: Gemini 2.5 Flash (Primary)
     try {
         const resFlash = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, reqOptions);
         if (resFlash.ok) {
             const data = await resFlash.json();
             const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
             incrementApiUsage('flash'); 
-            return { t: parsed.title, s: parsed.story, i: "📋", cat: "std", _source: "Gemini 2.5 Flash" };
+            return { t: parsed.title, s: parsed.story, pax: parsed.pax, cargo: parsed.cargo, i: "📋", cat: "std", _source: "Gemini 2.5 Flash" };
         } else if (resFlash.status === 429) {
-            console.warn("Flash API Quota erreicht (429). Wechsle zu Lite Modell...");
+            console.warn("Flash API Quota erreicht. Wechsle zu Lite...");
         } else {
             throw new Error('Flash API Fehler: ' + resFlash.status);
         }
@@ -928,22 +924,18 @@ async function fetchGeminiMission(startName, destName, dist, isPOI, paxText, car
         console.warn("Gemini Flash fehlgeschlagen:", e);
     }
 
-    // VERSUCH 2: Gemini 2.5 Flash Lite (Fallback)
     try {
         const resLite = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, reqOptions);
         if (resLite.ok) {
             const data = await resLite.json();
             const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
             incrementApiUsage('lite'); 
-            return { t: parsed.title, s: parsed.story, i: "📋", cat: "std", _source: "Gemini 2.5 Flash Lite" };
-        } else {
-            console.warn("Lite API Fehler (Code: " + resLite.status + "). Wechsle zu lokaler Datenbank.");
-            return null;
+            return { t: parsed.title, s: parsed.story, pax: parsed.pax, cargo: parsed.cargo, i: "📋", cat: "std", _source: "Gemini 2.5 Flash Lite" };
         }
     } catch (e) {
         console.warn("Gemini Lite fehlgeschlagen:", e);
-        return null; 
     }
+    return null;
 }
 
 /* =========================================================
@@ -1099,7 +1091,11 @@ async function generateMission() {
     indicator.innerText = `Kontaktiere KI-Dispatcher...`;
     let m = await fetchGeminiMission(start.n, dest.n, totalDist, isPOI, paxText, cargoText);
 
-    if (m) { dataSource = m._source; } else {
+    if (m) { 
+        dataSource = m._source; 
+        if (m.pax) paxText = m.pax;       // Nimmt den KI-Text für Passagiere
+        if (m.cargo) cargoText = m.cargo; // Nimmt den KI-Text für Fracht
+    } else {
         indicator.innerText = `Lade Auftrag aus lokaler Datenbank...`;
         dataSource = "Lokale DB"; 
         if (isPOI) {
