@@ -165,6 +165,41 @@ function toggleNotes() {
     }
 }
 
+function toggleWikiPhoto(event) {
+    event.stopPropagation(); // Verhindert das Umblättern der Notizseite
+    const container = document.getElementById('wikiImageContainer');
+    container.classList.toggle('photo-zoomed');
+    
+    let backdrop = document.getElementById('photo-backdrop');
+    if (container.classList.contains('photo-zoomed')) {
+        // Bild ist vergrößert -> Dunklen Hintergrundschleier erzeugen
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.id = 'photo-backdrop';
+            backdrop.style = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); border-radius: 4px; z-index: 50; opacity: 0; transition: opacity 0.4s;';
+            
+            // Schleier an Seite 2 heften
+            document.getElementById('notePage2').appendChild(backdrop);
+            
+            // Kurzer Reflow-Trick, damit die Fade-Animation flüssig läuft
+            void backdrop.offsetWidth;
+            backdrop.style.opacity = '1';
+            
+            // Klick auf den Hintergrundschleier schließt das Bild ebenfalls
+            backdrop.onclick = function(e) {
+                e.stopPropagation();
+                toggleWikiPhoto(e);
+            };
+        }
+    } else {
+        // Bild wird verkleinert -> Hintergrundschleier ausblenden
+        if (backdrop) {
+            backdrop.style.opacity = '0';
+            setTimeout(() => backdrop.remove(), 400); // Warten bis Animation fertig ist
+        }
+    }
+}
+
 function updateDynamicColors() {
     const isNavcom = document.body.classList.contains('theme-navcom');
     const isRetro = document.body.classList.contains('theme-retro') && !isNavcom;
@@ -352,6 +387,11 @@ function saveAiToggle() { const t = document.getElementById('aiToggle'); if(t) l
    ========================================================= */
 function saveMissionState() {
     if (document.getElementById("briefingBox").style.display !== "block") return;
+    
+    // NEU: Bild-URL für das Polaroid auslesen und merken
+    const imgEl = document.getElementById("wikiImage");
+    const imgUrl = (imgEl && imgEl.style.backgroundImage !== 'url("")') ? imgEl.style.backgroundImage : "";
+
     const state = {
         mTitle: document.getElementById('mTitle').innerHTML,
         mStory: document.getElementById('mStory').innerText,
@@ -370,6 +410,7 @@ function saveMissionState() {
         mHeadingNote: document.getElementById("mHeadingNote").innerText,
         mETENote: document.getElementById("mETENote").innerText,
         wikiDescText: document.getElementById("wikiDescText").innerText,
+        wikiImageUrl: imgUrl, // <--- HIER wird das Bild gespeichert
         isPOI: document.getElementById("destRwyContainer").style.display === "none",
         currentMissionData: currentMissionData,
         routeWaypoints: routeWaypoints,
@@ -391,6 +432,17 @@ async function restoreMissionState(state) {
     document.getElementById("mWeight").innerText = state.mWeight; document.getElementById("mDistNote").innerText = state.mDistNote;
     document.getElementById("mHeadingNote").innerText = state.mHeadingNote; document.getElementById("mETENote").innerText = state.mETENote;
     document.getElementById("wikiDescText").innerText = state.wikiDescText;
+    
+    // NEU: Bild wiederherstellen, falls vorhanden
+    const imgContainer = document.getElementById("wikiImageContainer");
+    const imgEl = document.getElementById("wikiImage");
+    if (state.wikiImageUrl && imgContainer && imgEl) {
+        imgEl.style.backgroundImage = state.wikiImageUrl;
+        imgContainer.style.display = 'block';
+    } else if (imgContainer) {
+        imgContainer.style.display = 'none';
+    }
+
     document.getElementById("destRwyContainer").style.display = state.isPOI ? "none" : "block";
     const destSwitchRow = document.getElementById("destSwitchRow"); if(destSwitchRow) destSwitchRow.style.display = state.isPOI ? "none" : "flex";
 
