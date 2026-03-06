@@ -237,12 +237,19 @@ body.theme-retro .meter-label { display: block; position: absolute; bottom: 2px;
 .paperclip, .page-number { display: none; }
 .mission-note-page { display: block !important; opacity: 1 !important; transform: none !important; }
 
-body.theme-retro .notes-stack { display: grid; grid-template-areas: "stack"; position: relative; margin-bottom: 25px; cursor: pointer; }
+body.theme-retro .notes-stack { 
+    display: grid; grid-template-areas: "stack"; 
+    position: relative; margin-bottom: 25px; cursor: pointer;
+    min-width: 250px; min-height: 400px; /* Explizite Mindestgröße für bessere Klick-Erkennung */
+    user-select: none; -webkit-user-select: none; /* Verhindert Text-Selektion statt Blättern */
+}
 body.theme-retro .paperclip { display: block; position: absolute; top: -18px; left: 20px; width: 25px; height: 60px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 60'%3E%3Cpath d='M10 40 V12 a4 4 0 0 1 8 0 v32 a6 6 0 0 1-12 0 V10 a8 8 0 0 1 16 0 v32' fill='none' stroke='%23889' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; z-index: 10; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5)); transform: rotate(-15deg); }
 body.theme-retro .mission-note-page { grid-area: stack; background-color: #fdf5e6; background-image: repeating-linear-gradient(transparent, transparent 23px, #a6bccc 24px); background-size: 100% 24px; background-position: 0 4px; padding: 15px 15px 15px 45px; border-radius: 2px 6px 4px 2px; border: 1px solid #d3cbb8; position: relative; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
 body.theme-retro .mission-note-page::before { content: ''; position: absolute; top: 0; bottom: 0; left: 30px; width: 1px; background-color: rgba(220, 50, 50, 0.4); }
 body.theme-retro .front-note { z-index: 2; transform: rotate(-1.5deg); box-shadow: 3px 5px 12px rgba(0,0,0,0.6); opacity: 1; }
 body.theme-retro .back-note { z-index: 1; transform: rotate(2deg) translate(8px, 6px); box-shadow: 2px 3px 8px rgba(0,0,0,0.5); filter: brightness(0.85); }
+body.theme-retro .third-note { z-index: 0; transform: rotate(-3deg) translate(14px, 12px); box-shadow: 1px 2px 5px rgba(0,0,0,0.4); filter: brightness(0.7); }
+body.theme-retro .fourth-note { z-index: -1; transform: rotate(1deg) translate(2px, 18px); box-shadow: 1px 2px 5px rgba(0,0,0,0.3); filter: brightness(0.6); }
 body.theme-retro .page-number { display: block; position: absolute; bottom: 5px; right: 10px; font-family: 'Caveat', cursive; font-size: 18px; color: #0b1f65; opacity: 0.6; }
 body.theme-retro #mTitle, body.theme-retro .wiki-title { display: block; font-family: 'Caveat', cursive; font-size: 28px; color: #0b1f65; text-shadow: none; margin-bottom: 8px; margin-top: 25px; transform: rotate(-1deg); line-height: 1.2; }
 body.theme-retro #mStory, body.theme-retro .wiki-info-note { font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; color: #222; line-height: 24px; border: none; padding-bottom: 0; margin-bottom: 0; text-shadow: none; letter-spacing: -0.5px; font-style: normal; }
@@ -340,7 +347,8 @@ body.theme-retro .api-fuel-meter .api-scale { border-left: 3px solid #d93829 !im
 /* --- FLIGHT POST-ITS (GESPEICHERTE FLÜGE) --- */
 .briefing-save-pin { position: absolute; top: 12px; right: 12px; font-size: 22px; cursor: pointer; z-index: 10; transition: transform 0.2s; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
 .briefing-export-pin { position: absolute; top: 12px; right: 42px; font-size: 20px; cursor: pointer; z-index: 10; transition: transform 0.2s; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
-.briefing-save-pin:hover, .briefing-export-pin:hover { transform: scale(1.2) rotate(10deg); }
+.briefing-pdf-pin { position: absolute; top: 12px; right: 72px; font-size: 20px; cursor: pointer; z-index: 10; transition: transform 0.2s; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.5)); }
+.briefing-save-pin:hover, .briefing-export-pin:hover, .briefing-pdf-pin:hover { transform: scale(1.2) rotate(10deg); }
 
 .post-it.flight-card { background: #e6f7ff; border: 1px solid #b3e0ff; width: 20cqw !important; height: auto !important; min-height: 12cqw !important; }
 .flight-load-btn { background: var(--blue); color: #fff; border: 1px solid #222; padding: 0.5cqw !important; width: 100%; margin-top: 0.8cqw !important; cursor: pointer; font-weight: bold; border-radius: 3px; font-size: 1cqw !important; font-family: sans-serif; transition: background 0.2s; }
@@ -353,12 +361,30 @@ body.theme-retro .api-fuel-meter .api-scale { border-left: 3px solid #d93829 !im
 #map { width: 72%; height: 86%; display: block; border-radius: 3px; filter: sepia(0.35) contrast(0.95); box-shadow: inset 0 0 15px rgba(0,0,0,0.6), 0 0 5px rgba(0,0,0,0.4); border: 1px solid rgba(0,0,0,0.3); }
 
 body.map-is-fullscreen .container { display: none !important; }
-body.map-is-fullscreen #mapTableOverlay { background: #111 !important; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; transform: none !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; border-radius: 0 !important; }
-body.map-is-fullscreen .maptable-content { width: 100% !important; height: 100% !important; transform: none !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; }
-body.map-is-fullscreen .pinboard-scroll-area { position: absolute; top: 50px; left: 0; right: 0; bottom: 0; display: block; padding: 0; margin: 0; overflow: hidden; }
-body.map-is-fullscreen #map { width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; }
-body.map-is-fullscreen .pinboard-header { position: absolute; top: 0; left: 0; right: 0; height: 50px; z-index: 100000; box-sizing: border-box; background: rgba(26,26,26,0.95); }
+body.map-is-fullscreen { overflow: hidden !important; padding: 0 !important; margin: 0 !important; }
+/* Flex-Layout explizit erzwingen */
+body.map-is-fullscreen #mapTableOverlay { background: #111 !important; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; transform: none !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; border-radius: 0 !important; display: flex !important; flex-direction: column !important; }
 
+body.map-is-fullscreen .maptable-content { 
+    width: 100% !important; 
+    height: 100% !important; 
+    max-width: none !important; /* Hebt die Desktop-Beschränkung auf */
+    max-height: none !important; 
+    aspect-ratio: auto !important; /* Hebt das 16:10 Format auf */
+    margin: 0 !important; /* Entfernt die Zentrierung */
+    transform: none !important; 
+    background: none !important; 
+    box-shadow: none !important; 
+    border-radius: 0 !important; 
+}
+
+/* Absolute Positionierung & harte 50px Höhe entfernt - flex-wrap erlaubt Umbrüche! */
+body.map-is-fullscreen .pinboard-header { position: relative !important; height: auto !important; z-index: 100000; box-sizing: border-box; background: rgba(26,26,26,0.95); flex-wrap: wrap; gap: 8px; }
+
+/* Nimmt sich flexibel den restlichen Platz */
+body.map-is-fullscreen .pinboard-scroll-area { position: relative !important; top: 0 !important; flex: 1 !important; display: block; padding: 0; margin: 0; overflow: hidden; }
+
+body.map-is-fullscreen #map { width: 100% !important; height: 100% !important; max-width: 100%; max-height: 100%; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; }
 /* ==========================================================================
    12. DIE SCHUBLADEN-ANIMATION (PC LAYOUT DYNAMISCH - SCROLLBAR FIX)
    ========================================================================== */
@@ -449,7 +475,25 @@ body.theme-retro .wp-data { color: var(--piper-yellow); }
 @media (max-width: 767px) {
     #mapTableOverlay .pinboard-scroll-area { padding: 0 !important; }
     .maptable-content { width: 100% !important; height: 100% !important; border-radius: 0 !important; background-size: 100% 100% !important; }
-    #map { width: 100% !important; height: 100% !important; border-radius: 0 !important; border: none !important; }
+    
+    
+    /* Karte mit 20px Rand, damit der Tisch sichtbar bleibt + abgerundete Ecken */
+    body:not(.map-is-fullscreen) #map { 
+        width: calc(100% - 40px) !important; 
+        height: calc(100% - 50px) !important; /* Unten etwas mehr Luft für die Home-Bar beim iPhone */
+        border-radius: 8px !important; 
+        border: 1px solid rgba(0,0,0,0.4) !important; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.6) !important;
+    }
+    
+    /* Im echten Vollbild-Modus (⛶) wieder den kompletten Screen ausfüllen */
+    body.map-is-fullscreen #map { 
+        width: 100% !important; 
+        height: 100% !important; 
+        border-radius: 0 !important; 
+        border: none !important; 
+        box-shadow: none !important;
+    }
 
     /* Pinnwand: nur horizontal panbar, kein Pinch-Zoom */
     #pinboardOverlay { touch-action: pan-x; }
@@ -1122,4 +1166,22 @@ body.theme-navcom .discord-link {
 body.theme-navcom .discord-link:hover {
     color: #33ff33;
     text-shadow: 0 0 5px rgba(51, 255, 51, 0.6);
+}
+
+/* ==========================================================================
+   18. OVERRIDES FÜR MOBILE (Muss ganz unten stehen!)
+   ========================================================================== */
+@media (max-width: 767px) {
+    .briefing-photo-attachment.photo-zoomed {
+        /* Überschreibt den 3.0 Zoom von weiter oben */
+        transform: translate(-50%, 20%) scale(2.6) rotate(2deg) !important; 
+    }
+}
+
+/* FIX: Interaktive Elemente auf Hintergrund-Seiten deaktivieren, damit Klicks zuverlässig zum Blättern führen */
+body.theme-retro .mission-note-page:not(.front-note) .briefing-photo-attachment,
+body.theme-retro .mission-note-page:not(.front-note) a,
+body.theme-retro .mission-note-page:not(.front-note) button,
+body.theme-retro .mission-note-page:not(.front-note) .retro-switch-container {
+    pointer-events: none;
 }
