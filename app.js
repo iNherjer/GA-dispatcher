@@ -170,58 +170,122 @@ function toggleWikiPhoto(event, containerId) {
     const container = document.getElementById(containerId);
     if (!container) { event.stopPropagation(); return; }
 
-    // Wenn bereits ein Clone vorhanden → immer Zoom-Out (Backdrop- oder Clone-Klick)
-    const existingClone = document.getElementById('photo-zoom-clone');
-    if (existingClone) {
+    // ── ZOOM-OUT: Placeholder im DOM → Element ist gerade gezoomt ──
+    const placeholder = document.getElementById('photo-zoom-placeholder');
+    if (placeholder) {
         event.stopPropagation();
-        const currentRect = container.getBoundingClientRect();
-        const origTransform = container.style.transform || 'rotate(3deg)';
-        // Clone ohne Animation zur aktuellen Originalposition springen (scrollsicher)
-        existingClone.style.transition = 'none';
-        existingClone.style.top  = currentRect.top  + 'px';
-        existingClone.style.left = currentRect.left + 'px';
-        void existingClone.offsetWidth;
-        // Dann transform zurück-animieren
-        existingClone.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s';
-        existingClone.style.transform  = origTransform;
-        existingClone.style.boxShadow  = '';
-        setTimeout(() => { existingClone.remove(); container.style.visibility = ''; }, 430);
+        const origTransform = container.dataset.wikiOrigTransform || '';
+        const rotMatch  = origTransform.match(/rotate\(([^)]+)\)/);
+        const origAngle = rotMatch ? rotMatch[1] : '0deg';
+
+        // Viewport-Mitte und Startskalierung aus Zoom-In wiederverwenden
+        const vpCx       = parseFloat(container.dataset.wikiVpCx  || window.innerWidth  / 2);
+        const vpCy       = parseFloat(container.dataset.wikiVpCy  || window.innerHeight * 0.42);
+        const startScale = parseFloat(container.dataset.wikiZoomStartScale || 0.35);
+
+        // Platzhalter-Mitte = Viewport-Position der Originalstelle (dank margin-left:auto im Platzhalter korrekt)
+        const phRect = placeholder.getBoundingClientRect();
+        const phCx   = phRect.left + phRect.width  / 2;
+        const phCy   = phRect.top  + phRect.height / 2;
+
+        // Schliess-Transform: von Mitte (translate 0,0 scale 1) zurück zur Originalposition (startScale)
+        void container.offsetWidth;
+        container.style.transform = `translate(${(phCx - vpCx).toFixed(1)}px, ${(phCy - vpCy).toFixed(1)}px) scale(${startScale.toFixed(4)}) rotate(${origAngle})`;
+        container.style.boxShadow = '';
+        container.style.cursor    = '';
+
+        setTimeout(() => {
+            placeholder.parentNode.insertBefore(container, placeholder);
+            placeholder.remove();
+            // Outer-Container-Style vollständig wiederherstellen (width, position, margin, transform …)
+            container.style.cssText = container.dataset.wikiOrigCssText || '';
+            // Inner photo-img-Höhe wiederherstellen
+            const imgEl = container.querySelector('.photo-img');
+            if (imgEl) imgEl.style.height = container.dataset.wikiPhotoImgOrigHeight || '';
+        }, 430);
+
         const bd = document.getElementById('photo-backdrop');
         if (bd) { bd.style.opacity = '0'; setTimeout(() => bd.remove(), 400); }
         return;
     }
 
-    // Zoom-In nur wenn das Foto auf der aktiven Seite ist (Retro: nur front-note)
+    // Zoom-In nur auf aktiver Seite
     const page = container.closest('.mission-note-page');
-    if (page && !page.classList.contains('front-note')) {
-        return; // Event durchlassen → Seite wird umgeblättert
-    }
+    if (page && !page.classList.contains('front-note')) return;
 
     event.stopPropagation();
 
-    // ── ZOOM IN: Clone in <body> hängen – kein Overflow-Clipping durch Eltern ──
+    // ── ZOOM-IN ──
+    // Strategie: Element auf Ziel-Displaygröße setzen (scale 1 im Endzustand) statt
+    // kleines Element hochzuskalieren. background-size:cover rendert dann nativ in
+    // voller Zielauflösung → gestochen scharfes Bild, keine GPU-Upscale-Unschärfe.
     const rect = container.getBoundingClientRect();
-    const origTransform = container.style.transform || 'rotate(3deg)';
+    container.dataset.wikiOrigTransform = container.style.transform || '';
+    container.dataset.wikiOrigCssText   = container.style.cssText;
 
-    const clone = container.cloneNode(true);
-    clone.id = 'photo-zoom-clone';
-    clone.onclick = e => { e.stopPropagation(); toggleWikiPhoto(e, containerId); };
-    clone.style.position   = 'fixed';
-    clone.style.top        = rect.top    + 'px';
-    clone.style.left       = rect.left   + 'px';
-    clone.style.width      = rect.width  + 'px';
-    clone.style.height     = rect.height + 'px';
-    clone.style.margin     = '0';
-    clone.style.float      = 'none';
-    clone.style.transform  = origTransform;
-    clone.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s';
-    clone.style.zIndex     = '10000';
-    clone.style.cursor     = 'zoom-out';
-    document.body.appendChild(clone);
+    const noteRef = container.closest('.notes-stack') || container.closest('.mission-note-page');
+    const noteW   = noteRef ? noteRef.getBoundingClientRect().width : window.innerWidth * 0.7;
 
-    container.style.visibility = 'hidden'; // hält Platz im Layout
+    const isMobile   = window.innerWidth <= 767;
+    const targetW    = isMobile ? (window.innerWidth - 24) : (noteW * 1.2);
+    const scaleRatio = targetW / rect.width;
 
-    // Hintergrund-Verdunkelung (fixed, überdeckt alles)
+    // Photo-img proportional skalieren, damit background-size:cover die Zielgröße füllt
+    const imgEl = container.querySelector('.photo-img');
+    container.dataset.wikiPhotoImgOrigHeight = imgEl ? (imgEl.style.height || '') : '';
+    const origPhotoH = imgEl
+        ? (parseFloat(imgEl.style.height) || parseFloat(window.getComputedStyle(imgEl).height) || 100)
+        : 100;
+    const newPhotoH = Math.round(origPhotoH * scaleRatio);
+    if (imgEl) imgEl.style.height = newPhotoH + 'px';
+
+    // Platzhalter mit korrektem margin-left → Zoom-Out landet exakt an Originalposition
+    const mlMatch = (container.dataset.wikiOrigCssText || '').match(/margin-left\s*:\s*([^;]+)/i);
+    const origML  = mlMatch ? mlMatch[1].trim() : 'auto';
+    const ph = document.createElement('div');
+    ph.id = 'photo-zoom-placeholder';
+    ph.style.cssText = `width:${rect.width}px;height:${rect.height}px;flex-shrink:0;margin-left:${origML};visibility:hidden;`;
+    container.parentNode.insertBefore(ph, container);
+
+    // Gesamthöhe analytisch berechnen (padding-top 6 + padding-bottom 22 + border 2 = 30px)
+    const actualTargetH = newPhotoH + 30;
+
+    // Viewport-Mitte für Zoom (wird für Zoom-Out gespeichert)
+    const vpCx = window.innerWidth  / 2;
+    const vpCy = window.innerHeight * 0.42;
+    container.dataset.wikiVpCx = vpCx;
+    container.dataset.wikiVpCy = vpCy;
+
+    const startScale = rect.width / targetW;   // < 1 → lässt Element in Originalgröße erscheinen
+    container.dataset.wikiZoomStartScale = startScale.toFixed(6);
+
+    // Element nach <body> verschieben – kein overflow-clipping durch Ancestors
+    document.body.appendChild(container);
+
+    // Transition unterdrücken während Setup (überschreibt das !important der CSS-Klasse)
+    container.classList.add('wiki-zoom-setup');
+
+    container.style.position = 'fixed';
+    container.style.width    = Math.round(targetW) + 'px';
+    container.style.top      = Math.round(vpCy - actualTargetH / 2) + 'px';
+    container.style.left     = Math.round(vpCx - targetW        / 2) + 'px';
+    container.style.margin   = '0';
+    container.style.float    = 'none';
+    container.style.zIndex   = '10000';
+    container.style.cursor   = 'zoom-out';
+
+    // Starttransform: Element erscheint an Originalposition in Originalgröße
+    const origCx = rect.left + rect.width  / 2;
+    const origCy = rect.top  + rect.height / 2;
+    const rotIn  = (container.dataset.wikiOrigTransform || '').match(/rotate\(([^)]+)\)/);
+    const startAngle = rotIn ? rotIn[1] : '3deg';
+    container.style.transform = `translate(${(origCx - vpCx).toFixed(1)}px, ${(origCy - vpCy).toFixed(1)}px) scale(${startScale.toFixed(4)}) rotate(${startAngle})`;
+
+    // Startzustand einfrieren, dann Transition wieder aktivieren
+    void container.offsetWidth;
+    container.classList.remove('wiki-zoom-setup');
+
+    // Hintergrund-Verdunkelung
     const bd = document.createElement('div');
     bd.id = 'photo-backdrop';
     bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;opacity:0;transition:opacity 0.4s;';
@@ -230,24 +294,10 @@ function toggleWikiPhoto(event, containerId) {
     bd.style.opacity = '1';
     bd.onclick = e => { e.stopPropagation(); toggleWikiPhoto(e, containerId); };
 
-    void clone.offsetWidth; // Reflow: Transition startet vom Ausgangszustand
-
-    // Zielgröße: PC/iPad = 120% des Hauptcontainers, iPhone = Bildschirmbreite − 24px
-    const isMobile = window.innerWidth <= 767;
-    const polW    = rect.width;
-    const noteRef = container.closest('.notes-stack') || container.closest('.mission-note-page');
-    const noteW   = noteRef ? noteRef.getBoundingClientRect().width : window.innerWidth * 0.7;
-    const targetW = isMobile ? (window.innerWidth - 24) : (noteW * 1.2);
-    const scale   = targetW / polW;
-
-    // Viewport-Mitte als Ziel (leicht über Bildschirmmitte damit alles sichtbar)
-    const vpCx  = window.innerWidth  / 2;
-    const vpCy  = window.innerHeight * 0.42;
-    const polCx = rect.left + polW        / 2;
-    const polCy = rect.top  + rect.height / 2;
-
-    clone.style.transform = `translate(${(vpCx - polCx).toFixed(1)}px, ${(vpCy - polCy).toFixed(1)}px) scale(${scale.toFixed(3)}) rotate(2deg)`;
-    clone.style.boxShadow = '5px 20px 50px rgba(0, 0, 0, 0.8)';
+    // Zielzustand: Element in voller Zielgröße, zentriert im Viewport – kein GPU-Upscaling
+    void container.offsetWidth;
+    container.style.transform = `translate(0px, 0px) scale(1) rotate(2deg)`;
+    container.style.boxShadow = '5px 20px 50px rgba(0, 0, 0, 0.8)';
 }
 
 function updateDynamicColors() {
@@ -520,6 +570,7 @@ function saveMissionState() {
         currentDestFreq: currentDestFreq,
         freqCache: freqCache,
         vpAltWaypoints: typeof vpAltWaypoints !== 'undefined' ? vpAltWaypoints : [],
+        vpSegmentAlts: typeof vpSegmentAlts !== 'undefined' ? vpSegmentAlts : [],
         vpElevationData: typeof vpElevationData !== 'undefined' ? vpElevationData : null
     };
     localStorage.setItem('ga_active_mission', JSON.stringify(state));
@@ -570,7 +621,15 @@ async function restoreMissionState(state) {
     currentDepFreq = state.currentDepFreq || ""; currentDestFreq = state.currentDestFreq || "";
     freqCache = state.freqCache || {};
     vpAltWaypoints = state.vpAltWaypoints || [];
+    vpSegmentAlts  = state.vpSegmentAlts  || [];
     vpElevationData = state.vpElevationData || null;
+    // Routenwechsel-Detektor vorbelegen – verhindert, dass vpAltWaypoints nach dem Restore
+    // sofort wieder gelöscht werden (window._lastVpRouteKey ist nach Reload undefined)
+    if (state.routeWaypoints && state.routeWaypoints.length > 0) {
+        window._lastVpRouteKey = state.routeWaypoints.map(p =>
+            `${(p.lat || 0).toFixed(4)},${((p.lng || p.lon) || 0).toFixed(4)}`
+        ).join('|');
+    }
 
     // Fallback: Wenn Frequenzen im Briefing fehlen (z.B. alte Pinnwand-Daten), neu laden
     if (!state.wikiDepFreqText && currentStartICAO) {
@@ -1097,7 +1156,7 @@ async function fetchAreaDescription(lat, lon, elementId, exactTitle = null, icao
         }
 
         if (titleToFetch) {
-            const extRes = await fetch(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro=true&explaintext=true&exsentences=4&pithumbsize=400&titles=${encodeURIComponent(titleToFetch)}&format=json&origin=*`);
+            const extRes = await fetch(`https://de.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro=true&explaintext=true&exsentences=4&pithumbsize=1200&titles=${encodeURIComponent(titleToFetch)}&format=json&origin=*`);
             const extData = await extRes.json();
 
             if (extData?.query?.pages) {
@@ -2820,6 +2879,7 @@ function pinCurrentFlight() {
         currentDestICAO: currentDestICAO, currentSName: currentSName, currentDName: currentDName,
         currentDepFreq: currentDepFreq, currentDestFreq: currentDestFreq, freqCache: freqCache,
         vpAltWaypoints: typeof vpAltWaypoints !== 'undefined' ? vpAltWaypoints : [],
+        vpSegmentAlts: typeof vpSegmentAlts !== 'undefined' ? vpSegmentAlts : [],
         vpElevationData: typeof vpElevationData !== 'undefined' ? vpElevationData : null
     };
 
@@ -4449,7 +4509,7 @@ function triggerVerticalProfileUpdate() {
             vpHighResData = null;
             vpZoomLevel = 100;
             const zd = document.getElementById('vpZoomDisplay');
-            if (zd) zd.textContent = '100%';
+            if (zd) zd.textContent = '0%';
             window._lastVpRouteKey = cacheKey;
         }
 
@@ -5002,7 +5062,8 @@ function syncAltFromMap(val) {
 
 function vpZoom(delta) {
     vpZoomLevel = Math.max(10, Math.min(100, vpZoomLevel + delta));
-    document.getElementById('vpZoomDisplay').textContent = vpZoomLevel + '%';
+    // Anzeige invertiert: 0 % = rausgezoomt (vpZoomLevel 100), 100 % = maximal rein (vpZoomLevel 10)
+    document.getElementById('vpZoomDisplay').textContent = Math.round((100 - vpZoomLevel) / 90 * 100) + '%';
 
     // If zoomed in, fetch higher resolution data
     if (vpZoomLevel < 100 && routeWaypoints && routeWaypoints.length >= 2) {
@@ -5796,6 +5857,7 @@ function initAltWaypoints() {
 
     function vpHandleDragEnd() {
         if (vpDraggingWP >= 0 || vpDraggingSegment || vpDraggingMagenta) {
+            const needsSave = vpDraggingWP >= 0 || !!vpDraggingSegment; // Magenta = nur Position, keine Höhendaten
             if (vpDraggingWP >= 0) {
                 vpAltWaypoints.sort((a, b) => a.distNM - b.distNM);
             }
@@ -5806,6 +5868,7 @@ function initAltWaypoints() {
             renderMapProfile();
             if (typeof renderVerticalProfile === 'function') renderVerticalProfile('verticalProfileCanvas');
             if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
+            if (needsSave) setTimeout(() => saveMissionState(), 200);
         }
     }
 
@@ -5823,7 +5886,7 @@ function initAltWaypoints() {
         const m = vpGetCanvasMetrics();
         if (!m) return;
         const { mx, my } = vpClientToCanvas(e.clientX, e.clientY, m);
-        vpHandleDoubleHit(mx, my, m);
+        if (vpHandleDoubleHit(mx, my, m)) setTimeout(() => saveMissionState(), 200);
     });
 
     // === CLICK: no more single-click creation ===
@@ -5902,7 +5965,7 @@ function initAltWaypoints() {
         const now = Date.now();
         if (now - lastTapTime < 300) {
             e.preventDefault();
-            vpHandleDoubleHit(mx, my, m);
+            if (vpHandleDoubleHit(mx, my, m)) setTimeout(() => saveMissionState(), 200);
             lastTapTime = 0;
             return;
         }

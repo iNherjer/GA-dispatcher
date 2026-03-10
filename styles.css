@@ -3633,6 +3633,11 @@ body.theme-navcom .kln90b-module .radio-label {
     cursor: zoom-out !important;
 }
 
+/* Transition während des Zoom-Setup unterdrücken (verhindert unerwünschte Zwischen-Animation) */
+.briefing-photo-attachment.wiki-zoom-setup {
+    transition: none !important;
+}
+
 /* ==========================================================================
    17. DISCORD LINK
    ========================================================================== */
