@@ -266,7 +266,9 @@ function toggleWikiPhoto(event, containerId) {
     container.classList.add('wiki-zoom-setup');
 
     container.style.position = 'fixed';
-    container.style.width    = Math.round(targetW) + 'px';
+    // Breite mit !important setzen, damit das mobile CSS (!important: 100px) überschrieben wird.
+    // Inline-!important schlägt Stylesheet-!important in der CSS-Kaskade.
+    container.style.setProperty('width', Math.round(targetW) + 'px', 'important');
     container.style.top      = Math.round(vpCy - actualTargetH / 2) + 'px';
     container.style.left     = Math.round(vpCx - targetW        / 2) + 'px';
     container.style.margin   = '0';
@@ -470,6 +472,11 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
 }
 
 window.onload = () => {
+    // iOS 10+ ignoriert user-scalable=no im Viewport-Tag.
+    // Pinch-to-Zoom auf dem gesamten Dokument per JS sperren (passive:false erforderlich).
+    document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    document.addEventListener('touchmove',  e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
     const savedTheme = localStorage.getItem('ga_theme') || 'retro';
     setTheme(savedTheme);
     applySavedPanelTheme();
