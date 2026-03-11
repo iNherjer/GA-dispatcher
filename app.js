@@ -5527,7 +5527,6 @@ computeFlightProfile = function (elevationData, cruiseAltFt, climbRateFpm, desce
    ========================================================= */
 const SYNC_URL = 'https://ga-proxy.einherjer.workers.dev/api/sync/';
 let localSyncTime = localStorage.getItem('ga_sync_time') ? parseInt(localStorage.getItem('ga_sync_time')) : 0;
-let syncSaveTimeout = null;
 let lastSyncedPayloadStr = "";
 function saveSyncToggle() {
     const t = document.getElementById('syncToggle');
@@ -5593,16 +5592,14 @@ async function triggerCloudSave(immediate = false) {
     const id = getSyncId();
     const t = document.getElementById('syncToggle');
     if (!id) return;
+    // SOFT-SYNC FIX: Normale Spielaktionen (wie Zettel bewegen) rufen dies ohne Parameter auf.
+    // Diese blockieren wir jetzt hart. Ein Upload findet NUR noch beim Schließen (true)
+    // oder durch manuelle Buttons ('manual') statt!
+    if (!immediate) return;
     if (immediate !== 'manual' && t && !t.checked) return;
     if (immediate === 'manual') {
         if (!confirm("⬆️ CLOUD UPLOAD\nMöchtest du deinen aktuellen, lokalen Stand hochladen und das bisherige Cloud-Backup überschreiben?")) return;
         setNavComLed('navcomSaveBtn', 'syncing');
-    }
-    if (!immediate) {
-        updateSyncStatus("Warte auf Abschluss...");
-        if (syncSaveTimeout) clearTimeout(syncSaveTimeout);
-        syncSaveTimeout = setTimeout(() => triggerCloudSave(true), 25000);
-        return;
     }
     localSyncTime = Date.now();
     const payloadToCompare = {
