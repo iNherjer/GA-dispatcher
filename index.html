@@ -143,8 +143,8 @@
                     <div class="audio-btn" id="btnAC-AERO" onclick="applyNavComPreset(220, 25, 6, 'AERO', this)">AERO<div class="audio-led"></div></div>
                     <div class="audio-btn" id="btnToggleAI" onclick="toggleNavComAI(this)">KI Mode<div class="audio-led"></div></div>
                     
-                    <div class="audio-btn" onclick="exportMission()">SAVE<div class="audio-led"></div></div>
-                    <div class="audio-btn" onclick="importMission()">LOAD<div class="audio-led"></div></div>
+                    <div class="audio-btn" id="navcomSaveBtn" onclick="triggerCloudSave('manual')">☁️ SAVE<div class="audio-led"></div></div>
+                    <div class="audio-btn" id="navcomLoadBtn" onclick="forceSyncLoad()">☁️ LOAD<div class="audio-led"></div></div>
                     <div class="audio-btn" id="btnToggleGPS" onclick="toggleGPSModule(this)">GPS<div class="audio-led"></div></div>
                 </div>
             </div>
@@ -341,7 +341,7 @@
     
     <div style="display:flex; gap: 10px; margin-top: 15px; margin-bottom: 5px;">
         <button class="btn-preset" style="flex:1; background-color: #444; color: #fff; border-color: #222;" onclick="toggleMapTable()">🗺️ Kartentisch</button>
-        <button class="btn-preset" style="flex:1; background-color: #444; color: #fff; border-color: #222;" onclick="togglePinboard()">📋 Pinnwand</button>
+        <button class="btn-preset" style="flex:1; background-color: #444; color: #fff; border-color: #222; position:relative;" onclick="togglePinboard()">📋 Pinnwand <span id="mainPinboardBadge" style="display:none; background:#ff4444; color:#fff; border-radius:50%; padding:1px 5px; font-size:10px; margin-left:4px; transform:translateY(-2px);">!</span></button>
     </div>
 
 <div class="briefing" id="briefingBox">
@@ -543,10 +543,55 @@
                 </label>
             </div>
         </div>
-        <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()">
+        <input type="text" style="display:none;" aria-hidden="true" autocomplete="username">
+        <input type="password" id="apiKeyInput" placeholder="Optional. Leer = Lokale Datenbank" onchange="saveApiKey()" autocomplete="new-password">
         <div class="api-hint">
             <strong>Tipp:</strong> Mehr Abwechslung? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API-Key</a> benutzen um dynamische Missionen generieren zu lassen. <br>
             <span style="opacity: 0.7;">🔒 Sicher: Der Key wird ausschließlich lokal in deinem Browser gespeichert.</span>
+        </div>
+    </div>
+
+    <div class="api-settings" style="margin-top: 15px; padding-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="margin: 0;">☁️ Cloud Sync (Pilot-ID)</label>
+                <label class="switch" style="transform: scale(0.6); margin: 0; transform-origin: left;">
+                    <input type="checkbox" id="syncToggle" onchange="saveSyncToggle()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <span id="syncTrafficIndicator" style="font-size: 13px; margin-right: 6px; opacity: 0; transition: opacity 0.3s;"></span>
+                <span id="syncStatus" style="font-size: 10px; color: #888;">Offline</span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="syncIdInput" placeholder="z.B. Echo-Bravo-123" style="flex: 1; margin: 0; font-family: monospace;" onchange="saveSyncId()" autocomplete="off" spellcheck="false" data-1p-ignore>
+            <button class="btn-preset" style="flex: 0 0 auto; width: 40px; margin: 0; height: 42px;" onclick="generateSyncId()" title="Neue ID generieren">🎲</button>
+            <button class="btn-preset" style="flex: 0 0 auto; margin: 0; height: 42px; background: #333; color: #4da6ff;" onclick="triggerCloudSave('manual')" title="Daten manuell hochladen">☁️ Push</button>
+            <button class="btn-preset" style="flex: 0 0 auto; margin: 0; height: 42px; background: #333; color: #f2c12e;" onclick="forceSyncLoad()">📥 Pull</button>
+        </div>
+        <div class="api-hint">
+            Sichere Flüge &amp; Pinnwand geräteübergreifend. ID eingeben und laden. Danach synct die App automatisch (Schalter = An).
+        </div>
+    </div>
+
+    <div class="api-settings" style="margin-top: 15px; padding-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="margin: 0;">👥 Crew Board (Multiplayer)</label>
+            <span id="groupStatus" style="font-size: 10px; color: #888;">Nicht verbunden</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <input type="text" id="groupNameInput" placeholder="Crew-Code (z.B. EDTK)" style="flex: 2; margin: 0; font-family: monospace;" autocomplete="off" spellcheck="false">
+            <input type="text" id="groupNickInput" placeholder="Rufname" style="flex: 2; margin: 0; font-family: monospace;" autocomplete="off" spellcheck="false">
+            <input type="text" id="groupPinInput" placeholder="PIN (Opt.)" maxlength="4" style="flex: 1; margin: 0; font-family: monospace; text-align: center;" autocomplete="off" spellcheck="false" data-1p-ignore>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-preset" style="flex: 1; margin: 0; height: 42px; background: #333; color: #4da6ff;" onclick="joinGroup()">🤝 Beitreten / Update</button>
+            <button class="btn-preset" style="flex: 1; margin: 0; height: 42px; background: #332222; color: #ff4444; border-color: #552222;" onclick="leaveGroup()">🚪 Verlassen</button>
+        </div>
+        <div class="api-hint">
+            Teile Flüge und Notizen mit bis zu 10 Freunden in Echtzeit.
         </div>
     </div>
 
@@ -561,7 +606,7 @@
 </div>
 
 <div class="version-info">
-    Version 95.0 (Dual-AI Fuel Edition)<br>
+    GA Dispatcher <span id="swVersionDisplay" style="color: var(--blue); font-weight: bold;">(Lade Version...)</span><br>
     <a href="https://discord.gg/xzXQXey2N8" target="_blank" class="discord-link" title="Komm auf unseren Discord für Feedback & Ideen!">
         <svg viewBox="0 0 127.14 96.36" width="14" height="14" style="fill: currentColor; vertical-align: middle; margin-right: 4px; margin-bottom: 2px;">
             <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
@@ -572,7 +617,13 @@
 
 <div id="pinboardOverlay" class="pinboard-overlay">
     <div class="pinboard-header">
-        <span style="color: #fff; font-weight: bold; font-family: monospace;">AIRCRAFT STATUS LOG</span>
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <span style="color: #fff; font-weight: bold; font-family: monospace;">AIRCRAFT STATUS LOG</span>
+            <div class="pb-tabs">
+                <button class="pb-tab active" id="tabPrivate" onclick="switchPinboardMode('private')">👤 Privat</button>
+                <button class="pb-tab" id="tabGroup" onclick="switchPinboardMode('group')">👥 Crew <span id="groupBadge" style="display:none; background:#ff4444; color:#fff; border-radius:50%; padding:1px 5px; font-size:10px; margin-left:4px; transform:translateY(-1px);">!</span></button>
+            </div>
+        </div>
         <div>
             <button class="pb-btn" style="background:#4da6ff; color:#fff; font-weight:bold; border:1px solid #222;" onclick="toggleTutorialNotes()">💡 Tipps an/aus</button>
             <button class="pb-btn" style="background:#f2c12e; color:#111; font-weight:bold; border:1px solid #222;" onclick="importMission()">📥 Code laden</button>
@@ -635,12 +686,23 @@
 <script src="missions.js"></script>
 <script src="app.js"></script>
 <script>
-    // Service Worker
+    // Service Worker mit Auto-Reload bei Updates
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('[PWA] Service Worker registriert:', reg.scope))
-                .catch(err => console.warn('[PWA] SW-Registrierung fehlgeschlagen:', err));
+            navigator.serviceWorker.register('./sw.js').then(reg => {
+                console.log('[PWA] Service Worker registriert:', reg.scope);
+
+                // Prüft auf Updates, wenn die Seite aus dem Hintergrund geholt wird
+                reg.update();
+            }).catch(err => console.warn('[PWA] SW-Registrierung fehlgeschlagen:', err));
+            // Wenn ein neuer Service Worker die Kontrolle übernimmt, Seite sofort neu laden!
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
         });
     }
 
@@ -695,6 +757,18 @@
         document.body.appendChild(btn);
     });
 </script>
+
+<div id="pinModalOverlay" class="pin-modal-overlay">
+    <div class="pin-modal-box">
+        <h3 style="margin-top:0; color: #fff; margin-bottom: 8px; font-family: 'Arial', sans-serif;">📌 Flug anpinnen</h3>
+        <p style="color: #aaa; font-size: 13px; margin:0 0 20px 0;">Wohin möchtest du diesen Flug heften?</p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn-main" style="padding:12px; font-size:14px; text-transform:none;" onclick="executePin('private')">👤 An mein privates Brett</button>
+            <button class="btn-main" style="padding:12px; font-size:14px; text-transform:none; background:linear-gradient(to bottom, #4da6ff, #1a73e8);" id="btnPinGroup" onclick="executePin('group')">👥 An das Crew-Brett</button>
+            <button class="btn-preset" style="padding:12px; margin-top:5px;" onclick="closePinModal()">❌ Abbrechen</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

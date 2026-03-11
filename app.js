@@ -527,6 +527,28 @@ window.onload = () => {
         const btnAI = document.getElementById('btnToggleAI');
         if (btnAI) btnAI.classList.add('active');
     }
+
+    const savedSyncId = localStorage.getItem('ga_sync_id');
+    if (savedSyncId) {
+        const syncInput = document.getElementById('syncIdInput');
+        if(syncInput) syncInput.value = savedSyncId;
+    }
+
+    // Sync Toggle Status laden (Standardmäßig auf AUS / false)
+    const syncTggl = document.getElementById('syncToggle');
+    if (syncTggl) { syncTggl.checked = (localStorage.getItem('ga_sync_enabled') === 'true'); }
+
+    // Lade Gruppen-Settings
+    const gName = localStorage.getItem('ga_group_name');
+    const gNick = localStorage.getItem('ga_group_nick');
+    if (gName && gNick) {
+        const inpN = document.getElementById('groupNameInput');
+        const inpU = document.getElementById('groupNickInput');
+        const stat = document.getElementById('groupStatus');
+        if (inpN) inpN.value = gName;
+        if (inpU) inpU.value = gNick;
+        if (stat) { stat.innerText = "Verbunden als " + gNick; stat.style.color = "var(--green)"; }
+    }
 };
 
 function saveApiKey() { localStorage.setItem('ga_gemini_key', document.getElementById('apiKeyInput').value.trim()); }
@@ -581,6 +603,7 @@ function saveMissionState() {
         vpElevationData: typeof vpElevationData !== 'undefined' ? vpElevationData : null
     };
     localStorage.setItem('ga_active_mission', JSON.stringify(state));
+    triggerCloudSave();
 }
 
 async function restoreMissionState(state) {
@@ -690,21 +713,6 @@ async function restoreMissionState(state) {
     const destP = routeWaypoints && routeWaypoints.length > 1 ? routeWaypoints[routeWaypoints.length - 1] : null;
     loadMetarWidget(state.isPOI ? null : currentDestICAO, 'metarContainerDest', destP?.lat, destP?.lng || destP?.lon);
 
-    if (routeWaypoints && routeWaypoints.length > 0) {
-        const depP = routeWaypoints[0];
-        renderTileCanvas(depP.lat, depP.lng || depP.lon, 13, 900, 600).then(url => {
-            const img = document.getElementById('uiDepDetailMap');
-            if (img) { img.src = url; img.style.display = 'block'; }
-        });
-
-        if (routeWaypoints.length > 1) {
-            const destP = routeWaypoints[routeWaypoints.length - 1];
-            renderTileCanvas(destP.lat, destP.lng || destP.lon, 13, 900, 600).then(url => {
-                const img = document.getElementById('uiDestDetailMap');
-                if (img) { img.src = url; img.style.display = 'block'; }
-            });
-        }
-    }
 }
 
 function resetApp() {
@@ -2235,10 +2243,6 @@ async function generateMission() {
         currentDestFreq = "";
 
         fetchAirportFreq(currentStartICAO, 'wikiDepFreqText', 'dep');
-        renderTileCanvas(start.lat, start.lon, 13, 900, 600).then(url => {
-            const img = document.getElementById('uiDepDetailMap');
-            if (img) { img.src = url; img.style.display = 'block'; }
-        });
 
         // --- NEU: METAR Start laden ---
         loadMetarWidget(currentStartICAO, 'metarContainerDep', start.lat, start.lon);
@@ -2249,11 +2253,6 @@ async function generateMission() {
             const df = document.getElementById('wikiDestFreqText');
             if (df) df.innerHTML = '';
         }
-
-        renderTileCanvas(dest.lat, dest.lon, 13, 900, 600).then(url => {
-            const img = document.getElementById('uiDestDetailMap');
-            if (img) { img.src = url; img.style.display = 'block'; }
-        });
 
         // --- NEU: METAR Ziel laden (nur wenn kein POI) ---
         loadMetarWidget(isPOI ? null : currentDestICAO, 'metarContainerDest', dest.lat, dest.lon);
@@ -2762,6 +2761,7 @@ function logCurrentFlight() {
     if (startLocRadioEl) startLocRadioEl.value = newStart;
     if (destLocRadioEl) destLocRadioEl.value = '';
     renderLog(); alert(`Flug geloggt! Du bist in ${currentMissionData.dest}.`);
+    triggerCloudSave();
 }
 
 function renderLog() {
@@ -2777,44 +2777,195 @@ function renderLog() {
         container.appendChild(div);
     });
 }
-function clearLog() { if (confirm("Gesamtes Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); } }
+function clearLog() { if (confirm("Gesamtes Logbuch löschen?")) { localStorage.removeItem('ga_logbook'); localStorage.removeItem('last_icao_dest'); renderLog(); triggerCloudSave(); } }
 
 /* =========================================================
-   10. HANGAR PINNWAND (LOKAL & TUTORIAL & SKALIERUNG)
+   10. HANGAR PINNWAND & CREW BOARD MULTIPLAYER
    ========================================================= */
+let currentBoardMode = 'private'; 
+let pendingPinNote = null;
+let groupDataCache = { members: [], notes: [] };
 const tutorialNotes = [
     { id: 101, text: "👋 WILLKOMMEN!\n\nZiehe diese Zettel umher, bearbeite sie (✏️) oder lösch sie (✖).", x: 4, y: 6, rot: -2 },
     { id: 102, text: "📻 NAVCOM THEME\n\nZieh mit gedrückter Maus an den runden Drehknöpfen, um TAS und GPH schnell einzustellen!", x: 28, y: 10, rot: 3 },
     { id: 103, text: "🗺️ KARTENTISCH\n\nKlick auf die rote Route für neue Wegpunkte. Nutze das ⛶ Icon für den echten Vollbildmodus!", x: 52, y: 5, rot: -1 },
-    { id: 104, text: "🔗 MULTIPLAYER\n\nKlick im Briefing auf das Link-Symbol, um den Code für deine Freunde zu kopieren (Import hier am Brett).", x: 76, y: 12, rot: 4 },
+    { id: 104, text: "🔗 MULTIPLAYER\n\nTritt unten in den Settings einer Crew bei, um Zettel und Flüge in Echtzeit zu teilen!", x: 76, y: 12, rot: 4 },
     { id: 105, text: "🌤️ WETTER & AIP\n\nIm Briefing (oder auf dem GPS) findest du Direkt-Links zu aktuellen METARs und Anflugkarten.", x: 6, y: 45, rot: 1 },
     { id: 106, text: "🎨 ANALOG DESIGN\n\nKlicke im Retro-Modus auf die silberne SCHRAUBE oben links, um die Panel-Lackierung zu wechseln!", x: 30, y: 50, rot: -3 },
     { id: 107, text: "🤖 KI DISPATCHER\n\nTrag unten deinen Gemini API-Key ein für kreative Missions-Storys mit Passagieren & Fracht.", x: 55, y: 42, rot: 2 },
     { id: 108, text: "📌 FLÜGE MERKEN\n\nPinne coole Routen an dieses Brett. Geflogen? Logge sie unten, um deinen Startplatz zu versetzen!", x: 78, y: 46, rot: -2 }
 ];
+function getGroupName() { return localStorage.getItem('ga_group_name') || ""; }
+function getGroupNick() { return localStorage.getItem('ga_group_nick') || ""; }
+function getGroupPin() { return localStorage.getItem('ga_group_pin') || null; }
+function hashPin(str) {
+    let h = 0;
+    for(let i=0; i<str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+    return h.toString();
+}
+async function joinGroup() {
+    const gName = document.getElementById('groupNameInput').value.trim().toUpperCase();
+    const gNick = document.getElementById('groupNickInput').value.trim();
+    const gPin = document.getElementById('groupPinInput').value.trim();
+    if(!gName || !gNick) { alert("Bitte Gruppen-Code und Rufname eingeben!"); return; }
+    document.getElementById('groupStatus').innerText = "Prüfe Zugang...";
 
+    try {
+        const res = await fetch(SYNC_URL + "GROUP_" + gName);
+        let data = { members: [], kicked: [] };
+        if (res.ok) data = await res.json();
+        // 1. Kick-Prüfung
+        if (data.kicked && data.kicked.includes(gNick)) {
+            alert("Dieser Rufname wurde aus der Crew gebannt!");
+            document.getElementById('groupStatus').innerText = "Nicht verbunden";
+            return;
+        }
+        // 2. PIN-Prüfung
+        const existingUser = (data.members || []).find(m => m.nick === gNick);
+        const pinHash = gPin ? hashPin(gPin) : null;
+        if (existingUser && existingUser.pin) {
+            if (existingUser.pin !== pinHash) {
+                alert("Falscher PIN für diesen Rufnamen!");
+                document.getElementById('groupStatus').innerText = "Nicht verbunden";
+                return;
+            }
+        }
+        // Zugang gewährt
+        localStorage.setItem('ga_group_name', gName);
+        localStorage.setItem('ga_group_nick', gNick);
+        if (pinHash) localStorage.setItem('ga_group_pin', pinHash); else localStorage.removeItem('ga_group_pin');
+        document.getElementById('groupStatus').innerText = "Verbunden als " + gNick;
+        document.getElementById('groupStatus').style.color = "var(--green)";
+
+        forceGroupSync();
+        triggerCloudSave(true);
+        alert("🤝 Du bist der Crew '" + gName + "' beigetreten!");
+    } catch(e) {
+        alert("Verbindungsfehler.");
+        document.getElementById('groupStatus').innerText = "Offline";
+    }
+}
+async function removeSelfFromGroup(gName, gNick) {
+    try {
+        const res = await fetch(SYNC_URL + "GROUP_" + gName);
+        if (!res.ok) return;
+        let data = await res.json();
+        if (data.members) {
+            const me = data.members.find(m => m.nick === gNick);
+            data.members = data.members.filter(m => m.nick !== gNick);
+
+            // Admin-Rechte weitergeben, falls Admin geht
+            if (me && me.isAdmin && data.members.length > 0) {
+                data.members.sort((a,b) => a.lastSeen - b.lastSeen);
+                data.members[0].isAdmin = true;
+            }
+
+            data.lastModified = Date.now();
+            await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(data), keepalive: true });
+        }
+    } catch(e) {}
+}
+function leaveGroup(isBanned = false) {
+    const oldName = getGroupName();
+    const oldNick = getGroupNick();
+    if (oldName && oldNick && !isBanned) {
+        removeSelfFromGroup(oldName, oldNick);
+    }
+    localStorage.removeItem('ga_group_name');
+    localStorage.removeItem('ga_group_nick');
+    localStorage.removeItem('ga_group_pin');
+    document.getElementById('groupNameInput').value = "";
+    document.getElementById('groupStatus').innerText = "Nicht verbunden";
+    document.getElementById('groupStatus').style.color = "#888";
+    if(currentBoardMode === 'group') switchPinboardMode('private');
+    triggerCloudSave(true);
+    if(!isBanned) alert("🚪 Crew verlassen.");
+}
+async function kickGroupUser(targetNick) {
+    if(!confirm(`Möchtest du ${targetNick} wirklich aus der Crew kicken?`)) return;
+    const gName = getGroupName();
+    try {
+        const res = await fetch(SYNC_URL + "GROUP_" + gName);
+        if (!res.ok) return;
+        let data = await res.json();
+        data.members = (data.members || []).filter(m => m.nick !== targetNick);
+        data.kicked = data.kicked || [];
+        data.kicked.push(targetNick);
+        data.lastModified = Date.now();
+        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(data) });
+        forceGroupSync();
+    } catch(e) {}
+}
+function updateGroupUIFromSync(gName, gNick) {
+    if (gName && gNick) {
+        localStorage.setItem('ga_group_name', gName);
+        localStorage.setItem('ga_group_nick', gNick);
+        const inpN = document.getElementById('groupNameInput');
+        const inpU = document.getElementById('groupNickInput');
+        const stat = document.getElementById('groupStatus');
+        if (inpN) inpN.value = gName;
+        if (inpU) inpU.value = gNick;
+        if (stat) { stat.innerText = "Verbunden als " + gNick; stat.style.color = "var(--green)"; }
+        silentGroupSync();
+    } else {
+        leaveGroup(true); // Lautlos aufräumen
+    }
+}
+function setNavComLed(btnId, state) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.classList.remove('led-syncing', 'led-success', 'led-error');
+    if (state !== 'off') btn.classList.add(`led-${state}`);
+}
+function updateGroupBadgeUI() {
+    let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
+    let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
+
+    // GHOST BUSTER: Wenn ein Zettel im lokalen Müll liegt, kann er nicht "Neu" sein!
+    let initialLen = newBadges.length;
+    newBadges = newBadges.filter(id => !hidden.includes(id));
+    if (newBadges.length !== initialLen) {
+        localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
+    }
+    const mainBadge = document.getElementById('mainPinboardBadge');
+    const tabBadge = document.getElementById('groupBadge');
+    const hasNew = newBadges.length > 0;
+
+    if (mainBadge) mainBadge.style.display = hasNew ? 'inline-block' : 'none';
+    if (tabBadge && currentBoardMode !== 'group') {
+        tabBadge.style.display = hasNew ? 'inline-block' : 'none';
+    } else if (tabBadge && currentBoardMode === 'group') {
+        tabBadge.style.display = 'none';
+    }
+}
+function switchPinboardMode(mode) {
+    if(mode === 'group' && !getGroupName()) {
+        alert("Bitte zuerst unten in den Einstellungen einer Crew beitreten!"); return;
+    }
+    currentBoardMode = mode;
+    document.getElementById('tabPrivate').classList.toggle('active', mode === 'private');
+    document.getElementById('tabGroup').classList.toggle('active', mode === 'group');
+    updateGroupBadgeUI();
+    renderNotes();
+}
 function toggleTutorialNotes() {
+    if (currentBoardMode === 'group') { alert("Tipps können nur auf dem privaten Brett geladen werden."); return; }
     let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
     const hasTutorial = notes.some(n => n.id >= 101 && n.id <= 108);
-
-    if (hasTutorial) {
-        notes = notes.filter(n => n.id < 101 || n.id > 108);
-    } else {
-        tutorialNotes.forEach(tn => {
-            if (!notes.find(n => n.id === tn.id)) notes.push(tn);
-        });
-    }
+    if (hasTutorial) notes = notes.filter(n => n.id < 101 || n.id > 108);
+    else tutorialNotes.forEach(tn => { if (!notes.find(n => n.id === tn.id)) notes.push(tn); });
     localStorage.setItem('ga_pinboard', JSON.stringify(notes));
     renderNotes();
 }
-
 function clearPinboard() {
-    if (confirm("🗑️ Möchtest du wirklich ALLE Zettel von der Pinnwand in den Müll werfen?")) {
+    if (currentBoardMode === 'group') {
+        alert("Du kannst nicht das gesamte Crew-Brett löschen. Bitte lösche deine Zettel einzeln."); return;
+    }
+    if (confirm("🗑️ Möchtest du wirklich ALLE Zettel von deinem privaten Brett in den Müll werfen?")) {
         localStorage.setItem('ga_pinboard', JSON.stringify([]));
-        renderNotes();
+        renderNotes(); triggerCloudSave();
     }
 }
-
 function togglePinboard() {
     const board = document.getElementById('pinboardOverlay');
     const mapBoard = document.getElementById('mapTableOverlay');
@@ -2824,48 +2975,81 @@ function togglePinboard() {
     if (board.classList.contains('active')) {
         lockBodyScroll();
         renderNotes();
+        silentSyncLoad();
+        if(getGroupName()) silentGroupSync();
     } else {
         unlockBodyScroll();
+        triggerCloudSave();
+        if(getGroupName()) triggerGroupSave();
     }
 }
-
 function addNote() {
-    const text = prompt("Was möchtest du ans schwarze Brett pinnen?");
+    const text = prompt("Was möchtest du ans Brett pinnen?");
     if (!text || text.trim() === "") return;
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    notes.push({ id: Date.now(), text: text, x: 30 + Math.random() * 15, y: 30 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4 });
-    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-    renderNotes();
+    const newNote = { id: Date.now(), text: text, x: 30 + Math.random() * 15, y: 30 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4 };
+    
+    if (currentBoardMode === 'group') {
+        newNote.author = getGroupNick();
+        let gNotes = groupDataCache.notes || [];
+        gNotes.push(newNote);
+        groupDataCache.notes = gNotes;
+        renderNotes(); triggerGroupSave(true);
+    } else {
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        notes.push(newNote);
+        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+        renderNotes(); triggerCloudSave();
+    }
 }
-
-function deleteNote(id) {
-    if (!confirm("Zettel wirklich abreißen?")) return;
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    notes = notes.filter(n => n.id !== id);
-    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-    renderNotes();
-}
-
-function editNote(id) {
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    const noteIndex = notes.findIndex(n => n.id === id);
-    if (noteIndex > -1) {
-        const newText = prompt("Notiz bearbeiten:", notes[noteIndex].text);
-        if (newText !== null && newText.trim() !== "") {
-            notes[noteIndex].text = newText;
-            localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+function deleteNote(id, isGroup) {
+    clearNewBadge(id);
+    if (isGroup) {
+        let gNotes = groupDataCache.notes || [];
+        const note = gNotes.find(n => n.id === id);
+        if (note && note.author === getGroupNick()) {
+            if(!confirm("Zettel für ALLE Crew-Mitglieder löschen?")) return;
+            groupDataCache.notes = gNotes.filter(n => n.id !== id);
+            renderNotes(); triggerGroupSave(true);
+        } else {
+            let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
+            hidden.push(id);
+            localStorage.setItem('ga_group_hidden', JSON.stringify(hidden));
             renderNotes();
+        }
+    } else {
+        if (!confirm("Zettel wirklich abreißen?")) return;
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        notes = notes.filter(n => n.id !== id);
+        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+        renderNotes(); triggerCloudSave();
+    }
+}
+function editNote(id, isGroup) {
+    if (isGroup) {
+        let gNotes = groupDataCache.notes || [];
+        const noteIndex = gNotes.findIndex(n => n.id === id);
+        if (noteIndex > -1 && gNotes[noteIndex].author === getGroupNick()) {
+            const newText = prompt("Notiz bearbeiten:", gNotes[noteIndex].text);
+            if (newText !== null && newText.trim() !== "") {
+                gNotes[noteIndex].text = newText;
+                renderNotes(); triggerGroupSave(true);
+            }
+        }
+    } else {
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        const noteIndex = notes.findIndex(n => n.id === id);
+        if (noteIndex > -1) {
+            const newText = prompt("Notiz bearbeiten:", notes[noteIndex].text);
+            if (newText !== null && newText.trim() !== "") {
+                notes[noteIndex].text = newText;
+                localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+                renderNotes(); triggerCloudSave();
+            }
         }
     }
 }
-
 function pinCurrentFlight() {
     if (document.getElementById("briefingBox").style.display !== "block" || !currentMissionData) return;
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    if (notes.filter(n => n.type === 'flight').length >= 10) {
-        alert("Das Board ist voll! Du kannst maximal 10 Flüge anheften. Bitte lösche alte Flüge von der Pinnwand (✖)."); return;
-    }
-
     const state = {
         mTitle: document.getElementById('mTitle').innerHTML, mStory: document.getElementById('mStory').innerText,
         mDepICAO: document.getElementById("mDepICAO").innerText, mDepName: document.getElementById("mDepName").innerText,
@@ -2889,1011 +3073,148 @@ function pinCurrentFlight() {
         vpSegmentAlts: typeof vpSegmentAlts !== 'undefined' ? vpSegmentAlts : [],
         vpElevationData: typeof vpElevationData !== 'undefined' ? vpElevationData : null
     };
-
     const routeText = `${currentStartICAO} ➔ ${currentDestICAO === "POI" ? currentMissionData.poiName : currentDestICAO}`;
-    notes.push({
+    pendingPinNote = {
         id: Date.now(), type: "flight", flightData: state,
         text: `✈️ <b>${routeText}</b><br><span style="font-size:11px; color:#555;">${state.currentMissionData?.mission || ''}</span><br><span style="font-size:11px;">${state.mDistNote}</span>`,
         x: 35 + Math.random() * 15, y: 20 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4
-    });
-
-    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-    renderNotes();
-    if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("📌 Flugauftrag erfolgreich ans schwarze Brett geheftet!");
+    };
+    if(getGroupName()) {
+        document.getElementById('pinModalOverlay').style.display = 'flex';
+        document.getElementById('btnPinGroup').innerText = `👥 An die Crew (${getGroupName()})`;
+    } else {
+        executePin('private');
+    }
 }
-
-function loadPinnedFlight(id) {
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    const note = notes.find(n => n.id === id);
+function closePinModal() {
+    document.getElementById('pinModalOverlay').style.display = 'none';
+    pendingPinNote = null;
+}
+function executePin(target) {
+    if(!pendingPinNote) return;
+    if(target === 'private') {
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        if (notes.filter(n => n.type === 'flight').length >= 10) {
+            alert("Dein privates Board ist voll! (Max 10 Flüge)."); closePinModal(); return;
+        }
+        notes.push(pendingPinNote);
+        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+        triggerCloudSave();
+        if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("📌 Flugauftrag privat gespeichert!");
+    } else if (target === 'group') {
+        pendingPinNote.author = getGroupNick();
+        let gNotes = groupDataCache.notes || [];
+        gNotes.push(pendingPinNote);
+        groupDataCache.notes = gNotes;
+        triggerGroupSave(true);
+        if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("👥 Flugauftrag mit der Crew geteilt!");
+    }
+    if(document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
+    closePinModal();
+}
+function loadPinnedFlight(id, isGroup) {
+    let note;
+    if(isGroup) {
+        note = (groupDataCache.notes || []).find(n => n.id === id);
+    } else {
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        note = notes.find(n => n.id === id);
+    }
     if (note && note.flightData) {
         restoreMissionState(note.flightData);
         togglePinboard();
         setTimeout(() => { if (map && routeWaypoints.length >= 2) { map.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] }); updateMiniMap(); } }, 300);
     }
 }
-
-// ==========================================
-// MISSION EXPORT & IMPORT (Community Feature)
-// ==========================================
-function exportMission() {
-    if (document.getElementById("briefingBox").style.display !== "block" || !currentMissionData) return;
-    const wps = routeWaypoints.map(wp => [parseFloat(wp.lat.toFixed(4)), parseFloat((wp.lng || wp.lon).toFixed(4))]);
-
-    const wikiData = {
-        dep: document.getElementById("wikiDepDescText") ? document.getElementById("wikiDepDescText").innerText : "",
-        dest: document.getElementById("wikiDestDescText") ? document.getElementById("wikiDestDescText").innerText : ""
-    };
-
-    const pack = [
-        document.getElementById('mTitle').innerHTML, document.getElementById('mStory').innerText,
-        document.getElementById("mDepICAO").innerText, document.getElementById("mDepName").innerText,
-        document.getElementById("mDepCoords").innerText, document.getElementById("mDepRwy").innerText,
-        document.getElementById("destIcon").innerText, document.getElementById("mDestICAO").innerText,
-        document.getElementById("mDestName").innerText, document.getElementById("mDestCoords").innerText,
-        document.getElementById("mDestRwy").innerText, document.getElementById("mPay").innerText,
-        document.getElementById("mWeight").innerText, document.getElementById("mDistNote").innerText,
-        document.getElementById("mHeadingNote").innerText, document.getElementById("mETENote").innerText,
-        wikiData, document.getElementById("destRwyContainer").style.display === "none" ? 1 : 0,
-        currentMissionData, wps, currentStartICAO, currentDestICAO, currentSName, currentDName
-    ];
-
-    const code = btoa(encodeURIComponent(JSON.stringify(pack)));
-    navigator.clipboard.writeText(code).then(() => { alert("🔗 Mission Code kopiert!\n\nDu kannst ihn jetzt einfügen und an deine Fliegerkollegen schicken."); })
-        .catch(err => { prompt("Dein Browser blockiert das automatische Kopieren. Bitte kopiere den Code hier:", code); });
-}
-
-function importMission() {
-    const code = prompt("Füge hier den Mission Code ein:");
-    if (!code || code.trim() === "") return;
-    try {
-        const pack = JSON.parse(decodeURIComponent(atob(code.trim())));
-        if (!Array.isArray(pack) || pack.length < 24) throw new Error("Ungültiges oder veraltetes Format");
-        const wps = pack[19].map(p => ({ lat: p[0], lng: p[1] }));
-
-        const wikiData = typeof pack[16] === 'object' && pack[16] !== null ? pack[16] : { dep: "", dest: pack[16] };
-
-        const state = {
-            mTitle: pack[0], mStory: pack[1], mDepICAO: pack[2], mDepName: pack[3], mDepCoords: pack[4], mDepRwy: pack[5],
-            destIcon: pack[6], mDestICAO: pack[7], mDestName: pack[8], mDestCoords: pack[9], mDestRwy: pack[10],
-            mPay: pack[11], mWeight: pack[12], mDistNote: pack[13], mHeadingNote: pack[14], mETENote: pack[15],
-            wikiDepDescText: wikiData.dep, wikiDestDescText: wikiData.dest, isPOI: pack[17] === 1, currentMissionData: pack[18], routeWaypoints: wps,
-            currentStartICAO: pack[20], currentDestICAO: pack[21], currentSName: pack[22], currentDName: pack[23]
-        };
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        if (notes.filter(n => n.type === 'flight').length >= 10) { alert("Das Board ist voll! Du kannst maximal 10 Flüge anheften. Bitte lösche alte Flüge (✖)."); return; }
-
-        const routeText = `${state.currentStartICAO} ➔ ${state.currentDestICAO === "POI" ? state.currentMissionData.poiName : state.currentDestICAO}`;
-        notes.push({
-            id: Date.now(), type: "flight", flightData: state,
-            text: `✈️ <b>${routeText}</b><br><span style="font-size:11px; color:#555;">${state.currentMissionData.mission}</span><br><span style="font-size:11px;">${state.mDistNote}</span>`,
-            x: 40 + Math.random() * 15, y: 25 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4
-        });
-        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-        renderNotes();
-        alert("📥 Flugauftrag erfolgreich empfangen und ans Brett geheftet!");
-    } catch (e) { alert("❌ Fehler: Der Code ist ungültig oder beschädigt."); }
-}
-
-// ==========================================
-// PDF BRIEFING PACK EXPORT
-// ==========================================
-
-function gatherBriefingData() {
-    const tas = parseInt(document.getElementById('tasSlider').value) || 115;
-    const gph = parseInt(document.getElementById('gphSlider').value) || 9;
-    const dist = currentMissionData.dist;
-    const totalMinutes = Math.round((dist / tas) * 60);
-    const hrs = Math.floor(totalMinutes / 60), mins = totalMinutes % 60;
-    return {
-        title: document.getElementById('mTitle').innerText,
-        story: document.getElementById('mStory').innerText,
-        payload: document.getElementById('mPay').innerText,
-        cargo: document.getElementById('mWeight').innerText,
-        distance: document.getElementById('mDistNote').innerText,
-        heading: document.getElementById('mHeadingNote').innerText,
-        ete: document.getElementById('mETENote').innerText,
-        aircraft: selectedAC,
-        tas: tas,
-        gph: gph,
-        depICAO: document.getElementById('mDepICAO').innerText,
-        depName: document.getElementById('mDepName').innerText,
-        depCoords: document.getElementById('mDepCoords').innerText,
-        depRwy: document.getElementById('mDepRwy').innerText,
-        destICAO: currentMissionData?.poiName ? 'POI' : document.getElementById('mDestICAO').innerText,
-        destName: document.getElementById('mDestName').innerText,
-        destCoords: document.getElementById('mDestCoords').innerText,
-        destRwy: document.getElementById('mDestRwy').innerText,
-        depDesc: document.getElementById('wikiDepDescText')?.innerText || '',
-        destDesc: document.getElementById('wikiDestDescText')?.innerText || '',
-        depRwyText: document.getElementById('wikiDepRwyText')?.innerText || '',
-        destRwyText: document.getElementById('wikiDestRwyText')?.innerText || '',
-        depFreq: document.getElementById('wikiDepFreqText')?.innerText || '',
-        destFreq: document.getElementById('wikiDestFreqText')?.innerText || '',
-        isPOI: document.getElementById('destRwyContainer')?.style.display === 'none',
-        date: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-        totalDist: Math.round(dist),
-        totalTime: totalMinutes,
-        totalTimeStr: hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min`,
-        totalFuel: Math.ceil((dist / tas * gph) + (0.75 * gph)),
-        reserveFuel: Math.ceil(0.75 * gph)
-    };
-}
-
-function computeLegs() {
-    const legs = [];
-    const tas = parseInt(document.getElementById('tasSlider').value) || 115;
-    const gph = parseInt(document.getElementById('gphSlider').value) || 9;
-
-    for (let i = 0; i < routeWaypoints.length - 1; i++) {
-        const p1 = routeWaypoints[i], p2 = routeWaypoints[i + 1];
-        const nav = calcNav(p1.lat, p1.lng || p1.lon, p2.lat, p2.lng || p2.lon);
-
-        let n1 = (i === 0) ? currentSName : (routeWaypoints[i].name || `WP ${i}`);
-        let n2 = (i === routeWaypoints.length - 2) ? currentDName : (routeWaypoints[i + 1].name || `WP ${i + 1}`);
-
-        n1 = n1.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '');
-        n2 = n2.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '');
-
-        let f1 = "";
-        let m1 = n1.match(/\(([^)]+)\)/);
-        if (m1) { f1 = m1[1]; n1 = n1.replace(/\s*\([^)]+\)/, ''); }
-        else if (i === 0 && currentDepFreq) { f1 = currentDepFreq; }
-
-        let f2 = "";
-        let m2 = n2.match(/\(([^)]+)\)/);
-        if (m2) { f2 = m2[1]; n2 = n2.replace(/\s*\([^)]+\)/, ''); }
-        else if (i === routeWaypoints.length - 2 && currentDestFreq) { f2 = currentDestFreq; }
-
-        let c1 = n1.match(/\[([^\]]+)\]/); if (c1) n1 = `[${c1[1]}]`;
-        let c2 = n2.match(/\[([^\]]+)\]/); if (c2) n2 = `[${c2[1]}]`;
-
-        const time = Math.round((nav.dist / tas) * 60);
-        const fuel = (nav.dist / tas * gph).toFixed(1);
-        legs.push({ from: n1.trim(), to: n2.trim(), f1: f1, f2: f2, heading: nav.brng, dist: nav.dist, time: time, fuel: fuel });
-    }
-    return legs;
-}
-
-function extractImageUrl(element) {
-    if (!element) return null;
-    const bg = element.style.backgroundImage;
-    if (!bg || bg === 'url("")' || bg === '' || bg === 'url()') return null;
-    return bg.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-}
-
-async function getImageAsBase64(url) {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (e) { return null; }
-}
-
-function stripEmojis(text) {
-    return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
-}
-
-async function captureMapForPDF() {
-    if (routeWaypoints.length < 2) return null;
-
-    const W = 900, H = 600;
-    const bounds = L.latLngBounds(routeWaypoints);
-
-    // Calculate zoom and center manually for tile rendering
-    let zoom = 1;
-    for (let z = 14; z >= 1; z--) {
-        const nw = bounds.getNorthWest(), se = bounds.getSouthEast();
-        const p1 = latLngToPixel(nw.lat, nw.lng || nw.lon, z);
-        const p2 = latLngToPixel(se.lat, se.lng || se.lon, z);
-        const routeW = Math.abs(p2.x - p1.x), routeH = Math.abs(p2.y - p1.y);
-        if (routeW < W - 20 && routeH < H - 20) { zoom = z; break; }
-    }
-
-    const center = bounds.getCenter();
-    const centerPx = latLngToPixel(center.lat, center.lng, zoom);
-
-    // Create canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = W * 2; canvas.height = H * 2;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(2, 2);
-    ctx.fillStyle = '#e8e0d0';
-    ctx.fillRect(0, 0, W, H);
-
-    // Load tiles
-    const tileSize = 256;
-    const subdomains = ['a', 'b', 'c'];
-    const tilePromises = [];
-
-    const startTileX = Math.floor((centerPx.x - W / 2) / tileSize);
-    const startTileY = Math.floor((centerPx.y - H / 2) / tileSize);
-    const endTileX = Math.ceil((centerPx.x + W / 2) / tileSize);
-    const endTileY = Math.ceil((centerPx.y + H / 2) / tileSize);
-
-    for (let tx = startTileX; tx <= endTileX; tx++) {
-        for (let ty = startTileY; ty <= endTileY; ty++) {
-            const s = subdomains[(tx + ty) % 3];
-            const topoUrl = `https://${s}.tile.opentopomap.org/${zoom}/${tx}/${ty}.png`;
-            const drawX = (tx * tileSize) - (centerPx.x - W / 2);
-            const drawY = (ty * tileSize) - (centerPx.y - H / 2);
-            tilePromises.push(loadTileImage(topoUrl).then(img => {
-                if (img) { ctx.globalAlpha = 0.5; ctx.drawImage(img, drawX, drawY, tileSize, tileSize); ctx.globalAlpha = 1.0; }
-            }));
-        }
-    }
-
-    // VFR aero overlay
-    const aeroZoom = Math.min(zoom, 12);
-    const scale = Math.pow(2, zoom - aeroZoom);
-    const aeroCenterPx = latLngToPixel(center.lat, center.lng, aeroZoom);
-    const aeroTileSize = tileSize * scale;
-    const aStartX = Math.floor((aeroCenterPx.x - (W / 2) / scale) / tileSize);
-    const aStartY = Math.floor((aeroCenterPx.y - (H / 2) / scale) / tileSize);
-    const aEndX = Math.ceil((aeroCenterPx.x + (W / 2) / scale) / tileSize);
-    const aEndY = Math.ceil((aeroCenterPx.y + (H / 2) / scale) / tileSize);
-
-    for (let tx = aStartX; tx <= aEndX; tx++) {
-        for (let ty = aStartY; ty <= aEndY; ty++) {
-            const aeroUrl = `https://nwy-tiles-api.prod.newaydata.com/tiles/${aeroZoom}/${tx}/${ty}.png?path=latest/aero/latest`;
-            const drawX = (tx * aeroTileSize) - (aeroCenterPx.x * scale - W / 2);
-            const drawY = (ty * aeroTileSize) - (aeroCenterPx.y * scale - H / 2);
-            tilePromises.push(loadTileImage(aeroUrl).then(img => {
-                if (img) { ctx.globalAlpha = 0.65; ctx.drawImage(img, drawX, drawY, aeroTileSize, aeroTileSize); ctx.globalAlpha = 1.0; }
-            }));
-        }
-    }
-
-    await Promise.all(tilePromises);
-
-    // Draw route line
-    ctx.strokeStyle = '#ff4444';
-    ctx.lineWidth = 5;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath();
-    routeWaypoints.forEach((wp, i) => {
-        const px = latLngToPixel(wp.lat, wp.lng || wp.lon, zoom);
-        const x = px.x - (centerPx.x - W / 2), y = px.y - (centerPx.y - H / 2);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw markers
-    routeWaypoints.forEach((wp, i) => {
-        const px = latLngToPixel(wp.lat, wp.lng || wp.lon, zoom);
-        const x = px.x - (centerPx.x - W / 2), y = px.y - (centerPx.y - H / 2);
-        const isStart = (i === 0), isDest = (i === routeWaypoints.length - 1);
-        const r = (isStart || isDest) ? 9 : 7;
-        const fill = isStart ? '#44ff44' : isDest ? '#ff4444' : '#fdfd86';
-
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = fill; ctx.fill();
-        ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke();
-
-        let label = isStart ? currentSName : isDest ? currentDName : (wp.name || `WP${i}`);
-        if (isStart && currentDepFreq) { label += ` (${currentDepFreq.split(',')[0].trim()})`; }
-        else if (isDest && currentDestFreq) { label += ` (${currentDestFreq.split(',')[0].trim()})`; }
-        if (!isStart && !isDest) {
-            label = label.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '');
-            const idM = label.match(/\[([^\]]+)\]/);
-            if (idM) { const frM = label.match(/\(([^)]+)\)/); label = frM ? `${idM[1]} (${frM[1]})` : idM[1]; }
-        }
-        ctx.font = 'bold 11px Helvetica, Arial, sans-serif';
-        ctx.fillStyle = '#111';
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-        ctx.strokeText(label, x + 12, y + 4);
-        ctx.fillText(label, x + 12, y + 4);
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    return { data: imgData, width: canvas.width, height: canvas.height };
-}
-
-async function renderTileCanvas(centerLat, centerLng, zoom, W, H) {
-    const centerPx = latLngToPixel(centerLat, centerLng, zoom);
-    const canvas = document.createElement('canvas');
-    canvas.width = W * 2; canvas.height = H * 2;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(2, 2);
-    ctx.fillStyle = '#e8e0d0';
-    ctx.fillRect(0, 0, W, H);
-
-    const tileSize = 256;
-    const subdomains = ['a', 'b', 'c'];
-    const tilePromises = [];
-
-    const startTileX = Math.floor((centerPx.x - W / 2) / tileSize);
-    const startTileY = Math.floor((centerPx.y - H / 2) / tileSize);
-    const endTileX = Math.ceil((centerPx.x + W / 2) / tileSize);
-    const endTileY = Math.ceil((centerPx.y + H / 2) / tileSize);
-
-    for (let tx = startTileX; tx <= endTileX; tx++) {
-        for (let ty = startTileY; ty <= endTileY; ty++) {
-            const s = subdomains[(tx + ty) % 3];
-            const topoUrl = `https://${s}.tile.opentopomap.org/${zoom}/${tx}/${ty}.png`;
-            const drawX = (tx * tileSize) - (centerPx.x - W / 2);
-            const drawY = (ty * tileSize) - (centerPx.y - H / 2);
-            tilePromises.push(loadTileImage(topoUrl).then(img => {
-                if (img) { ctx.globalAlpha = 0.5; ctx.drawImage(img, drawX, drawY, tileSize, tileSize); ctx.globalAlpha = 1.0; }
-            }));
-        }
-    }
-
-    const aeroZoom = Math.min(zoom, 12);
-    const scale = Math.pow(2, zoom - aeroZoom);
-    const aeroCenterPx = latLngToPixel(centerLat, centerLng, aeroZoom);
-    const aeroTileSize = tileSize * scale;
-    const aStartX = Math.floor((aeroCenterPx.x - (W / 2) / scale) / tileSize);
-    const aStartY = Math.floor((aeroCenterPx.y - (H / 2) / scale) / tileSize);
-    const aEndX = Math.ceil((aeroCenterPx.x + (W / 2) / scale) / tileSize);
-    const aEndY = Math.ceil((aeroCenterPx.y + (H / 2) / scale) / tileSize);
-
-    for (let tx = aStartX; tx <= aEndX; tx++) {
-        for (let ty = aStartY; ty <= aEndY; ty++) {
-            const aeroUrl = `https://nwy-tiles-api.prod.newaydata.com/tiles/${aeroZoom}/${tx}/${ty}.png?path=latest/aero/latest`;
-            const drawX = (tx * aeroTileSize) - (aeroCenterPx.x * scale - W / 2);
-            const drawY = (ty * aeroTileSize) - (aeroCenterPx.y * scale - H / 2);
-            tilePromises.push(loadTileImage(aeroUrl).then(img => {
-                if (img) { ctx.globalAlpha = 0.65; ctx.drawImage(img, drawX, drawY, aeroTileSize, aeroTileSize); ctx.globalAlpha = 1.0; }
-            }));
-        }
-    }
-
-    await Promise.all(tilePromises);
-
-    const apx = latLngToPixel(centerLat, centerLng, zoom);
-    const cx = apx.x - (centerPx.x - W / 2), cy = apx.y - (centerPx.y - H / 2);
-    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff4444'; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
-
-    return canvas.toDataURL('image/jpeg', 0.92);
-}
-
-function latLngToPixel(lat, lng, zoom) {
-    const x = ((lng + 180) / 360) * Math.pow(2, zoom) * 256;
-    const latRad = lat * Math.PI / 180;
-    const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * Math.pow(2, zoom) * 256;
-    return { x, y };
-}
-
-function loadTileImage(url) {
-    return new Promise(resolve => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = url;
-    });
-}
-
-function drawNotebookBackground(doc, pageNum, totalPages) {
-    const W = 210, H = 297;
-
-    doc.setFillColor(253, 245, 230);
-    doc.rect(0, 0, W, H, 'F');
-
-    doc.setDrawColor(180, 200, 215);
-    doc.setLineWidth(0.15);
-    for (let y = 21; y < H - 10; y += 7) {
-        doc.line(12, y, W - 12, y);
-    }
-
-    doc.setDrawColor(210, 70, 70);
-    doc.setLineWidth(0.35);
-    doc.line(28, 0, 28, H);
-
-    doc.setDrawColor(180, 175, 160);
-    doc.setLineWidth(0.3);
-    [55, H / 2, H - 55].forEach(y => {
-        doc.circle(9, y, 3.5);
-    });
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(120, 115, 100);
-    doc.text(`Seite ${pageNum} / ${totalPages}`, W - 15, H - 12, { align: 'right' });
-
-    doc.setFontSize(7);
-    doc.setTextColor(170, 165, 150);
-    doc.text('GA Dispatcher \u2013 Briefing Pack', W / 2, H - 6, { align: 'center' });
-}
-
-function pdfWrappedText(doc, text, x, y, maxWidth, lineHeight) {
-    const lines = doc.splitTextToSize(text, maxWidth);
-    lines.forEach((line, i) => {
-        doc.text(line, x, y + (i * lineHeight));
-    });
-    return y + (lines.length * lineHeight);
-}
-
-function drawMissionBriefingPage(doc, data, mapImage) {
-    let y = 30;
-
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(11, 31, 101);
-    const cleanTitle = stripEmojis(data.title);
-    const titleLines = doc.splitTextToSize(cleanTitle, 155);
-    titleLines.forEach((line, i) => { doc.text(line, 32, y + (i * 8)); });
-    y += titleLines.length * 8 + 3;
-
-    doc.setDrawColor(11, 31, 101); doc.setLineWidth(0.5); doc.line(32, y, 190, y);
-    y += 10;
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(80, 80, 80);
-    const routeStr = data.isPOI ? `${data.depICAO} > ${data.destName} (Rundflug)` : `${data.depICAO} (${data.depName}) > ${data.destICAO} (${data.destName})`;
-    const routeLines = doc.splitTextToSize(routeStr, 155);
-    routeLines.forEach((line, i) => { doc.text(line, 32, y + (i * 6)); });
-    y += routeLines.length * 6 + 6;
-
-    doc.setFont('Helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(40, 40, 40);
-    y = pdfWrappedText(doc, stripEmojis(data.story), 32, y, 155, 5.5);
-    y += 8;
-
-    doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.3); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0);
-    y += 10;
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(217, 56, 41); doc.text('PAYLOAD:', 32, y);
-    doc.setTextColor(40, 40, 40); doc.setFont('Helvetica', 'normal'); doc.text(data.payload, 62, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'bold'); doc.setTextColor(217, 56, 41); doc.text('FRACHT:', 32, y);
-    doc.setTextColor(40, 40, 40); doc.setFont('Helvetica', 'normal'); doc.text(data.cargo, 62, y);
-    y += 14;
-
-    doc.setDrawColor(180, 175, 160); doc.setFillColor(248, 243, 228); doc.setLineWidth(0.3);
-    doc.roundedRect(32, y - 4, 158, 50, 2, 2, 'FD');
-
-    y += 4;
-    const col1 = 38, col2 = 110;
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(217, 56, 41); doc.text('STRECKE:', col1, y);
-    doc.setTextColor(40, 40, 40); doc.text(data.distance, col1 + 35, y);
-
-    doc.setTextColor(217, 56, 41); doc.text('KURS:', col2, y);
-    doc.setTextColor(40, 40, 40); doc.text(data.heading, col2 + 25, y);
-    y += 8;
-
-    doc.setTextColor(217, 56, 41); doc.text('ETE CA:', col1, y);
-    doc.setTextColor(40, 40, 40); doc.text(data.totalTimeStr, col1 + 35, y);
-
-    doc.setTextColor(217, 56, 41); doc.text('FUEL:', col2, y);
-    doc.setTextColor(40, 40, 40); doc.text(`${data.totalFuel} Gal`, col2 + 25, y);
-    y += 8;
-
-    doc.setTextColor(217, 56, 41); doc.text('AIRCRAFT:', col1, y);
-    doc.setTextColor(40, 40, 40); doc.text(data.aircraft, col1 + 35, y);
-
-    doc.setTextColor(217, 56, 41); doc.text('TAS:', col2, y);
-    doc.setTextColor(40, 40, 40); doc.text(`${data.tas} kts`, col2 + 25, y);
-    y += 8;
-
-    doc.setTextColor(217, 56, 41); doc.text('GPH:', col1, y);
-    doc.setTextColor(40, 40, 40); doc.text(`${data.gph} gal/h`, col1 + 35, y);
-
-    doc.setTextColor(217, 56, 41); doc.text('DATUM:', col2, y);
-    doc.setTextColor(40, 40, 40); doc.text(`${data.date} ${data.time}`, col2 + 25, y);
-
-    y += 24;
-    if (mapImage) {
-        doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101);
-        doc.text('ROUTE MAP', 32, y);
-        y += 4;
-
-        const maxW = 158;
-        const maxH = Math.min(100, 280 - y);
-        const ratio = mapImage.width / mapImage.height;
-        let imgW, imgH;
-        if (ratio > maxW / maxH) { imgW = maxW; imgH = maxW / ratio; } else { imgH = maxH; imgW = maxH * ratio; }
-        const imgX = 32 + (maxW - imgW) / 2;
-
-        doc.setFillColor(230, 225, 210); doc.rect(imgX - 2, y - 2, imgW + 4, imgH + 4, 'F');
-        doc.setDrawColor(160, 155, 140); doc.setLineWidth(0.5); doc.rect(imgX - 2, y - 2, imgW + 4, imgH + 4, 'S');
-        doc.addImage(mapImage.data, 'JPEG', imgX, y, imgW, imgH);
-    }
-}
-
-function drawRouteNavigationPage(doc, data, legs) {
-    let y = 30;
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(11, 31, 101);
-    doc.text('ROUTE & NAVIGATION', 32, y); y += 4;
-    doc.setDrawColor(11, 31, 101); doc.setLineWidth(0.5); doc.line(32, y, 190, y); y += 10;
-
-    doc.setFont('Helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(80, 80, 80);
-    const wpNames = [data.depICAO || currentStartICAO];
-    for (let i = 1; i < routeWaypoints.length - 1; i++) wpNames.push(`WP${i}`);
-    if (routeWaypoints.length > 1) wpNames.push(data.isPOI ? 'POI' : (data.destICAO || currentDestICAO));
-    doc.text(wpNames.join(' -> '), 32, y); y += 8;
-
-    const tableX = 32, colWidths = [10, 42, 16, 16, 16, 16, 16];
-    const tableW = colWidths.reduce((a, b) => a + b, 0), rowH = 10;
-
-    doc.setFillColor(220, 215, 200); doc.rect(tableX, y, tableW, 7, 'F');
-    doc.setDrawColor(160, 155, 140); doc.rect(tableX, y, tableW, 7, 'S');
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(40, 40, 40);
-    doc.text('LEG', tableX + 2, y + 5);
-    doc.text('ROUTE', tableX + colWidths[0] + 2, y + 5);
-    doc.text('FREQ', tableX + colWidths[0] + colWidths[1] + 2, y + 5);
-    doc.text('HDG', tableX + colWidths[0] + colWidths[1] + colWidths[2] + 2, y + 5);
-    doc.text('DIST', tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 5);
-    doc.text('TIME', tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 5);
-    doc.text('FUEL', tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + colWidths[5] + 2, y + 5);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal');
-
-    let totalTime = 0;
-    let totalFuel = 0;
-
-    legs.forEach((leg, i) => {
-        totalTime += leg.time;
-        totalFuel += parseFloat(leg.fuel);
-
-        if (i % 2 === 0) { doc.setFillColor(250, 246, 235); doc.rect(tableX, y, tableW, rowH, 'F'); }
-        doc.setDrawColor(200, 195, 180); doc.rect(tableX, y, tableW, rowH, 'S');
-
-        doc.setTextColor(40, 40, 40);
-        doc.setFontSize(8);
-        doc.text(`${i + 1}`, tableX + 3, y + 6);
-
-        doc.text(`${leg.from}`, tableX + colWidths[0] + 2, y + 4);
-        doc.text(`-> ${leg.to}`, tableX + colWidths[0] + 2, y + 8.5);
-
-        doc.setFontSize(7);
-        doc.setTextColor(11, 31, 101);
-        if (leg.f1) doc.text(leg.f1, tableX + colWidths[0] + colWidths[1] + 2, y + 4);
-        if (leg.f2) doc.text(leg.f2, tableX + colWidths[0] + colWidths[1] + 2, y + 8.5);
-
-        doc.setFontSize(8);
-        doc.setTextColor(40, 40, 40);
-        doc.text(`${leg.heading}\u00B0`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + 2, y + 6);
-        doc.text(`${leg.dist} NM`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 6);
-        doc.text(`${leg.time} m`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 6);
-        doc.text(`${leg.fuel} G`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + colWidths[5] + 2, y + 6);
-        y += rowH;
-    });
-
-    doc.setFillColor(210, 205, 190); doc.rect(tableX, y, tableW, 7, 'F');
-    doc.setDrawColor(160, 155, 140); doc.rect(tableX, y, tableW, 7, 'S');
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(11, 31, 101);
-    doc.text('TOTAL', tableX + colWidths[0] + 2, y + 5);
-    doc.text(`${data.totalDist} NM`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 2, y + 5);
-    doc.text(`${totalTime} m`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 2, y + 5);
-    doc.text(`${totalFuel.toFixed(1)} G`, tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + colWidths[5] + 2, y + 5);
-    y += 7 + 6;
-
-    // --- COMPACT PERFORMANCE ---
-    doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.3); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0); y += 6;
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101); doc.text('PERFORMANCE', 32, y); y += 8;
-
-    doc.setFontSize(9);
-    const pc = [34, 66, 98, 130, 162];
-    const items = [
-        ['AC', data.aircraft], ['TAS', `${data.tas} kts`], ['GPH', `${data.gph} gal/h`],
-        ['ETE', data.totalTimeStr], ['FUEL', `${data.totalFuel} Gal`]
-    ];
-    items.forEach((item, i) => {
-        const x = pc[i];
-        doc.setFont('Helvetica', 'bold'); doc.setTextColor(217, 56, 41); doc.text(item[0], x, y);
-        doc.setFont('Helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.text(item[1], x, y + 5);
-    });
-
-    // Embed Vertical Profile Canvas
-    const vpCanvas = document.getElementById('verticalProfileCanvas');
-    if (vpCanvas && vpCanvas.width > 0 && vpCanvas.height > 0) {
-        try {
-            const vpDataUrl = vpCanvas.toDataURL('image/png', 1.0);
-            const vpW = 158;
-            const vpH = (vpCanvas.height / vpCanvas.width) * vpW;
-            y += 12;
-            doc.addImage(vpDataUrl, 'PNG', 32, y, vpW, vpH);
-            doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
-            doc.rect(32, y, vpW, vpH);
-            y += vpH;
-        } catch (e) {
-            console.error('Error adding vertical profile to PDF', e);
-        }
-    }
-
-    y += 14;
-
-    // --- AIRSPACE WARNINGS ---
-    doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.3); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0); y += 6;
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101); doc.text('AIRSPACE WARNINGS', 32, y); y += 8;
-
-    let finalAirspaces = activeAirspaces || [];
-    const filterCheckbox = document.getElementById('navLogAirspaceFilter');
-    const pdfFilterActive = filterCheckbox && filterCheckbox.checked;
-    if (pdfFilterActive && finalAirspaces.length > 0) {
-        let pdfFpResult = null;
-        if (typeof vpElevationData !== 'undefined' && vpElevationData && vpElevationData.length >= 2) {
-            const cruiseAlt = parseInt(document.getElementById('altSlider')?.value || 4500);
-            const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-            pdfFpResult = computeFlightProfile(vpElevationData, cruiseAlt, vpClimbRate, vpDescentRate, tas);
-        }
-        if (pdfFpResult && pdfFpResult.profile) {
-            finalAirspaces = finalAirspaces.filter(a => {
-                if (!a.lowerLimit || !a.upperLimit) return true;
-                const lowerFt = airspaceLimitToFt(a.lowerLimit);
-                const upperFt = airspaceLimitToFt(a.upperLimit);
-                if (lowerFt === null || upperFt === null) return true;
-                let intersects = false;
-                if (a.geometry) {
-                    const polys = [];
-                    if (a.geometry.type === 'Polygon') polys.push(a.geometry.coordinates[0]);
-                    else if (a.geometry.type === 'MultiPolygon') a.geometry.coordinates.forEach(mc => polys.push(mc[0]));
-                    for (let pi = 0; pi < pdfFpResult.profile.length; pi++) {
-                        const pp = pdfFpResult.profile[pi];
-                        if (pp.altFt >= lowerFt && pp.altFt <= upperFt) {
-                            const pt = vpElevationData[pi];
-                            for (const poly of polys) {
-                                if (vpPointInPoly(pt, poly)) { intersects = true; break; }
-                            }
-                        }
-                        if (intersects) break;
-                    }
-                } else {
-                    for (const pp of pdfFpResult.profile) {
-                        if (pp.altFt >= lowerFt && pp.altFt <= upperFt) { intersects = true; break; }
-                    }
-                }
-                return intersects;
-            });
-        }
-    }
-
-    if (finalAirspaces.length === 0) {
-        doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(40, 140, 40);
-        doc.text('Route frei - keine Konflikte erkannt.', 34, y);
-    } else {
-        const fmtLmt = (lim) => {
-            if (!lim) return '?';
-            if (lim.referenceDatum === 0 && lim.value === 0) return 'GND';
-            if (lim.unit === 6) return `FL ${lim.value}`;
-            let u = lim.unit === 1 ? 'FT' : (lim.unit === 6 ? 'FL ' : 'M');
-            let r = lim.referenceDatum === 1 ? ' MSL' : (lim.referenceDatum === 0 ? ' AGL' : '');
-            return `${lim.value} ${u}${r}`;
-        };
-
-        for (let i = 0; i < finalAirspaces.length; i++) {
-            if (y > 278) {
-                doc.setFont('Helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-                doc.text(`... und ${finalAirspaces.length - i} weitere`, 38, y);
-                break;
-            }
-            const a = finalAirspaces[i];
-            const style = getAirspaceStyle(a);
-            const displayName = getAirspaceDisplayName(a);
-
-            // Color dot
-            const rgb = hexToRgb(style.color);
-            if (rgb) { doc.setFillColor(rgb.r, rgb.g, rgb.b); doc.circle(35, y - 1.2, 1.2, 'F'); }
-
-            // Category + name
-            doc.setFont('Helvetica', 'bold'); doc.setFontSize(8);
-            doc.setTextColor(40, 40, 40);
-            const catTag = `[${style.category}]`;
-            doc.text(catTag, 38, y);
-            const catW = doc.getTextWidth(catTag);
-            doc.setFont('Helvetica', 'normal');
-            const maxNameLen = 28;
-            const trimmedName = displayName.length > maxNameLen ? displayName.substring(0, maxNameLen - 2) + '..' : displayName;
-            doc.text(trimmedName, 38 + catW + 1, y);
-
-            // Limits (right-aligned)
-            if (a.lowerLimit && a.upperLimit) {
-                const limStr = `${fmtLmt(a.lowerLimit)} - ${fmtLmt(a.upperLimit)}`;
-                doc.setFontSize(7); doc.setTextColor(100, 100, 100);
-                doc.text(limStr, 190, y, { align: 'right' });
-            }
-
-            // Frequency / Squawk on same line below
-            let freqStr = '';
-            if (a.frequencies && a.frequencies.length > 0) {
-                const primary = a.frequencies.find(f => f.primary) || a.frequencies[0];
-                if (primary && primary.value) {
-                    if (a.type === 27) {
-                        freqStr = `SQUAWK: ${primary.value}`;
-                    } else {
-                        freqStr = `${primary.name || 'FREQ'}: ${primary.value}`;
-                    }
-                }
-            }
-            if (freqStr) {
-                y += 3.5;
-                doc.setFontSize(7); doc.setTextColor(11, 31, 101);
-                doc.setFont('Helvetica', 'bold');
-                doc.text(freqStr, 38, y);
-            }
-
-            y += 5;
-        }
-    }
-}
-
-function hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
-}
-
-function drawAirportInfoPage(doc, type, data, photo, detailMap, metarImg) {
-    let y = 30;
-    const isDep = (type === 'dep');
-    const isPOI = (!isDep && data.isPOI);
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(11, 31, 101);
-    doc.text(isPOI ? 'ZIELPUNKT INFO' : (isDep ? 'DEPARTURE AIRPORT' : 'DESTINATION AIRPORT'), 32, y);
-    y += 4;
-    doc.setDrawColor(11, 31, 101); doc.setLineWidth(0.5); doc.line(32, y, 190, y);
-    y += 14;
-
-    const icao = isDep ? data.depICAO : data.destICAO;
-    const name = isDep ? data.depName : data.destName;
-    const coords = isDep ? data.depCoords : data.destCoords;
-    const rwy = isDep ? data.depRwy : data.destRwy;
-    const desc = isDep ? data.depDesc : data.destDesc;
-    const freq = isDep ? data.depFreq : data.destFreq;
-
-    const photoYStart = y - 2;
-    if (photo) {
-        try {
-            doc.addImage(photo, 'JPEG', 152, photoYStart, 38, 28);
-            doc.setDrawColor(200, 195, 180); doc.setLineWidth(0.4); doc.rect(151, photoYStart - 1, 40, 34);
-        } catch (e) { }
-    }
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(11, 31, 101);
-    doc.text(icao, 32, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal'); doc.setFontSize(14); doc.setTextColor(60, 60, 60);
-    doc.text(name, 32, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-    doc.text(`Coords: ${coords}`, 32, y);
-
-    y = photo ? Math.max(y + 6, photoYStart + 36) : y + 6;
-
-    doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.3); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0);
-    y += 8;
-
-    if (!isPOI) {
-        let blockY = y;
-        doc.setFont('Helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(217, 56, 41);
-        doc.text('RUNWAYS', 32, blockY);
-        doc.text('FREQUENZEN', 115, blockY);
-
-        let rwyY = blockY + 7;
-        let freqY = blockY + 7;
-
-        doc.setFont('Helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(40, 40, 40);
-        if (rwy && rwy !== 'Sucht Pisten-Infos...' && rwy !== 'Keine Daten gefunden') {
-            const runways = rwy.split(/\s*(?:\||\n|<br\s*\/?>)\s*/i).filter(r => r.trim());
-            runways.forEach(r => { doc.text(stripEmojis(r.trim()), 34, rwyY); rwyY += 6; });
-        } else {
-            doc.setTextColor(120, 120, 120); doc.text('Keine Pistendaten verfuegbar.', 34, rwyY); rwyY += 6;
-        }
-
-        doc.setTextColor(11, 31, 101);
-        if (freq && !freq.includes('Sucht Frequenz') && freq.trim() !== '') {
-            const freqClean = stripEmojis(freq);
-            const freqLines = freqClean.split('\n').filter(l => l.trim());
-            freqLines.forEach(line => { doc.text(line.trim(), 117, freqY); freqY += 6; });
-        } else {
-            doc.setTextColor(120, 120, 120); doc.text('Keine Frequenzdaten verfuegbar.', 117, freqY); freqY += 6;
-        }
-
-        y = Math.max(rwyY, freqY) + 4;
-
-        doc.setDrawColor(100, 100, 100); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0);
-        y += 8;
-    }
-
-    doc.setFont('Helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(11, 31, 101);
-    doc.text(isPOI ? 'INFO' : 'AIRPORT INFO', 32, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(50, 50, 50);
-
-    if (desc && desc !== 'Warte auf Daten...') {
-        const maxChars = 600;
-        const trimmedDesc = desc.length > maxChars ? desc.substring(0, maxChars) + '...' : desc;
-        y = pdfWrappedText(doc, trimmedDesc, 32, y, 155, 5.5);
-    } else {
-        doc.text('Keine weiteren Informationen verfuegbar.', 32, y);
-        y += 6;
-    }
-
-    if (detailMap || metarImg) {
-        y = Math.max(y + 6, 170);
-        doc.setDrawColor(100, 100, 100); doc.setLineDashPattern([2, 2], 0); doc.line(32, y, 190, y); doc.setLineDashPattern([], 0);
-        y += 6;
-
-        const hasMetar = metarImg && metarImg.data && !isPOI;
-        const mapAvailW = hasMetar ? 95 : 155;
-        const maxH = Math.min(100, 280 - y);
-
-        if (detailMap) {
-            doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101);
-            doc.text(isPOI ? 'KARTE' : `PLATZKARTE ${icao}`, 32, y);
-            const mapLabelY = y;
-            y += 5;
-
-            const mapRatio = 700 / 360;
-            let mapW, mapH;
-            if (mapAvailW / maxH < mapRatio) { mapW = mapAvailW; mapH = mapW / mapRatio; }
-            else { mapH = maxH; mapW = mapH * mapRatio; }
-
-            const mapX = 32;
-            doc.setFillColor(230, 225, 210); doc.rect(mapX - 1, y - 1, mapW + 2, mapH + 2, 'F');
-            doc.setDrawColor(160, 155, 140); doc.setLineWidth(0.4); doc.rect(mapX - 1, y - 1, mapW + 2, mapH + 2, 'S');
-            doc.addImage(detailMap, 'JPEG', mapX, y, mapW, mapH);
-
-            // METAR neben der Karte
-            if (hasMetar) {
-                const metarX = 32 + mapAvailW + 4;
-                const metarAvailW = 190 - metarX;
-
-                doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101);
-                doc.text('METAR', metarX, mapLabelY);
-
-                // Proportional skalieren anhand des echten Seitenverhältnisses
-                const metarRatio = metarImg.ratio || 1.5;
-                let metarW = metarAvailW;
-                let metarH = metarW / metarRatio;
-                if (metarH > mapH) { metarH = mapH; metarW = metarH * metarRatio; }
-
-                doc.setFillColor(240, 236, 224); doc.rect(metarX - 1, y - 1, metarW + 2, metarH + 2, 'F');
-                doc.setDrawColor(160, 155, 140); doc.setLineWidth(0.4); doc.rect(metarX - 1, y - 1, metarW + 2, metarH + 2, 'S');
-                try {
-                    doc.addImage(metarImg.data, 'PNG', metarX, y, metarW, metarH);
-                } catch (e) {
-                    doc.setFont('Helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-                    doc.text('METAR nicht verfuegbar', metarX + 2, y + 10);
-                }
-            }
-        } else if (hasMetar) {
-            // Nur METAR, keine Karte
-            doc.setFont('Helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(11, 31, 101);
-            doc.text('METAR', 32, y);
-            y += 5;
-            const metarRatio = metarImg.ratio || 1.5;
-            let metarW = 155;
-            let metarH = metarW / metarRatio;
-            if (metarH > maxH) { metarH = maxH; metarW = metarH * metarRatio; }
-            doc.setFillColor(240, 236, 224); doc.rect(31, y - 1, metarW + 2, metarH + 2, 'F');
-            doc.setDrawColor(160, 155, 140); doc.setLineWidth(0.4); doc.rect(31, y - 1, metarW + 2, metarH + 2, 'S');
-            try {
-                doc.addImage(metarImg.data, 'PNG', 32, y, metarW, metarH);
-            } catch (e) { }
-        }
-    }
-}
-
-async function captureMetarWidget(containerId) {
-    try {
-        const container = document.getElementById(containerId);
-        if (!container || container.style.display === 'none' || !container.innerHTML.trim()) return null;
-        // Check if it has actual METAR content (not loading or error)
-        if (container.innerHTML.includes('Sucht lokales') || container.innerHTML.includes('Fehler')) return null;
-        const ratio = container.offsetWidth / container.offsetHeight;
-        const canvas = await html2canvas(container, { backgroundColor: '#f0eada', scale: 2, useCORS: true, logging: false });
-        return { data: canvas.toDataURL('image/png'), ratio: ratio };
-    } catch (e) { console.warn('METAR capture failed:', e); return null; }
-}
-
-async function generateBriefingPDF() {
-    if (!currentMissionData || document.getElementById("briefingBox").style.display !== "block") {
-        alert('Kein aktives Briefing vorhanden.');
-        return;
-    }
-    if (!window.jspdf) {
-        alert('PDF-Bibliothek nicht geladen. Bitte Seite neu laden.');
-        return;
-    }
-
-    const indicator = document.getElementById('searchIndicator');
-    if (indicator) indicator.innerText = '\uD83D\uDCC4 Erstelle Briefing Pack PDF...';
-
-    try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-        const data = gatherBriefingData();
-        const legs = computeLegs();
-        const isPOI = data.isPOI;
-        const totalPages = isPOI ? 3 : 4;
-
-        const mapImagePromise = captureMapForPDF();
-        const depLL = routeWaypoints[0];
-        const destLL = routeWaypoints[routeWaypoints.length - 1];
-        const detailZoom = 12;
-        const depDetailPromise = renderTileCanvas(depLL.lat, depLL.lng || depLL.lon, detailZoom, 700, 360);
-        const destDetailPromise = renderTileCanvas(destLL.lat, destLL.lng || destLL.lon, detailZoom, 700, 360);
-
-        const depPhotoUrl = extractImageUrl(document.getElementById('wikiDepImage'));
-        const destPhotoUrl = extractImageUrl(document.getElementById('wikiDestImage'));
-        const depMetarPromise = captureMetarWidget('metarContainerDep');
-        const destMetarPromise = isPOI ? Promise.resolve(null) : captureMetarWidget('metarContainerDest');
-
-        const [depPhoto, destPhoto, depDetail, destDetail, depMetar, destMetar] = await Promise.all([
-            depPhotoUrl ? getImageAsBase64(depPhotoUrl) : Promise.resolve(null),
-            destPhotoUrl ? getImageAsBase64(destPhotoUrl) : Promise.resolve(null),
-            depDetailPromise,
-            destDetailPromise,
-            depMetarPromise,
-            destMetarPromise
-        ]);
-
-        const mapImage = await mapImagePromise;
-
-        doc.setProperties({ title: `Briefing Pack - ${data.depICAO} to ${isPOI ? 'POI' : data.destICAO}` });
-
-        drawNotebookBackground(doc, 1, totalPages);
-        drawMissionBriefingPage(doc, data, mapImage);
-
-        doc.addPage();
-        drawNotebookBackground(doc, 2, totalPages);
-        drawRouteNavigationPage(doc, data, legs);
-
-        doc.addPage();
-        drawNotebookBackground(doc, 3, totalPages);
-        drawAirportInfoPage(doc, 'dep', data, depPhoto, depDetail, depMetar);
-
-        doc.addPage();
-        drawNotebookBackground(doc, 4, totalPages);
-        drawAirportInfoPage(doc, 'dest', data, destPhoto, destDetail, destMetar);
-
-        const filename = `Briefing_${data.depICAO}_${isPOI ? 'Rundflug' : data.destICAO}_${data.date.replace(/\./g, '')}.pdf`;
-        doc.save(filename);
-
-        if (indicator) indicator.innerText = '\uD83D\uDCC4 Briefing Pack PDF erstellt!';
-        setTimeout(() => { if (indicator) indicator.innerText = 'System bereit.'; }, 4000);
-    } catch (e) {
-        console.error('PDF generation failed:', e);
-        if (indicator) indicator.innerText = '\u274C PDF-Erstellung fehlgeschlagen.';
-        alert('PDF konnte nicht erstellt werden: ' + e.message);
-    }
-}
-
 function renderNotes() {
     const board = document.getElementById('pinboard');
     if (!board) return;
     board.innerHTML = '';
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    notes.forEach(note => {
-        const div = document.createElement('div');
-        div.className = note.type === 'flight' ? 'post-it flight-card' : 'post-it';
+    
+    if (currentBoardMode === 'private') {
+        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+        notes.forEach(note => createNoteDOM(note, false));
+    } else {
+        // Render Crew Roster
+        const roster = document.createElement('div');
+        roster.className = 'post-it roster-card';
+        roster.style.left = '8%'; // Weiter nach rechts verschoben, damit er nicht auf dem Rahmen liegt
+        roster.style.top = '4%';
+        roster.style.transform = 'rotate(-2deg)';
+        
+        const amIAdmin = (groupDataCache.members || []).find(m => m.nick === getGroupNick())?.isAdmin;
+        let membersHtml = (groupDataCache.members || []).map(m => {
+            const isMe = m.nick === getGroupNick();
+            const timeoutMs = m.isAdmin ? (365 * 24 * 60 * 60 * 1000) : (28 * 24 * 60 * 60 * 1000); // Admin=12Mon, Normal=28Tage
+            const isStale = (Date.now() - m.lastSeen) > timeoutMs;
+            if(isStale) return '';
 
-        let posX = note.x > 100 ? (note.x / 1000) * 100 : note.x;
-        let posY = note.y > 100 ? (note.y / 600) * 100 : note.y;
+            const adminIcon = m.isAdmin ? '<span title="Admin">👑 </span>' : '';
+            const kickBtn = (amIAdmin && !isMe) ? `<span onclick="kickGroupUser('${m.nick}')" style="cursor:pointer; font-size:1cqw; margin-left:6px; transition:transform 0.2s;" title="Mitglied kicken">👢</span>` : '';
 
-        div.style.left = posX + '%';
-        div.style.top = posY + '%';
-        div.style.transform = `rotate(${note.rot}deg)`;
-
-        if (note.type === 'flight') {
-            div.innerHTML = `<div class="post-it-pin"></div><div class="post-it-del" onclick="deleteNote(${note.id})">✖</div>${note.text}<button class="flight-load-btn" onclick="loadPinnedFlight(${note.id})">📂 Flug laden</button>`;
-        } else {
-            div.innerHTML = `<div class="post-it-pin"></div><div class="post-it-edit" onclick="editNote(${note.id})">✏️</div><div class="post-it-del" onclick="deleteNote(${note.id})">✖</div>${note.text.replace(/\n/g, '<br>')}`;
-        }
-        makeDraggable(div, note.id); board.appendChild(div);
-    });
+            return `<div class="roster-item"><span style="font-weight:${isMe?'bold':'normal'}">${adminIcon}${m.nick}</span><span class="roster-status" style="display:flex; align-items:center;">${isMe?'Online':'Aktiv'}${kickBtn}</span></div>`;
+        }).join('');
+        
+        roster.innerHTML = `<div class="post-it-pin"></div><div style="font-weight:bold; font-size:1.4cqw; border-bottom:2px solid #aaa; padding-bottom:4px; margin-bottom:4px;">👥 CREW: ${getGroupName()}</div><div class="roster-list">${membersHtml}</div>`;
+        board.appendChild(roster);
+        // Render Group Notes
+        let gNotes = groupDataCache.notes || [];
+        let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
+        let localPos = JSON.parse(localStorage.getItem('ga_group_positions')) || {};
+        let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
+        
+        gNotes.forEach(note => {
+            if (hidden.includes(note.id)) return;
+            let renderNote = { ...note };
+            if (localPos[note.id]) {
+                renderNote.x = localPos[note.id].x;
+                renderNote.y = localPos[note.id].y;
+            }
+            if (newBadges.includes(note.id)) renderNote.isNew = true;
+            createNoteDOM(renderNote, true);
+        });
+    }
 }
+function createNoteDOM(note, isGroup) {
+    const board = document.getElementById('pinboard');
+    const div = document.createElement('div');
+    div.className = note.type === 'flight' ? 'post-it flight-card' : 'post-it';
+    let posX = note.x > 100 ? (note.x / 1000) * 100 : note.x;
+    let posY = note.y > 100 ? (note.y / 600) * 100 : note.y;
+    div.style.left = posX + '%'; div.style.top = posY + '%'; div.style.transform = `rotate(${note.rot}deg)`;
+    
+    let badgeHtml = note.isNew ? `<div class="post-it-new-badge">NEU</div>` : '';
+    let authorHtml = isGroup && note.author ? `<div style="position:absolute; bottom:0.4cqw; right:0.8cqw; font-size:0.8cqw; color:#888; font-family:sans-serif;">@${note.author}</div>` : '';
+    
+    if (note.type === 'flight') {
+        div.innerHTML = `${badgeHtml}<div class="post-it-pin"></div><div class="post-it-del" onclick="deleteNote(${note.id}, ${isGroup})">✖</div>${note.text}<button class="flight-load-btn" onclick="loadPinnedFlight(${note.id}, ${isGroup})">📂 Flug laden</button>${authorHtml}`;
+    } else {
+        let editBtn = (!isGroup || note.author === getGroupNick()) ? `<div class="post-it-edit" onclick="editNote(${note.id}, ${isGroup})">✏️</div>` : '';
+        div.innerHTML = `${badgeHtml}<div class="post-it-pin"></div>${editBtn}<div class="post-it-del" onclick="deleteNote(${note.id}, ${isGroup})">✖</div>${note.text.replace(/\n/g, '<br>')}${authorHtml}`;
+    }
+    
+    div.addEventListener('mousedown', () => clearNewBadge(note.id));
+    div.addEventListener('touchstart', () => clearNewBadge(note.id), {passive:true});
+    makeDraggable(div, note.id, isGroup);
+    board.appendChild(div);
+}
+function clearNewBadge(id) {
+    let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
+    if(newBadges.includes(id)) {
+        newBadges = newBadges.filter(nid => nid !== id);
+        localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
+        updateGroupBadgeUI();
+        triggerCloudSave(true); // "Gelesen"-Status sofort geräteübergreifend in die Cloud pushen
 
-function makeDraggable(element, noteId) {
+        const b = document.getElementById('pinboard');
+        const renderedBadges = b.querySelectorAll('.post-it-new-badge');
+        renderedBadges.forEach(el => el.style.display = 'none');
+        if(currentBoardMode === 'group') renderNotes();
+    }
+}
+function makeDraggable(element, noteId, isGroup) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     element.onmousedown = dragMouseDown; element.ontouchstart = dragMouseDown;
-
     function dragMouseDown(e) {
         if (e.target.className === 'post-it-del' || e.target.className === 'post-it-edit' || e.target.className === 'flight-load-btn') return;
         e.preventDefault();
@@ -3902,37 +3223,43 @@ function makeDraggable(element, noteId) {
         document.onmouseup = closeDragElement; document.ontouchend = closeDragElement;
         document.onmousemove = elementDrag; document.ontouchmove = elementDrag;
     }
-
     function elementDrag(e) {
         e.preventDefault();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX, clientY = e.touches ? e.touches[0].clientY : e.clientY;
         pos1 = pos3 - clientX; pos2 = pos4 - clientY; pos3 = clientX; pos4 = clientY;
-
         const board = document.getElementById('pinboard');
         let newTop = element.offsetTop - pos2, newLeft = element.offsetLeft - pos1;
         const padding = 10;
         const minLeft = padding, maxLeft = board.offsetWidth - element.offsetWidth - padding;
         const minTop = padding, maxTop = board.offsetHeight - element.offsetHeight - padding;
-
         if (newLeft < minLeft) newLeft = minLeft; if (newLeft > maxLeft) newLeft = maxLeft;
         if (newTop < minTop) newTop = minTop; if (newTop > maxTop) newTop = maxTop;
-
         element.style.top = (newTop / board.offsetHeight * 100) + "%";
         element.style.left = (newLeft / board.offsetWidth * 100) + "%";
     }
-
     function closeDragElement() {
         document.onmouseup = null; document.ontouchend = null; document.onmousemove = null; document.ontouchmove = null;
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        const noteIndex = notes.findIndex(n => n.id === noteId);
-        if (noteIndex > -1) {
-            const board = document.getElementById('pinboard');
-            notes[noteIndex].x = (element.offsetLeft / board.offsetWidth) * 100;
-            notes[noteIndex].y = (element.offsetTop / board.offsetHeight) * 100;
-            localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+        const board = document.getElementById('pinboard');
+        if (isGroup) {
+            let localPos = JSON.parse(localStorage.getItem('ga_group_positions')) || {};
+            localPos[noteId] = {
+                x: (element.offsetLeft / board.offsetWidth) * 100,
+                y: (element.offsetTop / board.offsetHeight) * 100
+            };
+            localStorage.setItem('ga_group_positions', JSON.stringify(localPos));
+        } else {
+            let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
+            const noteIndex = notes.findIndex(n => n.id === noteId);
+            if (noteIndex > -1) {
+                notes[noteIndex].x = (element.offsetLeft / board.offsetWidth) * 100;
+                notes[noteIndex].y = (element.offsetTop / board.offsetHeight) * 100;
+                localStorage.setItem('ga_pinboard', JSON.stringify(notes));
+                triggerCloudSave();
+            }
         }
     }
 }
+
 
 /* =========================================================
    KLN 90B GPS MODULE
@@ -4417,6 +3744,20 @@ document.addEventListener('DOMContentLoaded', () => {
     initGPSEncoders();
     initCom2Knob();
     restoreAudioButtonStates();
+
+    // SW Version auslesen und sofort anzeigen (wartet nicht auf Bilder)
+    fetch('sw.js', { cache: 'no-store' })
+        .then(r => r.text())
+        .then(text => {
+            const match = text.match(/const CACHE = ['"]([^'"]+)['"]/);
+            if (match) {
+                const el = document.getElementById('swVersionDisplay');
+                if (el) el.innerText = match[1];
+            }
+        }).catch(() => {
+            const el = document.getElementById('swVersionDisplay');
+            if (el) el.innerText = "Offline";
+        });
 });
 
 /* =========================================================
@@ -4448,24 +3789,37 @@ function updateSnapButtonUI() {
 
 async function fetchOpenAIPData() {
     if (!map || !snapMode) return;
-    const b = map.getBounds();
-    const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`;
-    const proxy = 'https://ga-proxy.einherjer.workers.dev';
 
+    // 1. Schutz: Nicht laden, wenn man zu weit rausgezoomt ist (verhindert "Box too large" 500er Fehler)
+    if (map.getZoom() < 8) {
+        cachedNavData = [];
+        return;
+    }
+    const b = map.getBounds();
+
+    // 2. Schutz: Koordinaten auf die reale Weltkarte limitieren (-180 bis 180 / -90 bis 90)
+    const w = Math.max(-180, b.getWest());
+    const s = Math.max(-90, b.getSouth());
+    const e = Math.min(180, b.getEast());
+    const n = Math.min(90, b.getNorth());
+
+    const bbox = `${w},${s},${e},${n}`;
+    const proxy = 'https://ga-proxy.einherjer.workers.dev';
     try {
         const [navRes, repRes, aptRes] = await Promise.all([
             fetch(`${proxy}/api/navaids?bbox=${bbox}&limit=250&t=${Date.now()}`),
             fetch(`${proxy}/api/reporting-points?bbox=${bbox}&limit=250&t=${Date.now()}`),
             fetch(`${proxy}/api/airports?bbox=${bbox}&limit=250&t=${Date.now()}`)
         ]);
-
+        // 3. Schutz: Falls OpenAIP blockt, breche leise ab statt abzustürzen
+        if (!navRes.ok || !repRes.ok || !aptRes.ok) {
+            return;
+        }
         const navJson = await navRes.json(), repJson = await repRes.json(), aptJson = await aptRes.json();
         cachedNavData = [];
-
         let navArray = navJson.items || [];
         let repArray = repJson.items || [];
         let aptArray = aptJson.items || [];
-
         navArray.forEach(i => {
             if (!i.geometry) return;
             let freqVal = '';
@@ -4479,19 +3833,19 @@ async function fetchOpenAIPData() {
             let ident = idVal ? ` [${idVal}]` : '';
             cachedNavData.push({ name: `${i.name}${ident}${freq}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
         });
-
         repArray.forEach(i => {
             if (!i.geometry) return;
             cachedNavData.push({ name: `RPP ${i.name}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
         });
-
         aptArray.forEach(i => {
             if (!i.geometry) return;
             let freq = (i.frequencies && i.frequencies.length > 0 && i.frequencies[0].value) ? ` (${i.frequencies[0].value})` : '';
             let displayName = i.icaoCode ? i.icaoCode : i.name;
             cachedNavData.push({ name: `APT ${displayName}${freq}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
         });
-    } catch (e) { console.error("❌ Fetch Error:", e); }
+    } catch (e) {
+        // Leiser Fallback, wenn das Netzwerk mal hakt
+    }
 }
 
 /* =========================================================
@@ -6138,4 +5492,389 @@ computeFlightProfile = function (elevationData, cruiseAltFt, climbRateFpm, desce
 };
 
 // Init altitude waypoints when map table canvas is ready
+
+/* =========================================================
+   CLOUD SYNC LOGIC (Adaptive, Diffing, Debounce & Toggle)
+   ========================================================= */
+const SYNC_URL = 'https://ga-proxy.einherjer.workers.dev/api/sync/';
+let localSyncTime = localStorage.getItem('ga_sync_time') ? parseInt(localStorage.getItem('ga_sync_time')) : 0;
+let syncSaveTimeout = null;
+let lastSyncedPayloadStr = "";
+function saveSyncToggle() {
+    const t = document.getElementById('syncToggle');
+    if (t) localStorage.setItem('ga_sync_enabled', t.checked);
+    if (t && t.checked) silentSyncLoad();
+}
+function getSyncId() {
+    return document.getElementById('syncIdInput')?.value.trim() || localStorage.getItem('ga_sync_id') || "";
+}
+function saveSyncId() {
+    const id = document.getElementById('syncIdInput').value.trim();
+    const oldId = localStorage.getItem('ga_sync_id');
+    if (id !== oldId) {
+        localSyncTime = 0;
+        localStorage.setItem('ga_sync_time', 0);
+    }
+    localStorage.setItem('ga_sync_id', id);
+    if (id) silentSyncLoad();
+}
+function generateSyncId() {
+    const words = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "Xray", "Yankee", "Zulu"];
+    const w1 = words[Math.floor(Math.random() * words.length)];
+    const w2 = words[Math.floor(Math.random() * words.length)];
+    const num = Math.floor(Math.random() * 900) + 100;
+    const newId = `${w1}-${w2}-${num}`;
+    document.getElementById('syncIdInput').value = newId;
+    localSyncTime = 0;
+    localStorage.setItem('ga_sync_time', 0);
+    localStorage.setItem('ga_sync_id', newId);
+    const t = document.getElementById('syncToggle');
+    if (t) { t.checked = true; localStorage.setItem('ga_sync_enabled', 'true'); }
+    updateSyncStatus("Neue ID generiert. Speichere...");
+    triggerCloudSave(true);
+}
+function updateSyncStatus(msg, isError = false) {
+    const el = document.getElementById('syncStatus');
+    if (el) {
+        el.innerText = msg;
+        el.style.color = isError ? "var(--red)" : "var(--green)";
+        setTimeout(() => { if(el.innerText === msg) el.style.color = "#888"; }, 4000);
+    }
+}
+function flashSyncIndicator(direction) {
+    const ind = document.getElementById('syncTrafficIndicator');
+    if (!ind) return;
+    ind.innerText = direction === 'up' ? '⬆️' : '⬇️';
+    ind.style.opacity = '1';
+    setTimeout(() => { ind.style.opacity = '0'; }, 800);
+}
+function setLastSyncedPayload() {
+    const payloadToCompare = {
+        pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
+        logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
+        activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
+        groupName: getGroupName(),
+        groupNick: getGroupNick(),
+        knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
+        newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
+    };
+    lastSyncedPayloadStr = JSON.stringify(payloadToCompare);
+}
+async function triggerCloudSave(immediate = false) {
+    const id = getSyncId();
+    const t = document.getElementById('syncToggle');
+    if (!id) return;
+    if (immediate !== 'manual' && t && !t.checked) return;
+    if (immediate === 'manual') {
+        if (!confirm("⬆️ CLOUD UPLOAD\nMöchtest du deinen aktuellen, lokalen Stand hochladen und das bisherige Cloud-Backup überschreiben?")) return;
+        setNavComLed('navcomSaveBtn', 'syncing');
+    }
+    if (!immediate) {
+        updateSyncStatus("Warte auf Abschluss...");
+        if (syncSaveTimeout) clearTimeout(syncSaveTimeout);
+        syncSaveTimeout = setTimeout(() => triggerCloudSave(true), 25000);
+        return;
+    }
+    localSyncTime = Date.now();
+    const payloadToCompare = {
+        pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
+        logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
+        activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
+        groupName: getGroupName(),
+        groupNick: getGroupNick(),
+        knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
+        newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
+    };
+
+    const currentPayloadStr = JSON.stringify(payloadToCompare);
+    if (currentPayloadStr === lastSyncedPayloadStr && immediate !== 'manual') {
+        updateSyncStatus("Cloud: Aktuell ✅");
+        return;
+    }
+    updateSyncStatus("Speichere in Cloud...");
+    localStorage.setItem('ga_sync_time', localSyncTime);
+    const payload = { ...payloadToCompare, lastModified: localSyncTime };
+    try {
+        const res = await fetch(SYNC_URL + id, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
+        if (res.ok) {
+            lastSyncedPayloadStr = currentPayloadStr;
+            updateSyncStatus("Cloud: Gespeichert ✅");
+            flashSyncIndicator('up');
+            if (immediate === 'manual') {
+                setNavComLed('navcomSaveBtn', 'success');
+                setTimeout(() => setNavComLed('navcomSaveBtn', 'off'), 3000);
+            }
+        } else {
+            throw new Error("Server Error");
+        }
+    } catch (e) {
+        updateSyncStatus("Cloud: Speicher-Fehler", true);
+        if (immediate === 'manual') {
+            setNavComLed('navcomSaveBtn', 'error');
+            setTimeout(() => setNavComLed('navcomSaveBtn', 'off'), 3000);
+        }
+    }
+}
+async function forceSyncLoad() {
+    if (!confirm("⬇️ CLOUD DOWNLOAD\nMöchtest du deinen Spielstand aus der Cloud laden? Alle lokalen Änderungen (die nicht hochgeladen wurden) gehen dabei verloren!")) return;
+    const id = getSyncId();
+    if (!id) { alert("Bitte zuerst eine Pilot-ID eingeben oder generieren (🎲)."); return; }
+
+    setNavComLed('navcomLoadBtn', 'syncing');
+    updateSyncStatus("Lade Daten...");
+
+    try {
+        const res = await fetch(SYNC_URL + id);
+        if (res.status === 404) {
+            alert("Zu dieser ID wurden keine Daten gefunden.");
+            updateSyncStatus("Nicht gefunden", true);
+            setNavComLed('navcomLoadBtn', 'error');
+            setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
+            return;
+        }
+        if (!res.ok) throw new Error("Netzwerkfehler");
+        const data = await res.json();
+
+        if (data.lastModified) {
+            localSyncTime = data.lastModified;
+            localStorage.setItem('ga_sync_time', localSyncTime);
+        }
+        if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
+        if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
+        if (data.activeMission) {
+            localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
+            restoreMissionState(data.activeMission);
+        } else {
+            localStorage.removeItem('ga_active_mission');
+            document.getElementById("briefingBox").style.display = "none";
+        }
+        if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
+        if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
+
+        if (data.groupName !== undefined) {
+            updateGroupUIFromSync(data.groupName, data.groupNick);
+        }
+        setLastSyncedPayload();
+        updateGroupBadgeUI();
+        updateSyncStatus("Cloud: Geladen ✅");
+        flashSyncIndicator('down');
+
+        setNavComLed('navcomLoadBtn', 'success');
+        setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
+        if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
+        renderLog();
+    } catch (e) {
+        updateSyncStatus("Cloud: Lade-Fehler", true);
+        alert("Fehler beim Laden aus der Cloud.");
+        setNavComLed('navcomLoadBtn', 'error');
+        setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
+    }
+}
+async function silentSyncLoad() {
+    const id = getSyncId();
+    const t = document.getElementById('syncToggle');
+    if (!id || (t && !t.checked)) return;
+    try {
+        const res = await fetch(SYNC_URL + id);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.lastModified && data.lastModified > localSyncTime) {
+            localSyncTime = data.lastModified;
+            localStorage.setItem('ga_sync_time', localSyncTime);
+            if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
+            if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
+            if (data.activeMission) {
+                localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
+                restoreMissionState(data.activeMission);
+            } else {
+                localStorage.removeItem('ga_active_mission');
+                document.getElementById("briefingBox").style.display = "none";
+            }
+            if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
+            if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
+
+            if (data.groupName !== undefined) {
+                updateGroupUIFromSync(data.groupName, data.groupNick);
+            }
+
+            setLastSyncedPayload();
+            updateGroupBadgeUI();
+            if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
+            renderLog();
+            updateSyncStatus("Auto-Sync: Aktualisiert 🔄");
+            flashSyncIndicator('down');
+        }
+    } catch (e) {}
+}
+// === GROUP SYNC LOGIC ===
+let groupSyncTime = 0;
+let isGroupSyncing = false;
+async function silentGroupSync() {
+    const gName = getGroupName();
+    const gNick = getGroupNick();
+    if(!gName || isGroupSyncing) return;
+
+    try {
+        const res = await fetch(SYNC_URL + "GROUP_" + gName);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.lastModified && data.lastModified > groupSyncTime) {
+            groupSyncTime = data.lastModified;
+            let knownNotes = JSON.parse(localStorage.getItem('ga_known_group_notes')) || [];
+            let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
+            let changed = false;
+            if (data.kicked && data.kicked.includes(gNick)) {
+                alert("❌ Du wurdest vom Admin aus der Crew entfernt.");
+                leaveGroup(true);
+                return;
+            }
+            const downloadedNotes = data.notes || [];
+            const activeNoteIds = downloadedNotes.map(n => n.id);
+
+            // Ghost-Badge Fix: Entferne alte Badges von Zetteln, die gelöscht wurden
+            const originalBadgeCount = newBadges.length;
+            newBadges = newBadges.filter(id => activeNoteIds.includes(id));
+            if (originalBadgeCount !== newBadges.length) changed = true;
+            downloadedNotes.forEach(dn => {
+                if(!knownNotes.includes(dn.id)) {
+                    knownNotes.push(dn.id);
+                    if (dn.author !== gNick) {
+                        newBadges.push(dn.id);
+                    }
+                    changed = true;
+                }
+            });
+            if (changed) {
+                localStorage.setItem('ga_known_group_notes', JSON.stringify(knownNotes));
+                localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
+                triggerCloudSave(true); // Ins Profil sichern
+            }
+            groupDataCache = data;
+            updateGroupBadgeUI();
+            if (document.getElementById('pinboardOverlay').classList.contains('active') && currentBoardMode === 'group') {
+                renderNotes();
+            }
+        }
+    } catch(e) {}
+}
+async function triggerGroupSave(immediate = false) {
+    const gName = getGroupName();
+    const gNick = getGroupNick();
+    if(!gName) return;
+
+    isGroupSyncing = true;
+    try {
+        const res = await fetch(SYNC_URL + "GROUP_" + gName);
+        let latestData = { members: [], notes: [] };
+        if (res.ok) latestData = await res.json();
+
+        let members = latestData.members || [];
+        // Veraltete Mitglieder (außer Admin) herausfiltern
+        members = members.filter(m => {
+            const timeoutMs = m.isAdmin ? (365 * 24 * 60 * 60 * 1000) : (28 * 24 * 60 * 60 * 1000);
+            return (Date.now() - m.lastSeen) < timeoutMs && m.nick !== gNick;
+        });
+
+        let amIAdmin = false;
+        const existingMe = (latestData.members || []).find(m => m.nick === gNick);
+        if (existingMe && existingMe.isAdmin) amIAdmin = true;
+        if (members.length === 0) amIAdmin = true; // Wer die Gruppe belebt, wird Admin
+        members.push({ nick: gNick, lastSeen: Date.now(), pin: getGroupPin(), isAdmin: amIAdmin });
+
+        // Max 10 Mitglieder (älteste Nicht-Admins fliegen zuerst)
+        if(members.length > 10) {
+            members.sort((a,b) => b.lastSeen - a.lastSeen); // Neueste zuerst
+            members = members.slice(0, 10);
+        }
+
+        // Kicked-Liste behalten
+        const kickedList = latestData.kicked || [];
+
+        let cloudNotes = latestData.notes || [];
+        let localNotes = groupDataCache.notes || [];
+
+        const myLocalNotes = localNotes.filter(n => n.author === gNick);
+        const theirCloudNotes = cloudNotes.filter(n => n.author !== gNick);
+        let mergedNotes = [...myLocalNotes, ...theirCloudNotes];
+
+        const payload = { members: members, notes: mergedNotes, kicked: kickedList, lastModified: Date.now() };
+
+        groupDataCache = payload;
+        groupSyncTime = payload.lastModified;
+        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(payload) });
+    } catch(e) {}
+    isGroupSyncing = false;
+}
+async function forceGroupSync() {
+    await triggerGroupSave(true);
+    await silentGroupSync();
+}
+// === Auto-Sync Trigger (Adaptive Polling: 10s / 30s / Sleep) ===
+let syncLastActivityTime = Date.now();
+let syncLastFetchTime = Date.now();
+let syncIsSleeping = false;
+function resetSyncTimer() {
+    const now = Date.now();
+    syncLastActivityTime = now;
+    if (syncIsSleeping) {
+        syncIsSleeping = false;
+        if (document.visibilityState === 'visible') silentSyncLoad();
+        syncLastFetchTime = now;
+    }
+}
+['click', 'touchstart', 'scroll', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, resetSyncTimer, { passive: true, capture: true });
+});
+// Wenn der Tab in den Vordergrund/Hintergrund wechselt
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible') {
+        resetSyncTimer();
+        silentSyncLoad();
+    } else if (document.visibilityState === 'hidden') {
+        // App wird in den Hintergrund gewischt oder geschlossen
+        if (syncSaveTimeout) {
+            clearTimeout(syncSaveTimeout);
+            syncSaveTimeout = null;
+            triggerCloudSave(true); // Sofort pushen!
+        }
+    }
+});
+window.addEventListener("focus", () => { resetSyncTimer(); silentSyncLoad(); });
+// Fallback für alte iOS-Versionen oder explizites Tab-Schließen
+window.addEventListener("pagehide", () => {
+    if (syncSaveTimeout) {
+        clearTimeout(syncSaveTimeout);
+        syncSaveTimeout = null;
+        triggerCloudSave(true);
+    }
+});
+setTimeout(setLastSyncedPayload, 1000);
+setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    const t = document.getElementById('syncToggle');
+    const personalSyncActive = getSyncId() && t && t.checked;
+    const groupSyncActive = !!getGroupName();
+    // Loop abbrechen, wenn weder Personal noch Group Sync an sind
+    if (!personalSyncActive && !groupSyncActive) return;
+    const now = Date.now();
+    const idleTime = now - syncLastActivityTime;
+
+    if (idleTime < 60000) {
+        // Phase 1: Aktiv (Letzte Aktivität vor < 60 Sekunden) -> Alle 10s
+        if (personalSyncActive) silentSyncLoad();
+        if (groupSyncActive) silentGroupSync();
+        syncLastFetchTime = now;
+    } else if (idleTime < 180000) {
+        // Phase 2: Halbschlaf (1 bis 3 Minuten) -> Alle 30s
+        if (now - syncLastFetchTime >= 30000) {
+            if (personalSyncActive) silentSyncLoad();
+            if (groupSyncActive) silentGroupSync();
+            syncLastFetchTime = now;
+        }
+    } else {
+        // Phase 3: Tiefschlaf (> 3 Minuten) -> Sync stoppen
+        syncIsSleeping = true;
+    }
+}, 10000);
 setTimeout(() => initAltWaypoints(), 2000);

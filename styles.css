@@ -20,6 +20,8 @@
 
 html {
     overflow-x: hidden;
+    overflow-y: scroll; /* Zwingt den Scrollbalken zur Sichtbarkeit (Klassischer Fix) */
+    scrollbar-gutter: stable; /* Moderner Fix für neue Browser */
     overscroll-behavior-x: none;
 }
 
@@ -55,6 +57,8 @@ body {
     box-sizing: border-box;
     backdrop-filter: blur(8px);
     transition: all 0.3s;
+    /* Zwingt den Flex-Container dazu, niemals durch Textinhalte in die Breite zu wachsen */
+    min-width: 0;
 }
 
 body.fullscreen-active .container {
@@ -104,6 +108,12 @@ h1 {
     font-style: italic;
     height: 15px;
     opacity: 1.0;
+    /* Verhindert horizontales Layout-Zucken bei langen Texten! */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 label {
@@ -1671,7 +1681,7 @@ body.theme-retro .api-fuel-meter .api-scale {
     cursor: grab;
     user-select: none;
     line-height: 1.2;
-    overflow: hidden !important;
+    overflow: visible !important;
 }
 
 .post-it:active {
@@ -3749,4 +3759,120 @@ body.theme-retro .mission-note-page:not(.front-note) a,
 body.theme-retro .mission-note-page:not(.front-note) button,
 body.theme-retro .mission-note-page:not(.front-note) .retro-switch-container {
     pointer-events: none;
+}
+
+/* ==========================================================================
+   19. CREW BOARD / MULTIPLAYER
+   ========================================================================== */
+.pb-tabs {
+    display: inline-flex;
+    background: #111;
+    border-radius: 4px;
+    border: 1px solid #333;
+    overflow: hidden;
+}
+.pb-tab {
+    background: transparent;
+    color: #888;
+    border: none;
+    padding: 6px 15px;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+}
+.pb-tab:hover { background: #222; color: #ccc; }
+.pb-tab.active { background: #4da6ff; color: #000; }
+body.theme-retro .pb-tab.active { background: var(--piper-yellow); color: #111; }
+body.theme-navcom .pb-tab.active { background: #33ff33; color: #000; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+.pin-modal-overlay {
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100000;
+    display: none; justify-content: center; align-items: center;
+    backdrop-filter: blur(4px);
+}
+.pin-modal-box {
+    background: #1e1e1e;
+    border: 2px solid #444;
+    border-radius: 12px;
+    padding: 25px;
+    width: 320px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+}
+.post-it-new-badge {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    background: #ff4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 3px 6px;
+    border-radius: 10px;
+    transform: rotate(-10deg);
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.5);
+    z-index: 100 !important;
+    font-family: sans-serif;
+    pointer-events: none;
+}
+.post-it.roster-card {
+    background: #e6e6e6;
+    border: 2px solid #ccc;
+    cursor: default;
+}
+.roster-list {
+    font-size: 1.1cqw;
+    margin-top: 1cqw;
+    line-height: 1.4;
+    color: #333;
+    font-weight: normal;
+    text-align: left;
+}
+.roster-item {
+    display: flex; justify-content: space-between;
+    border-bottom: 1px dashed #ccc; padding-bottom: 2px; margin-bottom: 2px;
+}
+.roster-status {
+    font-size: 0.9cqw;
+    color: #888;
+}
+
+/* ==========================================================================
+   20. HARDWARE ACCELERATION FIX (JITTER PREVENTION)
+   ========================================================================== */
+body.theme-navcom .radio-stack,
+body.theme-navcom .radio-module,
+.marker-light {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+.marker-light.blinking {
+    will-change: opacity, box-shadow;
+}
+
+/* ==========================================================================
+   21. NAVCOM SYNC LED FEEDBACK
+   ========================================================================== */
+@keyframes led-blink-fast {
+    0%, 100% { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; border-color: #fff; }
+    50% { background: #111; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1); border-color: #000; }
+}
+.audio-btn.led-syncing .audio-led {
+    animation: led-blink-fast 0.3s infinite;
+}
+.audio-btn.led-success .audio-led {
+    background: #33ff33 !important;
+    box-shadow: 0 0 8px #33ff33, inset 0 1px 2px #fff !important;
+    border-color: #fff !important;
+}
+.audio-btn.led-error .audio-led {
+    background: #ff4444 !important;
+    box-shadow: 0 0 8px #ff4444, inset 0 1px 2px #fff !important;
+    border-color: #fff !important;
 }
