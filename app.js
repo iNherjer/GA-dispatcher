@@ -5802,7 +5802,7 @@ async function triggerGroupSave(immediate = false) {
 
         groupDataCache = payload;
         groupSyncTime = payload.lastModified;
-        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(payload) });
+        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
     } catch(e) {}
     isGroupSyncing = false;
 }

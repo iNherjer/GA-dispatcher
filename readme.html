@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>GA Dispatcher - Hilfe & Handbuch</title>
+    <title>GA Dispatcher BETA - Hilfe</title>
     
     <link rel="icon" type="image/png" href="IconDRK.PNG">
     <link rel="icon" type="image/png" sizes="32x32" href="Icon.PNG" media="(prefers-color-scheme: light)">
@@ -143,61 +143,69 @@
 
     <div class="readme-content">
         <h1 style="border-bottom:none; margin-bottom:0;">GA Dispatcher</h1>
-        <p style="margin-top:0; font-style:italic; opacity:0.8;">Virtueller Flugdienstleiter für General Aviation</p>
+        <p style="margin-top:0; font-style:italic; opacity:0.8;">Beta Version Documentation</p>
         
-        <p>Der <strong>GA Dispatcher</strong> unterstützt Piloten der General Aviation bei der Flugplanung im Simulator. Das Tool generiert auf Knopfdruck abwechslungsreiche Flugaufträge, ergänzt diese mit realen Wetter- sowie Pistendaten und stellt ein vollständiges, kontextbezogenes Briefing zur Verfügung.</p>
+        <p>Der <strong>GA Dispatcher</strong> ist ein interaktiver, webbasierter Flugdienstleiter für General Aviation (GA) Piloten in Flugsimulatoren (MSFS, X-Plane, etc.). Wenn du mal wieder nicht weißt, wohin du fliegen sollst, generiert dir dieses Tool realistische, abwechslungsreiche und immersive Flugaufträge.</p>
 
         <hr style="border:0; border-top:1px dashed #555; margin: 20px 0;">
 
-        <h2>🚀 Schnelleinstieg (Quick Start)</h2>
-        <p>Für einen unkomplizierten Start ohne detaillierte Vorplanung:</p>
-        <ol>
-            <li>Trage unter <span class="key-badge">Start / DEP</span> deinen aktuellen ICAO-Code ein (z.B. <code>EDTW</code>).</li>
-            <li>Belasse die restlichen Einstellungen auf den Standardwerten.</li>
-            <li>Klicke auf <span class="key-badge">Auftrag generieren</span> (bzw. DISPATCH im NavCom-Modus).</li>
-        </ol>
-        <p>Das System wählt nun ein passendes Ziel und erstellt eine direkte GPS-Route (Direct). Frequenzen, das aktuelle METAR und ein kurzes Briefing werden umgehend bereitgestellt, sodass der Flug sofort beginnen kann.</p>
-
-        <hr style="border:0; border-top:1px dashed #555; margin: 20px 0;">
-
-        <h2>🗺️ Erweiterte Flugplanung</h2>
-        <p>Für detailliertere Routen oder reine VFR-Flüge bietet der <span class="key-badge">🗺️ Kartentisch</span> zusätzliche Werkzeuge zur Flugvorbereitung:</p>
-
+        <h2>✨ Kernfunktionen</h2>
         <ul>
-            <li><strong>Wegpunkte setzen:</strong> Klicke auf die Routen-Linie, um neue Wegpunkte hinzuzufügen. Diese lassen sich per Drag & Drop verschieben, um beispielsweise Kontrollzonen strukturiert zu umfliegen.</li>
-            <li><strong>🧲 Snapping:</strong> Wenn der Snapping-Modus aktiviert ist, rasten Wegpunkte beim Verschieben automatisch an echten VORs, Flugplätzen oder VFR-Pflichtmeldepunkten ein.</li>
-            <li><strong>📊 Höhenprofil (Vertical Profile):</strong> Unterhalb der Karte wird ein Querschnitt der geplanten Route dargestellt.
-                <ul>
-                    <li><strong>Terrain & Lufträume:</strong> Zeigt das Bodenprofil (inklusive höchster Erhebung) sowie alle durchkreuzten Lufträume im Seitenprofil.</li>
-                    <li><strong>Interaktive Flughöhe:</strong> Die Reiseflughöhe kann durch vertikales Verschieben der roten Fluglinie mit der Maus direkt und visuell angepasst werden.</li>
-                    <li><strong>Step-Climbs (Doppelklick):</strong> Ein Doppelklick auf die Fluglinie setzt einen festen Höhen-Wegpunkt. Dies ist besonders nützlich, um Steig- und Sinkflüge gezielt zu planen, wenn Berge oder bestimmte Lufträume überflogen werden müssen.</li>
-                </ul>
-            </li>
-            <li><strong>Luftraum-Warnungen:</strong> Auf Seite 2 des Briefings (Nav-Log) werden relevante Lufträume detailliert aufgelistet. Ist der Höhenfilter aktiv, zeigt das System nur noch die Zonen an, in die du auf deiner aktuell eingestellten Flughöhe auch tatsächlich einfliegen würdest.</li>
+            <li><strong>Dynamischer Missions-Generator:</strong> Generiert zufällige A-nach-B Flüge oder Sightseeing-Rundflüge (POIs) basierend auf deinen Vorgaben.</li>
+            <li><strong>Gemini KI-Integration:</strong> Verbindet echte geografische Wikipedia-Daten mit der Gemini KI für kreative Briefings (Passagiere, Fracht, lokale Storys).</li>
+            <li><strong>Vertikales Profil & OpenAIP:</strong> Berechnet ein interaktives Höhenprofil inklusive Terrain (TOC/TOD) und warnt vor VFR-Lufträumen auf deiner Route.</li>
+            <li><strong>Visual METAR & Wetter:</strong> Live-Abruf von METAR-Daten, visuell aufbereitet mit animierten Wind-Instrumenten und Pisten-Ausrichtung.</li>
+            <li><strong>☁️ Cloud Sync & Multiplayer:</strong> Synchronisiere deine Flüge geräteübergreifend (PC/iPad) und teile sie in Echtzeit auf dem neuen Crew Board.</li>
+            <li><strong>Drei interaktive Cockpit-Themes:</strong> Modern, Analog (mit mechanischen Zählwerken) und NavCom (Radio-Stack Simulation inkl. KLN 90B).</li>
+        </ul>
+
+        <h2>🚀 Kurzanleitung</h2>
+
+        <h3>1. Flugzeug & Startplatz</h3>
+        <p>Gib oben links unter <span class="key-badge">Start / DEP</span> deinen aktuellen ICAO-Code (z.B. <code>EDTW</code>) ein. Wähle ein Flugzeug-Preset (C172, PA24) oder stelle Speed (TAS) und Verbrauch (GPH) manuell ein.</p>
+
+        <h3>2. Auftrags-Parameter</h3>
+        <p>Wähle <strong>Typ</strong> (Flugplatz oder POI), <strong>Distanz</strong> (Short/Long) und <strong>Region</strong>. Klicke danach auf <span class="key-badge">Auftrag generieren</span> bzw. <span class="key-badge">DISPATCH</span>.</p>
+
+        <h3>3. Kartentisch & Flugprofil</h3>
+        <p>Nutze den <span class="key-badge">🗺️ Kartentisch</span> um deine Route zu verfeinern:</p>
+        <ul>
+            <li>Nutze das <strong>🧲 Snapping</strong>, um Wegpunkte magisch an reale VORs oder Flughäfen andocken zu lassen.</li>
+            <li>Aktiviere das <strong>📊 Profil</strong>, um das Terrain unter dir zu analysieren. Klicke doppelt auf die Fluglinie, um <strong>Höhen-Wegpunkte</strong> zu erstellen und unter Lufträumen hindurchzutauchen.</li>
         </ul>
 
         <hr style="border:0; border-top:1px dashed #555; margin: 20px 0;">
 
-        <h2>🎨 Benutzeroberfläche (Themes)</h2>
-        <p>Über den Schieberegler im unteren Bereich lässt sich das Erscheinungsbild der Anwendung anpassen:</p>
+        <h2>☁️ Cloud Sync & Multiplayer Crew Board</h2>
+        
+        <h3>Persönlicher Cloud Sync</h3>
+        <p>Scrolle nach unten zu den Einstellungen (oder nutze die SAVE/LOAD Buttons am NavCom-Radio). Klicke auf das 🎲-Icon, um dir eine einmalige <strong>Pilot-ID</strong> zu generieren, und nutze diese auf all deinen Geräten.</p>
         <ul>
-            <li><strong>Modern:</strong> Klar strukturiertes, zeitgemäßes User Interface.</li>
-            <li><strong>Analog:</strong> 60er-Jahre Retro-Optik mit mechanischen Trommelzählwerken. <em>Tipp: Die Farbe des Panels lässt sich durch einen Klick auf die obere linke Schraube wechseln.</em></li>
-            <li><strong>NavCom:</strong> Simulation eines typischen Bendix/King Radio-Stacks (inklusive funktionsfähigem KLN 90B GPS-Display). Werte werden hier authentisch über Rändelräder (Drag-Knobs) eingestellt.</li>
+            <li><strong>☁️ Push (SAVE):</strong> Sichert deinen aktuellen lokalen Stand in der Cloud. Das bisherige Backup wird dabei überschrieben.</li>
+            <li><strong>📥 Pull (LOAD):</strong> Lädt den Speicherstand aus der Cloud herunter. <em>Achtung:</em> Lokale Änderungen, die noch nicht hochgeladen wurden, gehen dabei verloren!</li>
+            <li><strong>🔄 Auto-Sync (Schalter):</strong> Wenn aktiviert, synchronisiert die App im Hintergrund nach Zeitstempel. <span style="color:var(--warn); font-weight:bold;">Achtung: Dieses Feature sollte aktuell nur testweise genutzt werden!</span> Bei längerer Offline-Nutzung kann der strikte Zeitstempel-Abgleich zu Datenverlust führen. Nutze für maximale Sicherheit die manuellen Push/Pull-Buttons.</li>
+        </ul>
+
+        <h3>👥 Crew Board (Mit Freunden fliegen)</h3>
+        <p>Erstelle mit deinen Fliegerkollegen eine Gruppe (z.B. "EDTK-Crew") und vergib dir einen Rufnamen. Optional könnt ihr einen 4-stelligen PIN festlegen, um euren Namen zu schützen.</p>
+        <ul>
+            <li><strong>Der Admin:</strong> Der erste, der der Crew beitritt, erhält die Admin-Krone (👑) und kann inaktive Spieler kicken (👢).</li>
+            <li><strong>Flüge teilen:</strong> Wenn du im Briefing auf das 📌-Icon klickst, fragt dich die App ab sofort, ob du den Flug an dein privates Brett oder live an das Crew-Brett heften möchtest.</li>
+            <li><strong>Neu-Badge:</strong> Postet ein Freund einen Flug, erscheint auf deinem Brett sofort ein rotes "NEU"-Badge.</li>
         </ul>
 
         <hr style="border:0; border-top:1px dashed #555; margin: 20px 0;">
 
-        <h2>🤖 Dynamische KI-Briefings (Gemini API)</h2>
-        <p>Für individuellere und kreativere Einsatzbeschreibungen (inklusive fiktiver Passagier- und Frachtdetails sowie dem Einbezug lokaler Wikipedia-Informationen) lässt sich eine KI integrieren:</p>
+        <h2>🤖 KI-Feature (Gemini API)</h2>
+        <p>Um dynamische Story-Briefings zu erhalten:</p>
         <ol>
-            <li>Beziehe einen kostenlosen API-Key im <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</li>
-            <li>Füge diesen Key unten im Tool in das Passwort-Feld unter <strong>"KI-Dispatcher"</strong> ein.</li>
+            <li>Hole dir einen kostenlosen Key im <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</li>
+            <li>Füge ihn unten im Tool unter <strong>"KI-Dispatcher"</strong> ein.</li>
         </ol>
-        <p><em>Hinweis zur Datensicherheit: Der Key wird ausschließlich lokal im Cache deines Browsers gespeichert und nur für die direkte Abfrage an Google verwendet.</em></p>
+        <p><em>Hinweis: Der Key wird extrem sicher und ausschließlich lokal im Cache deines Browsers gespeichert.</em></p>
         
         <div style="text-align:center; margin-top:40px; font-size:0.8em; opacity:0.6;">
-            &copy; 2024 GA Dispatcher
+            &copy; 2024 GA Dispatcher Beta
         </div>
     </div>
 </div>
@@ -220,7 +228,7 @@
         } else if (savedTheme === 'navcom') {
             document.body.classList.add('theme-navcom');
         } else {
-            // Classic/Modern
+            // Classic/Modern hat keine spezielle Body-Klasse im CSS-Root, aber wir lassen es leer
         }
     }
 
