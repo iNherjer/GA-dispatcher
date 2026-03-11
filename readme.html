@@ -181,9 +181,14 @@
         <h3>Persönlicher Cloud Sync</h3>
         <p>Scrolle nach unten zu den Einstellungen (oder nutze die SAVE/LOAD Buttons am NavCom-Radio). Klicke auf das 🎲-Icon, um dir eine einmalige <strong>Pilot-ID</strong> zu generieren, und nutze diese auf all deinen Geräten.</p>
         <ul>
-            <li><strong>☁️ Push (SAVE):</strong> Sichert deinen aktuellen lokalen Stand in der Cloud. Das bisherige Backup wird dabei überschrieben.</li>
-            <li><strong>📥 Pull (LOAD):</strong> Lädt den Speicherstand aus der Cloud herunter. <em>Achtung:</em> Lokale Änderungen, die noch nicht hochgeladen wurden, gehen dabei verloren!</li>
-            <li><strong>🔄 Auto-Sync (Schalter):</strong> Wenn aktiviert, synchronisiert die App im Hintergrund nach Zeitstempel. <span style="color:var(--warn); font-weight:bold;">Achtung: Dieses Feature sollte aktuell nur testweise genutzt werden!</span> Bei längerer Offline-Nutzung kann der strikte Zeitstempel-Abgleich zu Datenverlust führen. Nutze für maximale Sicherheit die manuellen Push/Pull-Buttons.</li>
+            <li><strong>☁️ Push (SAVE):</strong> Sichert deinen aktuellen lokalen Stand manuell in der Cloud.</li>
+            <li><strong>📥 Pull (LOAD):</strong> Lädt den Speicherstand manuell aus der Cloud herunter.</li>
+            <li><strong>🔄 Auto-Sync (Soft-Sync):</strong> Wenn der Schalter aktiviert ist, arbeitet die App extrem ressourcenschonend und sicher:
+                <ul style="margin-top: 4px;">
+                    <li><strong>Smartes Laden & Speichern:</strong> Die App lädt beim Öffnen des Tabs automatisch den neuesten Stand und pusht deine Änderungen beim Schließen (oder beim in den Hintergrund wischen auf dem Tablet/Smartphone) leise in die Cloud.</li>
+                    <li><strong>Idle-Schutz (Konfliktlösung):</strong> Lässt du die App länger als 30 Sekunden ungenutzt offen, prüft sie beim nächsten Klick automatisch die Cloud. Wurde in der Zwischenzeit z.B. auf dem iPad etwas geändert, warnt dich die App vor einem Überschreiben und lässt dir die Wahl!</li>
+                </ul>
+            </li>
         </ul>
 
         <h3>👥 Crew Board (Mit Freunden fliegen)</h3>

@@ -348,6 +348,35 @@ let currentDepFreq = "";
 let currentDestFreq = "";
 let globalAirports = null, runwayCache = {}, freqCache = {};
 
+/* =========================================================
+   PWA UPDATE TRIGGER & SOFT AUTO SYNC EVENTS
+   ========================================================= */
+let isRefreshing = false;
+if ('serviceWorker' in navigator) {
+    // Erzwingt einen automatischen Reload, sobald ein Update (neue sw.js Version) installiert wurde
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!isRefreshing) { isRefreshing = true; window.location.reload(); }
+    });
+}
+// SOFT AUTO SYNC: Lädt beim Öffnen, Speichert beim Schließen (oder in den Hintergrund wischen)
+window.addEventListener('visibilitychange', () => {
+    const t = document.getElementById('syncToggle');
+    if (t && t.checked && getSyncId()) {
+        if (document.visibilityState === 'hidden') {
+            triggerCloudSave(true); // Push in die Cloud (nur wenn sich Daten wirklich geändert haben)
+        } else if (document.visibilityState === 'visible') {
+            silentSyncLoad(); // Pull aus der Cloud
+        }
+    }
+});
+window.addEventListener('pagehide', () => {
+    const t = document.getElementById('syncToggle');
+    if (t && t.checked && getSyncId()) {
+        triggerCloudSave(true); // Letzter Rettungs-Push beim Schließen des Tabs
+    }
+});
+/* ========================================================= */
+
 async function fetchWithTimeout(url, ms = 6000) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), ms);
@@ -5810,71 +5839,94 @@ async function forceGroupSync() {
     await triggerGroupSave(true);
     await silentGroupSync();
 }
-// === Auto-Sync Trigger (Adaptive Polling: 10s / 30s / Sleep) ===
+// === Auto-Sync Trigger (Adaptive Polling & Idle-Conflict-Check) ===
 let syncLastActivityTime = Date.now();
 let syncLastFetchTime = Date.now();
 let syncIsSleeping = false;
+let idleCheckInProgress = false;
+async function checkCloudAfterIdle() {
+    const id = getSyncId();
+    if (!id) return;
+    idleCheckInProgress = true;
+    updateSyncStatus("Prüfe Cloud...");
+    try {
+        const res = await fetch(SYNC_URL + id);
+        if (!res.ok) throw new Error("Netzwerkfehler");
+        const data = await res.json();
+        if (data.lastModified && data.lastModified > localSyncTime) {
+            // Lokalen Status abgleichen (Habe ich hier ungespeicherte Änderungen?)
+            const payloadToCompare = {
+                pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
+                logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
+                activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
+                groupName: getGroupName(),
+                groupNick: getGroupNick(),
+                knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
+                newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
+            };
+            const currentPayloadStr = JSON.stringify(payloadToCompare);
+            const hasLocalUnsavedChanges = (currentPayloadStr !== lastSyncedPayloadStr);
+            let msg = "☁️ NEUE CLOUD DATEN VERFÜGBAR\n\nEin anderes Gerät hat in der Zwischenzeit neue Daten gespeichert.\nMöchtest du deinen aktuellen Bildschirm aktualisieren?";
+            if (hasLocalUnsavedChanges) {
+                msg = "⚠️ CLOUD KONFLIKT\n\nEin anderes Gerät hat in der Zwischenzeit neue Daten gespeichert. Du hast hier aber UNGESPEICHERTE lokale Änderungen!\n\nMöchtest du die Cloud-Daten laden? (Deine lokalen Änderungen hier gehen dann verloren!)";
+            }
+            if (confirm(msg)) {
+                // User will laden -> Daten anwenden
+                localSyncTime = data.lastModified;
+                localStorage.setItem('ga_sync_time', localSyncTime);
+                if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
+                if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
+                if (data.activeMission) {
+                    localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
+                    restoreMissionState(data.activeMission);
+                } else {
+                    localStorage.removeItem('ga_active_mission');
+                    document.getElementById("briefingBox").style.display = "none";
+                }
+                if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
+                if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
+                if (data.groupName !== undefined) {
+                    updateGroupUIFromSync(data.groupName, data.groupNick);
+                }
+                setLastSyncedPayload();
+                updateGroupBadgeUI();
+                if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
+                renderLog();
+                updateSyncStatus("Cloud-Update geladen ✅");
+                flashSyncIndicator('down');
+            } else {
+                // User lehnt ab -> Behalte lokale Daten.
+                // Wir setzen die Sync-Zeit künstlich hoch, damit der lokale Stand als der "neueste" gilt und beim Schließen gepusht wird.
+                localSyncTime = Date.now();
+                localStorage.setItem('ga_sync_time', localSyncTime);
+                updateSyncStatus("Lokaler Stand behalten");
+            }
+        } else {
+            updateSyncStatus("Auto-Sync: Aktuell ✅");
+        }
+    } catch(e) {
+        updateSyncStatus("Cloud-Prüfung fehlgeschlagen", true);
+    }
+    // 10 Sekunden Cooldown, damit man bei vielen Klicks nicht bombardiert wird
+    setTimeout(() => { idleCheckInProgress = false; }, 10000);
+}
 function resetSyncTimer() {
     const now = Date.now();
+    const idleTime = now - syncLastActivityTime;
+    // IDLE CHECK: Wenn länger als 30 Sekunden keine Aktion stattfand
+    if (idleTime > 30000 && !idleCheckInProgress) {
+        const t = document.getElementById('syncToggle');
+        if (getSyncId() && t && t.checked) {
+            checkCloudAfterIdle();
+        }
+    }
     syncLastActivityTime = now;
     if (syncIsSleeping) {
         syncIsSleeping = false;
-        if (document.visibilityState === 'visible') silentSyncLoad();
         syncLastFetchTime = now;
     }
 }
 ['click', 'touchstart', 'scroll', 'keydown'].forEach(evt => {
     document.addEventListener(evt, resetSyncTimer, { passive: true, capture: true });
 });
-// Wenn der Tab in den Vordergrund/Hintergrund wechselt
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === 'visible') {
-        resetSyncTimer();
-        silentSyncLoad();
-    } else if (document.visibilityState === 'hidden') {
-        // App wird in den Hintergrund gewischt oder geschlossen
-        if (syncSaveTimeout) {
-            clearTimeout(syncSaveTimeout);
-            syncSaveTimeout = null;
-            triggerCloudSave(true); // Sofort pushen!
-        }
-    }
-});
-window.addEventListener("focus", () => { resetSyncTimer(); silentSyncLoad(); });
-// Fallback für alte iOS-Versionen oder explizites Tab-Schließen
-window.addEventListener("pagehide", () => {
-    if (syncSaveTimeout) {
-        clearTimeout(syncSaveTimeout);
-        syncSaveTimeout = null;
-        triggerCloudSave(true);
-    }
-});
-setTimeout(setLastSyncedPayload, 1000);
-setInterval(() => {
-    if (document.visibilityState !== 'visible') return;
-    const t = document.getElementById('syncToggle');
-    const personalSyncActive = getSyncId() && t && t.checked;
-    const groupSyncActive = !!getGroupName();
-    // Loop abbrechen, wenn weder Personal noch Group Sync an sind
-    if (!personalSyncActive && !groupSyncActive) return;
-    const now = Date.now();
-    const idleTime = now - syncLastActivityTime;
-
-    if (idleTime < 60000) {
-        // Phase 1: Aktiv (Letzte Aktivität vor < 60 Sekunden) -> Alle 10s
-        if (personalSyncActive) silentSyncLoad();
-        if (groupSyncActive) silentGroupSync();
-        syncLastFetchTime = now;
-    } else if (idleTime < 180000) {
-        // Phase 2: Halbschlaf (1 bis 3 Minuten) -> Alle 30s
-        if (now - syncLastFetchTime >= 30000) {
-            if (personalSyncActive) silentSyncLoad();
-            if (groupSyncActive) silentGroupSync();
-            syncLastFetchTime = now;
-        }
-    } else {
-        // Phase 3: Tiefschlaf (> 3 Minuten) -> Sync stoppen
-        syncIsSleeping = true;
-    }
-}, 10000);
 setTimeout(() => initAltWaypoints(), 2000);
