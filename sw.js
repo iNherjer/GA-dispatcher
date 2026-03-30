@@ -1,13 +1,18 @@
 // GA Dispatcher – Service Worker
-const CACHE = 'ga-dispatcher-v39';
+const CACHE = 'ga-dispatcher-v224';
 
 const STATIC = [
     './',
     './index.html',
     './styles.css',
     './app.js',
+    './sync.js',
+    './profile.js',
+    './map.js',
+    './board.js',
     './datenbank.js',
     './missions.js',
+    './airports.json',
     './manifest.json',
     './Icon.PNG',
     './IconDRK.PNG',
@@ -17,7 +22,6 @@ const STATIC = [
     './board.jpg',
     './map.jpg',
     './pinicon.png',
-    // CDN – Leaflet
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
     // CDN – html2canvas & jsPDF
@@ -28,6 +32,10 @@ const STATIC = [
 // API-Domains – immer vom Netz holen, nie cachen
 const NETWORK_ONLY = [
     'ga-proxy.einherjer.workers.dev',
+    'aviationweather.gov',
+    'api.codetabs.com',
+    'corsproxy.io',
+    'api.allorigins.win',
     'api.open-meteo.com',
     'nominatim.openstreetmap.org',
     'opensky-network.org',

@@ -16,6 +16,8 @@
     --navlog-data: #ffcc00;
     --navlog-freq: #ffcc00;
     --navlog-border: #444;
+    --plane-color: #E63946;
+    --plane-size: 40px;
 }
 
 html {
@@ -106,9 +108,9 @@ h1 {
     text-align: center;
     margin-bottom: 15px;
     font-style: italic;
-    height: 15px;
+    min-height: 18px;
+    line-height: 1.4;
     opacity: 1.0;
-    /* Verhindert horizontales Layout-Zucken bei langen Texten! */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1901,6 +1903,38 @@ body.theme-retro .api-fuel-meter .api-scale {
 .vp-zoom-btn:active {
     background: #222;
 }
+
+.vp-ctrl-btn {
+    background: #333; color: #fff; border: 1px solid #555; width: 22px; height: 22px;
+    font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 3px;
+    line-height: 1; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; flex-shrink: 0;
+}
+.vp-ctrl-btn:active { background: #111; }
+.vp-ctrl-val {
+    color: #4da6ff; font-family: monospace; font-size: 14px; font-weight: bold;
+    cursor: pointer; padding: 0 4px; min-width: 3ch; text-align: center;
+    user-select: none; transition: color 0.1s;
+}
+.vp-ctrl-val:active { color: #fff; }
+.vp-ctrl-input {
+    background: rgba(0, 0, 0, 0.3); color: #fff; font-family: monospace; font-size: 12px;
+    border: 1px solid #444; width: 58px; text-align: center; margin: 0 2px;
+    -moz-appearance: textfield; padding: 4px 2px; border-radius: 3px; box-sizing: border-box;
+}
+.vp-ctrl-input:focus { border: 1px solid #4da6ff; outline: none; background: #111; color: #fff; }
+.vp-ctrl-input::-webkit-outer-spin-button, .vp-ctrl-input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+}
+.vp-ctrl-label {
+    color: #fff; font-size: 11px; font-family: monospace; min-width: 32px; text-align: center;
+    cursor: pointer; user-select: none;
+}
+.vp-toggle-cloud {
+    background: transparent; border: none; font-size: 16px; cursor: pointer;
+    filter: grayscale(100%); opacity: 0.4; transition: 0.2s; margin-left: 4px; flex-shrink: 0;
+}
+.vp-toggle-cloud.active { filter: none; opacity: 1; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
 
 .map-profile-scroll {
     flex: 1;
@@ -3997,4 +4031,102 @@ body.theme-navcom .btn-menu:active {
     border-radius: 50%;
     box-sizing: border-box;
     display: none;
+}
+
+/* ==========================================================================
+   4. MAP OVERLAYS (Auto-Follow & Telemetry)
+   ========================================================================== */
+.map-overlay-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10001;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: var(--blue);
+    color: #000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.map-overlay-btn:active {
+    transform: scale(0.9);
+}
+.telemetry-box {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10001;
+    background: rgba(15,15,15,0.85);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    padding: 12px 15px;
+    border-radius: 10px;
+    border: 1.5px solid #444;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    pointer-events: none;
+    min-width: 100px;
+}
+.tele-val {
+    font-weight: bold;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+}
+.tele-unit {
+    font-size: 10px;
+    color: #888;
+    margin-left: 4px;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   DIRECT TO MODE
+   ========================================================================== */
+#freeflightBtn.active {
+    background: #00e5ff !important;
+    color: #000 !important;
+    font-weight: bold;
+}
+.ff-context-popup .leaflet-popup-content-wrapper {
+    background: rgba(10, 10, 10, 0.92);
+    border: 2px solid #00e5ff;
+    border-radius: 6px;
+    color: #fff;
+}
+.ff-context-popup .leaflet-popup-tip {
+    border-top-color: rgba(10, 10, 10, 0.92);
+}
+.ff-context-popup .leaflet-popup-close-button {
+    color: #aaa;
+}
+.ff-toast {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 229, 255, 0.9);
+    color: #000;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 8px 18px;
+    border-radius: 4px;
+    z-index: 1000;
+    pointer-events: none;
+    white-space: nowrap;
+    animation: ffToastFade 3s ease-out forwards;
+}
+@keyframes ffToastFade {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
 }

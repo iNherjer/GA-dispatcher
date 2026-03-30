@@ -1,0 +1,3133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>2D GA Flight Simulator v0.7 - Constant Speed Prop</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
+        canvas { display: block; }
+
+        .warn { position:absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 24px; color: red; font-weight: bold; display: none; animation: blink 1s infinite; z-index: 2000; }
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        /* ===================== COCKPIT PANEL ===================== */
+        #sidebar {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 320px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+            border-left: 3px solid #333;
+            color: white; padding: 8px; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 6px; user-select: none;
+            overflow-y: auto; z-index: 1000;
+            font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+        }
+        .panel-section {
+            background: linear-gradient(145deg, #1e1e1e, #141414);
+            border: 1px solid #333; border-radius: 6px;
+            padding: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+        }
+        .panel-label {
+            font-size: 9px; text-transform: uppercase; letter-spacing: 2px;
+            color: #777; text-align: center; margin-bottom: 6px;
+        }
+
+        /* --- Six-Pack Flight Instruments --- */
+        .sixpack {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 6px; justify-items: center;
+        }
+        .inst {
+            width: 88px; height: 88px; border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, #1a1a1a, #050505);
+            border: 3px solid #444;
+            position: relative; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-size: 9px; font-weight: bold; flex-direction: column;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.5);
+        }
+        .inst::after {
+            content: ''; position: absolute; top: 2px; left: 10%; width: 80%; height: 40%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
+            border-radius: 50%; pointer-events: none;
+        }
+        .inst-label { position: absolute; bottom: 14px; color: #888; z-index: 2; font-size: 8px; letter-spacing: 1px; }
+        .inst-val { position: absolute; bottom: 3px; font-size: 13px; z-index: 2; color: #0f0; font-family: 'Courier New', monospace; }
+        .needle {
+            position: absolute; width: 2px; height: 38px; background: white;
+            bottom: 50%; transform-origin: bottom center; transition: transform 0.1s; z-index: 3;
+            box-shadow: 0 0 4px rgba(255,255,255,0.3);
+        }
+        .needle::after {
+            content: ''; position: absolute; bottom: -4px; left: -3px;
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #555; border: 1px solid #777;
+        }
+        .horizon-bg {
+            position: absolute; width: 150%; height: 200%;
+            background: linear-gradient(to bottom, #2e6bb5 50%, #6b4226 50%);
+            top: -50%; transition: transform 0.1s;
+        }
+        .horizon-line { position: absolute; width: 40px; height: 2px; background: #FFD700; z-index: 2; box-shadow: 0 0 3px #FFD700; }
+
+        /* --- Round Engine Gauges --- */
+        .engine-gauges {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 6px; justify-items: center;
+        }
+        .gauge {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, #1a1a1a, #050505);
+            border: 2px solid #444; position: relative;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 1px 4px rgba(0,0,0,0.4);
+        }
+        .gauge-label { font-size: 7px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+        .gauge-val { font-size: 16px; font-weight: bold; font-family: 'Courier New', monospace; color: #0f0; }
+        .gauge-unit { font-size: 7px; color: #666; margin-top: 1px; }
+        .gauge-bar {
+            position: absolute; bottom: 6px; width: 50px; height: 4px;
+            background: #222; border-radius: 2px; overflow: hidden;
+        }
+        .gauge-bar-fill { height: 100%; background: #4CAF50; width: 0%; transition: width 0.15s, background 0.15s; border-radius: 2px; }
+
+        /* --- Power Quadrant --- */
+        .power-quadrant {
+            display: flex; gap: 8px; background: linear-gradient(145deg, #1e1e1e, #111);
+            padding: 10px 8px; border-radius: 6px; justify-content: center;
+            border: 1px solid #333; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .lever-col {
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+        }
+        .lever-col label {
+            font-size: 9px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;
+        }
+        .lever-col input[type="range"] {
+            -webkit-appearance: slider-vertical; appearance: slider-vertical;
+            writing-mode: bt-lr; height: 90px; width: 18px; cursor: pointer;
+        }
+        .lever-col.thr label { color: #aaa; }
+        .lever-col.thr input { accent-color: #888; }
+        .lever-col.prop label { color: #42a5f5; }
+        .lever-col.prop input { accent-color: #2196F3; }
+        .lever-col.mix label { color: #ef5350; }
+        .lever-col.mix input { accent-color: #f44336; }
+        .lever-col.flap label { color: #ccc; }
+        .lever-col.flap input { accent-color: white; direction: rtl; }
+
+        /* --- Annunciator / Switches --- */
+        .switch-row {
+            display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+        }
+        .cockpit-btn {
+            padding: 6px 10px; font-size: 10px; font-weight: bold;
+            background: #2a2a2a; color: #ccc; border: 1px solid #555;
+            border-radius: 4px; cursor: pointer; text-transform: uppercase;
+            letter-spacing: 1px; transition: background 0.15s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .cockpit-btn:active { transform: translateY(1px); box-shadow: none; }
+
+        /* Legacy compat */
+        .bar-container { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .bar { flex: 1; height: 12px; background: #333; border-radius: 6px; overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; background: #4CAF50; width: 0%; transition: width 0.1s, background 0.1s; }
+        .bar-label { min-width: 40px; }
+        .bar-val { min-width: 35px; text-align: right; }
+        .pedestal { display: flex; gap: 15px; background: #222; padding: 15px; border-radius: 8px; justify-content: center; }
+        .slider-col { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; }
+        .slider-col input[type="range"] {
+            -webkit-appearance: slider-vertical; appearance: slider-vertical;
+            writing-mode: bt-lr; height: 100px; width: 15px;
+        }
+        .slider-col.thr input { accent-color: #888; }
+        .slider-col.prop input { accent-color: #2196F3; }
+        .slider-col.mix input { accent-color: #f44336; }
+        .slider-col.flap input { accent-color: white; direction: rtl; }
+        .inst-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+        .trim-controls { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 11px; }
+        .trim-controls button { padding: 4px 8px; cursor: pointer; color: black; }
+
+        /* Mobile Triple-Decker Responsive Layout */
+        @media (max-width: 800px), (orientation: portrait) {
+            body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; touch-action: none; }
+            button, input, #sidebar, #mobile-minimap-container { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+            #mobile-flight-view, #gameCanvas { touch-action: none !important; -webkit-user-select: none; user-select: none; }
+
+            #mobile-flight-view { flex: 1 1 0%; min-height: 0; height: auto !important; order: 1; overflow: hidden; position: relative; }
+            #gameCanvas { width: 100% !important; height: 100% !important; }
+
+            #mobile-minimap-container { width: 100vw !important; height: 8vh !important; order: 2; border-bottom: 2px solid #555; flex-shrink: 0; position: relative; margin: 0; padding: 0; overflow: hidden; }
+            #minimap { width: 100% !important; height: 100% !important; position: relative !important; top: 0 !important; left: 0 !important; display: block; border-radius: 0; border: none; }
+
+            #sidebar {
+                position: relative !important; width: 100vw !important; height: auto !important;
+                order: 4; border-left: none; border-top: 2px solid #444;
+                padding: 0 env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 8px) env(safe-area-inset-left, 0) !important;
+                display: flex !important; flex-direction: column !important;
+                gap: 0 !important; flex-shrink: 0; overflow: hidden !important;
+            }
+            .mobile-row-top { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; height: auto !important; min-height: 50px; padding: 2px 0 !important; border-bottom: 1px solid #333; }
+            .mobile-row-bottom { display: flex; flex-direction: row; justify-content: space-between; align-items: stretch; width: 100%; flex: 1; padding: 0 !important; }
+
+            /* Dashboard: Instruments + Engine in one flat row, hide DG + OAT */
+            .inst-dg { display: none !important; }
+            .gauge-oat { display: none !important; }
+            .sixpack { grid-template-columns: repeat(5, 1fr) !important; gap: 2px !important; }
+            .inst { width: 36px !important; height: 36px !important; border-width: 1.5px !important; }
+            .inst-val { font-size: 7px !important; bottom: 0px !important; }
+            .inst-label { bottom: 4px !important; font-size: 5px !important; }
+            .needle { height: 16px !important; }
+            .panel-label { font-size: 6px !important; margin-bottom: 1px !important; letter-spacing: 1px !important; }
+            .panel-section { padding: 2px 4px !important; }
+
+            /* Engine gauges: compact row beside sixpack, 5 cols (no OAT) */
+            .engine-gauges { grid-template-columns: repeat(5, 1fr) !important; gap: 2px !important; }
+            .gauge { width: 36px !important; height: 36px !important; border-width: 1.5px !important; }
+            .gauge-label { font-size: 5px !important; }
+            .gauge-val { font-size: 9px !important; }
+            .gauge-unit { font-size: 5px !important; }
+            .gauge-bar { width: 24px !important; height: 3px !important; bottom: 3px !important; }
+
+            /* OAT text display under score on mobile */
+            #mobile-oat-display {
+                position: fixed; top: calc(env(safe-area-inset-top, 15px) + 26px);
+                left: 50%; transform: translateX(-50%);
+                font-size: 11px; color: #0dd; font-family: 'Courier New', monospace;
+                text-shadow: 1px 1px 3px rgba(0,0,0,0.8); z-index: 2000; pointer-events: none;
+            }
+
+            /* Show instruments + engine side by side in one row */
+            #mobile-dashboard-row .panel-section {
+                display: inline-flex !important; flex-direction: column; align-items: center;
+                vertical-align: top; width: auto; flex-shrink: 1; flex: 1;
+            }
+            #mobile-dashboard-row {
+                display: flex; flex-direction: row; gap: 4px; width: 100%;
+                padding: 2px 4px; box-sizing: border-box; align-items: flex-start;
+                justify-content: center; flex-shrink: 0; border-bottom: 1px solid #333;
+            }
+
+            .pedestal { flex: 1; padding: 0 !important; background: transparent !important; gap: 5px !important; justify-content: flex-end !important; padding-right: 15px !important; }
+            .power-quadrant { flex: 1; gap: 0 !important; justify-content: space-around !important; padding: 2px 8px !important; align-items: stretch !important; }
+            .lever-col { flex: 1; justify-content: stretch !important; }
+            .lever-col input[type="range"] { height: 100% !important; flex: 1; }
+            .lever-col label { font-size: 8px !important; }
+            .slider-col { gap: 2px !important; }
+            .slider-col input[type="range"] { height: 80px !important; width: 30px !important; }
+            .bar-container { font-size: 8px !important; gap: 2px !important; }
+            .bar { height: 6px !important; }
+
+            #simRateControls { position: static !important; background: none !important; padding: 2px !important; }
+            #routeScaleControls { position: static !important; background: none !important; padding: 2px !important; }
+            #simRateControls span, #routeScaleControls span { display: none; }
+
+            .radio-btn, .mobile-ctrl-btn { padding: 6px !important; font-size: 11px !important; min-height: 40px; }
+            #mobile-pitch { width: 55px !important; margin: 0 !important; }
+
+            /* --- Mobile Top HUD Bar --- */
+            #mobile-top-hud {
+                position: fixed; top: 0; left: 0; right: 0;
+                padding: calc(env(safe-area-inset-top, 15px) + 4px) env(safe-area-inset-right, 8px) 6px env(safe-area-inset-left, 8px);
+                display: flex; justify-content: space-between; align-items: flex-start;
+                z-index: 9999; pointer-events: none;
+            }
+            #mobile-top-hud > * { pointer-events: auto; }
+            #mobile-top-hud button { min-height: 38px; min-width: 38px; font-size: 11px; }
+            .hud-left { display: flex; gap: 6px; }
+            .hud-left button { background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 8px 10px; font-weight: bold; font-family: sans-serif; }
+            .hud-center { flex: 1; display: flex; justify-content: center; pointer-events: none; }
+
+            /* Score repositioned on mobile to sit at safe-area top center */
+            #score-display { top: calc(env(safe-area-inset-top, 15px) + 4px) !important; font-size: 16px !important; }
+            .hud-right { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+            .hud-right button { min-height: 32px; min-width: 32px; padding: 4px 6px; font-size: 10px; }
+
+            /* Hide old absolute-positioned top buttons on mobile (now in HUD) */
+            .desktop-top-buttons { display: none !important; }
+
+            /* --- Floating Action Buttons on Flight View --- */
+            #btn-flip-dir, #btn-recenter {
+                position: absolute; z-index: 1500;
+                width: 56px; height: 56px; border-radius: 50%;
+                background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.4);
+                color: white; font-size: 24px; cursor: pointer;
+                display: flex; align-items: center; justify-content: center;
+            }
+            #btn-flip-dir { bottom: 15px; left: 15px; }
+            #btn-recenter { bottom: 15px; right: 15px; display: none; }
+
+            /* --- Cockpit Toggle Bar --- */
+            #cockpit-toggle {
+                order: 3; height: 28px; background: #1a1a1a; border-top: 1px solid #444; border-bottom: 1px solid #333;
+                display: flex; align-items: center; justify-content: center; color: #888;
+                font-size: 16px; cursor: pointer; flex-shrink: 0; -webkit-user-select: none; user-select: none;
+            }
+
+            /* --- Compact Cockpit (collapsed) --- */
+            #sidebar.cockpit-collapsed { height: auto !important; }
+            #sidebar.cockpit-collapsed #mobile-dashboard-row { display: none !important; }
+            #sidebar.cockpit-collapsed .panel-section { display: none !important; }
+            #sidebar.cockpit-collapsed .pq-section { display: flex !important; margin-top: 0 !important; }
+            #sidebar.cockpit-collapsed .pq-section .panel-label { display: none !important; }
+            #sidebar.cockpit-collapsed > div:last-child { display: none !important; } /* Hide restart in collapsed */
+
+            /* --- Power Quadrant: fixed layout, no shift when toggling --- */
+            .pq-section {
+                flex: 1 !important; display: flex !important; flex-direction: column !important;
+                margin-top: 0 !important;
+            }
+            .pq-section .panel-label { flex-shrink: 0; height: 14px; line-height: 14px; }
+
+            /* --- Touch Target Minimums --- */
+            .cockpit-btn { min-height: 44px; min-width: 44px; padding: 8px 10px !important; font-size: 10px !important; }
+
+            /* --- Annunciator row compact on mobile --- */
+            .switch-row { gap: 3px !important; }
+
+            /* --- Start Overlay & Weather Menu mobile --- */
+            #startOverlay { padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px) 16px !important; }
+            #startOverlay textarea { width: 95% !important; height: 100px !important; font-size: 11px !important; }
+            #startOverlay h1 { font-size: 20px !important; margin-bottom: 10px !important; }
+            #startOverlay .start-buttons { flex-direction: column !important; gap: 10px !important; align-items: center; }
+            #startOverlay .start-buttons button { width: 80vw; max-width: 350px; font-size: 14px !important; padding: 12px 20px !important; }
+
+            #weatherMenu .weather-buttons { flex-direction: column !important; gap: 12px !important; align-items: center; }
+            #weatherMenu .weather-buttons button { width: 80vw; max-width: 350px; font-size: 16px !important; padding: 14px 20px !important; }
+            #weatherMenu h1 { font-size: 22px !important; margin-bottom: 20px !important; }
+        }
+
+        /* Global Mobile UX - Large Slider Thumbs */
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 30px; width: 30px; border-radius: 50%; background: #fff; border: 2px solid #000; cursor: pointer; margin-top: 0px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        input[type=range]::-moz-range-thumb { height: 30px; width: 30px; border-radius: 50%; background: #fff; border: 2px solid #000; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+
+        /* Mega-Thumb for Pitch Slider */
+        #mobile-pitch::-webkit-slider-thumb { width: 50px !important; height: 50px !important; border-width: 3px !important; }
+        #mobile-pitch::-moz-range-thumb { width: 50px !important; height: 50px !important; border-width: 3px !important; }
+
+        /* Desktop: hide mobile-only elements, show desktop score */
+        @media (min-width: 801px) and (orientation: landscape) {
+            #mobile-top-hud, #btn-flip-dir, #btn-recenter, #cockpit-toggle, #mobile-dashboard-row, #mobile-oat-display, #mobile-pitch-controls { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="startOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index: 3000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white;">
+        <h1 style="margin-bottom: 20px;">GA Simulator Bootstrapper</h1>
+        <textarea id="fplInput" style="width: 80%; max-width: 600px; height: 150px; font-family: monospace; background: #222; color: #0f0; border: 1px solid #555; padding: 10px;">{
+  "weather": { "windVX": -5, "windVY": 0, "oat": 15, "qnh": 1013, "cloudBase": 1500 },
+  "waypoints": [
+    { "x": -50, "elevation": 0, "type": "runway", "length": 1550 },
+    { "x": 3000, "elevation": 50, "type": "terrain" },
+    { "x": 6000, "elevation": 15, "type": "runway", "length": 800 },
+    { "x": 10000, "elevation": 200, "type": "terrain" }
+  ],
+  "landmarks": [{ "x": 4500, "name": "Airport City", "type": "city" }],
+  "weatherZones": [{ "x": 5000, "hasRain": true, "clouds": [{"baseM": 400, "type": "OVC"}] }],
+  "airspaces": [{ "startX": 0, "endX": 10000, "lowerM": 0, "upperM": 1200, "isLowerAgl": true, "isCTR": true, "name": "CTR" }]
+}</textarea>
+        <div class="start-buttons" style="display:flex; gap:20px; margin-top: 20px;">
+            <button id="startFlightBtn" style="padding: 15px 25px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; font-weight: bold;">Load FPL from Dispatcher</button>
+            <button id="startDemoWorldBtn" style="padding: 10px 16px; font-size: 12px; cursor: pointer; background: #555; color: #aaa; border: 1px solid #777; border-radius: 5px;">Debug: Demo World</button>
+        </div>
+    </div>
+
+    <div id="weatherMenu" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 5000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; font-family: sans-serif;">
+        <h1 style="margin-bottom: 30px; text-shadow: 2px 2px 4px #000;">FLIGHT CONDITIONS</h1>
+        <div class="weather-buttons" style="display: flex; gap: 20px;">
+            <button onclick="startGame('real')" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #3498db; color: white; border: 2px solid #fff; border-radius: 8px; cursor: pointer;">Real (Dispatcher)</button>
+            <button onclick="startGame('easy')" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #2ecc71; color: white; border: 2px solid #fff; border-radius: 8px; cursor: pointer;">Easy (Clear/Few)</button>
+            <button onclick="startGame('hard')" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #e74c3c; color: white; border: 2px solid #fff; border-radius: 8px; cursor: pointer;">Anspruchsvoll (IMC/Precip)</button>
+        </div>
+    </div>
+
+    <div id="stallWarn" class="warn">STALL WARNUNG!</div>
+
+    <!-- Score Display (shared between mobile HUD and desktop) -->
+    <div id="score-display" style="position: absolute; top: max(15px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: bold; color: #FFD700; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 2000; pointer-events: none;">Score: 0</div>
+    <!-- FPS Debug Overlay -->
+    <div id="fps-debug" style="position:fixed; top:5px; left:5px; z-index:99999; background:rgba(0,0,0,0.7); color:#0f0; font:bold 14px monospace; padding:4px 8px; border-radius:4px; pointer-events:none; line-height:1.4;">0 FPS</div>
+    <!-- Mobile OAT readout under score -->
+    <div id="mobile-oat-display">OAT: 15°C</div>
+
+    <!-- Mobile Top HUD Bar -->
+    <div id="mobile-top-hud">
+        <div class="hud-left">
+            <button id="btn-alt-mode" onpointerdown="window.isAglMode = !window.isAglMode; this.innerText = window.isAglMode ? 'AGL' : 'MSL'; event.preventDefault();">MSL</button>
+            <button onpointerdown="window.toggleATC(); event.preventDefault();" style="background: #2980b9;">ATC</button>
+        </div>
+        <div class="hud-center"></div>
+        <div class="hud-right" id="mobile-hud-right"></div>
+    </div>
+
+    <!-- Desktop top buttons (hidden on mobile via CSS) -->
+    <div class="desktop-top-buttons" style="position: absolute; top: max(15px, env(safe-area-inset-top)); left: max(15px, env(safe-area-inset-left)); z-index: 9999; display: flex; gap: 10px;">
+        <button id="btn-alt-mode-dt" onpointerdown="window.isAglMode = !window.isAglMode; this.innerText = window.isAglMode ? 'Grid: AGL' : 'Grid: MSL'; document.getElementById('btn-alt-mode').innerText = window.isAglMode ? 'AGL' : 'MSL'; event.preventDefault();" style="pointer-events: auto; background: rgba(0, 0, 0, 0.5); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-family: sans-serif; font-weight: bold; cursor: pointer;">Grid: MSL</button>
+        <button id="btn-mobile-atc" onpointerdown="window.toggleATC(); event.preventDefault();" style="pointer-events: auto; background: #2980b9; color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 10px; font-family: sans-serif; font-weight: bold; cursor: pointer;">ATC / RADIO</button>
+    </div>
+
+
+
+    <div id="sidebar">
+        <!-- ===== PRIMARY FLIGHT INSTRUMENTS (Six-Pack) ===== -->
+        <div class="panel-section">
+            <div class="panel-label">Primary Flight</div>
+            <div class="sixpack">
+                <!-- Row 1: ASI, Attitude, Altimeter -->
+                <div class="inst"><div class="needle" id="ndl-spd"></div><div class="inst-label">ASI</div><div class="inst-val" id="val-spd">0</div></div>
+                <div class="inst"><div class="horizon-bg" id="ndl-att"></div><div class="horizon-line"></div><div class="inst-label">ATT</div></div>
+                <div class="inst"><div class="needle" id="ndl-alt"></div><div class="inst-label">ALT</div><div class="inst-val" id="val-alt">0</div></div>
+                <!-- Row 2: Trim, DG (placeholder), VSI -->
+                <div class="inst" style="border-color: #27ae60;">
+                    <div class="inst-label" style="bottom:16px;">TRIM</div>
+                    <div class="inst-val" id="val-trim" style="color:#27ae60; font-size:14px;">0.050</div>
+                </div>
+                <div class="inst inst-dg" style="border-color: #555;">
+                    <div style="font-size:24px; color: #555;">N</div>
+                    <div class="inst-label">DG</div>
+                </div>
+                <div class="inst"><div class="needle" id="ndl-vsi"></div><div class="inst-label">VSI</div><div class="inst-val" id="val-vsi">0</div></div>
+            </div>
+        </div>
+
+        <!-- ===== ENGINE INSTRUMENTS ===== -->
+        <div class="panel-section">
+            <div class="panel-label">Engine</div>
+            <div class="engine-gauges">
+                <!-- Row 1: RPM, MAP, CHT -->
+                <div class="gauge">
+                    <div class="gauge-label">RPM</div>
+                    <div class="gauge-val" id="val-rpm">0</div>
+                    <div class="gauge-bar"><div class="gauge-bar-fill" id="bar-rpm"></div></div>
+                </div>
+                <div class="gauge">
+                    <div class="gauge-label">MAP</div>
+                    <div class="gauge-val" id="val-map">0</div>
+                    <div class="gauge-unit">inHg</div>
+                </div>
+                <div class="gauge">
+                    <div class="gauge-label">CHT</div>
+                    <div class="gauge-val" id="val-tmp">0</div>
+                    <div class="gauge-bar"><div class="gauge-bar-fill" id="bar-tmp"></div></div>
+                </div>
+                <!-- Row 2: HP, HLT, OAT -->
+                <div class="gauge">
+                    <div class="gauge-label">HP</div>
+                    <div class="gauge-val" id="val-hp">0</div>
+                    <div class="gauge-bar"><div class="gauge-bar-fill" id="bar-hp"></div></div>
+                </div>
+                <div class="gauge">
+                    <div class="gauge-label">ENG HLT</div>
+                    <div class="gauge-val" id="val-hlt">100</div>
+                    <div class="gauge-bar"><div class="gauge-bar-fill" id="bar-hlt" style="width:100%"></div></div>
+                </div>
+                <div class="gauge gauge-oat" style="border-color: #0dd;">
+                    <div class="gauge-label">OAT</div>
+                    <div class="gauge-val" id="warn-oat" style="color: #0dd; font-size:14px;">15°C</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ANNUNCIATOR / SWITCHES ===== -->
+        <div class="panel-section">
+            <div class="switch-row">
+                <button id="btn-carbheat" class="cockpit-btn" onclick="window.carbHeatOn = !window.carbHeatOn; this.style.background = window.carbHeatOn ? '#e67e22' : '#2a2a2a'; this.style.color = window.carbHeatOn ? '#fff' : '#ccc'; this.innerText = 'CARB HEAT: ' + (window.carbHeatOn ? 'ON' : 'OFF');">CARB HEAT: OFF</button>
+                <button id="btn-zoom-in" class="cockpit-btn" onclick="event.stopPropagation(); isAutoZoom = false; document.getElementById('btn-auto-zoom').innerText = 'AUTO Z: OFF'; manualZoomLevel = Math.min(40, currentZoom * 1.5);">ZOOM +</button>
+                <button id="btn-zoom-out" class="cockpit-btn" onclick="event.stopPropagation(); isAutoZoom = false; document.getElementById('btn-auto-zoom').innerText = 'AUTO Z: OFF'; manualZoomLevel = Math.max(2, currentZoom / 1.5);">ZOOM -</button>
+                <button id="btn-auto-zoom" class="cockpit-btn" onclick="event.stopPropagation(); isAutoZoom = true; window.isCameraDetached = false; window.panOffsetX = 0; window.panOffsetY = 0; this.innerText = 'AUTO Z: ON';">AUTO Z: ON</button>
+            </div>
+        </div>
+
+        <!-- ===== WEATHER WARNINGS (absolute overlay) ===== -->
+        <div id="weather-warnings" style="position:absolute; top: 100px; left: 50%; transform: translateX(-50%); text-align:center; font-family:sans-serif; font-weight:bold; font-size:18px; text-shadow:2px 2px 4px #000; pointer-events:none; z-index:2500;">
+            <div id="warn-imc" style="color: #FFA500; display:none;">IMC LIMIT: <span id="imc-timer">60</span>s</div>
+            <div id="warn-carbice" style="color: #FF4444; display:none;">CARB ICE! PWR DROP</div>
+            <div id="warn-airframeice" style="color: #FF4444; display:none;">AIRFRAME ICE! STALL RISK</div>
+        </div>
+
+        <!-- ===== ATC RADIO ===== -->
+        <div id="radioMenu" style="display: none; width: 100%; box-sizing: border-box; background: #2a3b4c; border: 2px solid #5599ff; border-radius: 8px; padding: 10px; flex-shrink: 0; color: #fff; font-family: monospace; z-index: 10000 !important; pointer-events: auto;">
+            <div id="radioHistory" style="height: 80px; overflow-y: auto; margin-bottom: 10px; font-size: 14px; color: #aaa;"></div>
+            <div id="radioOptions" style="display: flex; flex-direction: column; gap: 5px;">
+                <button class="radio-btn" onclick="event.stopPropagation(); handleRadioOption(1);" ontouchstart="event.stopPropagation();">1. [Option A]</button>
+                <button class="radio-btn" onclick="event.stopPropagation(); handleRadioOption(2);" ontouchstart="event.stopPropagation();">2. [Option B]</button>
+                <button class="radio-btn" onclick="event.stopPropagation(); handleRadioOption(3);" ontouchstart="event.stopPropagation();">3. [Option C]</button>
+            </div>
+        </div>
+
+        <!-- ===== POWER QUADRANT ===== -->
+        <div class="panel-section pq-section" style="margin-top: auto; flex: 1; display: flex; flex-direction: column;">
+            <div class="panel-label">Power Quadrant</div>
+            <div class="mobile-row-bottom">
+                <div id="mobile-pitch-controls" style="display: flex; gap: 6px; align-items: stretch; padding-left: 6px;">
+                    <div class="lever-col" style="align-items:center; flex: 0 0 auto;">
+                        <label style="color: white; font-weight: bold; margin-bottom: 2px; font-size: 8px;">PITCH</label>
+                        <input type="range" id="mobile-pitch" min="-1.5" max="1.5" step="0.01" value="0" style="touch-action: none; flex: 1;">
+                        <span id="val-pitch" style="display:none;">0</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 3px; justify-content: stretch;">
+                        <button class="mobile-ctrl-btn cockpit-btn" id="btn-trim-up-mob" style="background: #27ae60; color: white; border: none; flex: 1;">TRIM ▲</button>
+                        <button class="mobile-ctrl-btn cockpit-btn" id="btn-trim-dn-mob" style="background: #27ae60; color: white; border: none; flex: 1;">TRIM ▼</button>
+                        <button class="mobile-ctrl-btn cockpit-btn" id="btn-brake-mob" style="background: #c0392b; color: white; border: none; flex: 1; touch-action: none;">BRAKE</button>
+                    </div>
+                </div>
+
+                <div class="power-quadrant">
+                    <div class="lever-col thr"><label>THR</label><input type="range" id="sl-thr" min="0" max="1" step="0.01" value="0"></div>
+                    <div class="lever-col prop"><label>PROP</label><input type="range" id="sl-prop" min="0" max="1" step="0.01" value="1"></div>
+                    <div class="lever-col mix"><label>MIX</label><input type="range" id="sl-mix" min="0" max="1" step="0.01" value="1"></div>
+                    <div class="lever-col flap"><label>FLAP</label><input type="range" id="sl-flap" min="0" max="3" step="1" value="0"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== RESTART ===== -->
+        <div style="padding: 2px; flex-shrink: 0;">
+            <button onclick="restartGame()" class="cockpit-btn" style="width:100%; background: #8b0000; color: #faa; border-color: #c0392b;">↻ RESTART SIMULATION</button>
+        </div>
+    </div>
+
+    <div id="mobile-minimap-container">
+        <canvas id="minimap" width="400" height="100" style="position: absolute; top: 10px; left: 10px; z-index: 100; border: 2px solid #333; border-radius: 4px;"></canvas>
+    </div>
+
+    <div id="cockpit-toggle">&#9660; Cockpit</div>
+    
+    <div id="simRateControls" style="position: absolute; top: 120px; left: 10px; z-index: 100; background: rgba(0, 0, 0, 0.7); color: white; padding: 5px; border-radius: 4px; font-family: sans-serif; font-size: 12px;">
+      <span>Sim Rate: </span>
+      <button onclick="simRate = 1" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">1x</button>
+      <button onclick="simRate = 2" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">2x</button>
+      <button onclick="simRate = 5" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">5x</button>
+      <button onclick="simRate = 10" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">10x</button>
+    </div>
+
+    <div id="routeScaleControls" style="position: absolute; top: 155px; left: 10px; z-index: 100; background: rgba(0, 0, 0, 0.7); color: white; padding: 5px; border-radius: 4px; font-family: sans-serif; font-size: 12px;">
+      <span>Route Compress: </span>
+      <button onclick="setRouteScale(1)" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">1x</button>
+      <button onclick="setRouteScale(2)" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">2x</button>
+      <button onclick="setRouteScale(5)" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">5x</button>
+      <button onclick="setRouteScale(10)" style="cursor:pointer; background: #444; color: white; border: 1px solid #777;">10x</button>
+    </div>
+
+    <div id="mobile-flight-view">
+        <canvas id="gameCanvas"></canvas>
+        <button id="btn-flip-dir" title="Richtung wechseln">&#x27F2;</button>
+        <button id="btn-recenter" title="Kamera zurücksetzen">&#x2295;</button>
+    </div>
+
+    <script>
+        // --- FPS Counter (debug) ---
+        var _fpsFrames = 0, _fpsLast = performance.now(), _fpsDisplay = 0;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            let isMobile = window.innerWidth <= 800 || window.innerHeight > window.innerWidth;
+            let mobileView = document.getElementById('mobile-flight-view');
+            let miniContainer = document.getElementById('mobile-minimap-container');
+            if (isMobile && mobileView && miniContainer) {
+                canvas.width = mobileView.clientWidth;
+                canvas.height = mobileView.clientHeight;
+                let minimap = document.getElementById('minimap');
+                minimap.width = miniContainer.clientWidth;
+                minimap.height = miniContainer.clientHeight;
+            } else {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                let minimap = document.getElementById('minimap');
+                if(minimap) { minimap.width = 400; minimap.height = 100; }
+            }
+        }
+        window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', () => { setTimeout(resize, 100); setTimeout(resize, 300); });
+        resize();
+        // Re-measure after flex layout settles (fixes squished canvas on mobile first load)
+        requestAnimationFrame(() => { resize(); requestAnimationFrame(() => { resize(); setTimeout(resize, 200); }); });
+        // ResizeObserver for robust canvas sizing when cockpit toggles
+        if (window.ResizeObserver) {
+            const mfv = document.getElementById('mobile-flight-view');
+            if (mfv) new ResizeObserver(() => { resize(); }).observe(mfv);
+        }
+
+        // --- MOBILE TOUCH PITCH SLIDER IMPLEMENTATION (Self-Centering) ---
+        const pitchSlider = document.getElementById('mobile-pitch');
+        const pitchValText = document.getElementById('val-pitch');
+
+        if (pitchSlider) {
+            pitchSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                plane.elevatorInput = val;
+                if (pitchValText) pitchValText.innerText = val.toFixed(2);
+            });
+
+            const resetPitch = () => {
+                pitchSlider.value = 0;
+                plane.elevatorInput = 0;
+                if (pitchValText) pitchValText.innerText = "0.00";
+            };
+
+            pitchSlider.addEventListener('touchend', resetPitch);
+            pitchSlider.addEventListener('mouseup', resetPitch);
+            pitchSlider.addEventListener('touchcancel', resetPitch);
+        }
+
+        // Logic for mobile buttons (CONTINUOUS TRIM - RECTIFIED POLARITY)
+        const btnTrimUpM = document.getElementById('btn-trim-up-mob');
+        const btnTrimDnM = document.getElementById('btn-trim-dn-mob');
+        let trimUpInt, trimDnInt;
+
+        if (btnTrimUpM && btnTrimDnM) {
+            const startTrimUp = (e) => {
+                e.preventDefault();
+                plane.trim = Math.min(0.2, plane.trim + 0.001);
+                trimUpInt = setInterval(() => plane.trim = Math.min(0.2, plane.trim + 0.001), 50);
+            };
+            const startTrimDn = (e) => {
+                e.preventDefault();
+                plane.trim = Math.max(-0.2, plane.trim - 0.001);
+                trimDnInt = setInterval(() => plane.trim = Math.max(-0.2, plane.trim - 0.001), 50);
+            };
+            const stopTrim = () => {
+                clearInterval(trimUpInt);
+                clearInterval(trimDnInt);
+            };
+
+            btnTrimUpM.addEventListener('touchstart', startTrimUp, { passive: false });
+            btnTrimUpM.addEventListener('mousedown', startTrimUp);
+            btnTrimDnM.addEventListener('touchstart', startTrimDn, { passive: false });
+            btnTrimDnM.addEventListener('mousedown', startTrimDn);
+            window.addEventListener('touchend', stopTrim);
+            window.addEventListener('mouseup', stopTrim);
+
+            const btnBrakeM = document.getElementById('btn-brake-mob');
+            if (btnBrakeM) {
+                const startBrake = (e) => { e.preventDefault(); isBraking = true; btnBrakeM.style.background = '#c0392b'; };
+                const stopBrake = (e) => { isBraking = false; if (btnBrakeM) btnBrakeM.style.background = '#e74c3c'; };
+                btnBrakeM.addEventListener('touchstart', startBrake, {passive: false});
+                btnBrakeM.addEventListener('mousedown', startBrake);
+                btnBrakeM.addEventListener('touchend', stopBrake);
+                btnBrakeM.addEventListener('touchcancel', stopBrake);
+                window.addEventListener('mouseup', stopBrake); 
+            }
+            window.addEventListener('touchcancel', stopTrim);
+        }
+
+        // --- Mobile: Direction flip button ---
+        const btnFlipDir = document.getElementById('btn-flip-dir');
+        if (btnFlipDir) {
+            btnFlipDir.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                plane.facingRight = !plane.facingRight;
+                plane.vx *= -1;
+                plane.pitch *= -1;
+            });
+        }
+
+        // --- Mobile: Re-center / follow button ---
+        const btnRecenter = document.getElementById('btn-recenter');
+        if (btnRecenter) {
+            btnRecenter.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isAutoZoom = true;
+                window.isCameraDetached = false;
+                window.panOffsetX = 0;
+                window.panOffsetY = 0;
+                const autoBtn = document.getElementById('btn-auto-zoom');
+                if (autoBtn) autoBtn.innerText = 'AUTO Z: ON';
+            });
+        }
+
+        // --- Mobile: Cockpit toggle (robust resize) ---
+        const cockpitToggle = document.getElementById('cockpit-toggle');
+        if (cockpitToggle) {
+            cockpitToggle.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('cockpit-collapsed');
+                cockpitToggle.innerHTML = sidebar.classList.contains('cockpit-collapsed') ? '&#9650; Cockpit' : '&#9660; Cockpit';
+                // Robust multi-frame resize to catch flex reflow
+                requestAnimationFrame(() => { resize(); requestAnimationFrame(resize); });
+            });
+        }
+
+        // --- Mobile: Reorganize layout - dashboard row + HUD controls ---
+        (function() {
+            let isMob = window.innerWidth <= 800 || window.innerHeight > window.innerWidth;
+            if (isMob) {
+                const hudRight = document.getElementById('mobile-hud-right');
+                const simRC = document.getElementById('simRateControls');
+                const routeRC = document.getElementById('routeScaleControls');
+                if (hudRight && simRC) hudRight.appendChild(simRC);
+                if (hudRight && routeRC) hudRight.appendChild(routeRC);
+
+                // Create dashboard row: instruments + engine side by side
+                const sidebar = document.getElementById('sidebar');
+                const panels = sidebar.querySelectorAll('.panel-section');
+                if (panels.length >= 3) {
+                    const dashRow = document.createElement('div');
+                    dashRow.id = 'mobile-dashboard-row';
+                    // Move primary flight (panel 0) and engine (panel 1) into the row
+                    dashRow.appendChild(panels[0]);
+                    dashRow.appendChild(panels[1]);
+                    // Annunciator (panel 2) stays but gets inserted after dashRow
+                    sidebar.insertBefore(dashRow, sidebar.firstChild);
+                    // Move annunciator panel after dashboard row
+                    sidebar.insertBefore(panels[2], dashRow.nextSibling);
+                }
+            }
+        })();
+
+        const planeSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 504.91 184.69"><defs><style>.cls-1{fill:#231f20; stroke:#ffffff; stroke-width:5px; stroke-linejoin:round;}</style></defs><title>Asset 3</title><g id="Layer_2" data-name="Layer 2"><g id="Layer_1-2" data-name="Layer 1"><path class="cls-1" d="M504.83,54.71l-.57-2.37a1.12,1.12,0,0,0-.84-.84,1.14,1.14,0,0,0-1.13.35,108.13,108.13,0,0,0-7.76,9.95,42.45,42.45,0,0,0-6.15,11.54,20.33,20.33,0,0,0-2.53-.45c-1.13-2.15-6.44-3.5-15.36-3.92-12.18-.81-42.61-3.25-51.64-4a13.91,13.91,0,0,1-3.4-.72l-.53-.2a15,15,0,0,1-1.62-.77c-5.49-3.07-19.3-10.65-29.11-14.65-7.6-3.09-12.88-5.24-18.9-6.51l-.8-.16a71.07,71.07,0,0,0-12.43-1.21,161,161,0,0,0-20.61,1.63v-.86a1.45,1.45,0,0,0-1.62-1.43c-2.38.28-6.23,1.11-7.08,3.5L320,44c-2.6-2-6.49-2.07-8.85-1.92a2,2,0,0,0-1.88,2.22l.15,1.42c-13.69,1.51-38.55,6-65.14,11.22l-.07-1.22A4.24,4.24,0,0,0,243,52.92l-17-16.46a.46.46,0,0,0-.65,0,.47.47,0,0,0,0,.65l17,16.46a3.36,3.36,0,0,1,1,2.22l.07,1.35c-19.92,3.91-40.74,8.21-58.51,11.94l-.22-4a4.17,4.17,0,0,0-1.29-2.83l-17-16.46a.46.46,0,0,0-.64.66l17,16.46a3.3,3.3,0,0,1,1,2.22l.23,4.2c-15.46,3.25-28.52,6.07-36.53,7.8a18.29,18.29,0,0,1-17.05-5.25L73.68,12.1a9.11,9.11,0,0,0-5-2.7V5.7A.68.68,0,0,0,68,5H67V1.89A1.89,1.89,0,0,0,65.08,0a1.89,1.89,0,0,0-1.89,1.89V5H62.13a.68.68,0,0,0-.67.68v4.55L38.14,15.42a4.46,4.46,0,0,0-1.16.41,4.74,4.74,0,0,0-1,.69,1.66,1.66,0,0,0-.45.69h0L24,18.84a.46.46,0,0,0,.06.92h.07l11.35-1.61a1.58,1.58,0,0,0,.82,1l.07,0a4.28,4.28,0,0,1,2.17,2.37l26.85,72a24.81,24.81,0,0,0-2.32,5.77L0,110.9l1.15.32c.18,0,18.4,5,48.57,5.2h0l17.32-4.16a1.51,1.51,0,0,1,1.34.31c1.35,1.13,5.76,3.21,20.08,4.44l.41,0-1.62,2.45a2.43,2.43,0,0,0,3.49,3.29l6.64-5c7.72.7,16.8,1.57,26.24,2.47,15.52,1.48,31.57,3,42.88,4,18.77,1.55,54.16,4.95,61,5.6l-19.28,7.63,39.35.54,3.63,6.59a1.32,1.32,0,0,0,1.52.63l1.57-.47a1.31,1.31,0,0,0,.8-1.84l-2.4-4.84,13.36.19.8,2.92,9.31-2.57,36.25,2v4.57l5.11,3.2c-3.29.8-18.46,4.51-24.31,6.06-6.22,1.65-9.95,2.88-9.29,6.17.41,2.05,2.4,3.68,4.29,5,3.29,2.3,6.84,3.11,10.19,3.73s6.52,1.17,9.34,1.65l5.46.93a13.62,13.62,0,0,0,27,1.79c.42-.06.87-.13,1.33-.22a41.71,41.71,0,0,0,10.61-3.56l.16-.07c2.56-1.25,6.42-3.13,5.92-6.53-.69-4.67-5.09-7.72-8.63-10.16-5.13-3.55-14.6-4.94-18.2-5.36v-7.41c3.37-.32,39.35-3.77,51.17-5.41,12.27-1.71,32.66-6.86,37-9.86.82.14,5.58.81,9.48-1.56v3.31l1.82,1.81a.78.78,0,0,0,1.34-.55v-5.27l7.93-1.18v.82l-7.77,7.73,7.05,3.51a11.14,11.14,0,0,1-3.52,1.38c-1.71.33-18.72-.25-26-.51a2.13,2.13,0,0,0-1.82,3.35l5.63,8.07a5.22,5.22,0,0,0,3.56,2.17,53.38,53.38,0,0,1,9.85,2.13L430,151.4a36.46,36.46,0,0,0,9.37,2.64,13.18,13.18,0,0,0,24.92-.47c.83-.36,1.67-.76,2.51-1.19l.49-.25c2.2-1.11,5.52-2.79,4.68-5.72a11.89,11.89,0,0,0-3.26-4.68l-.33-.34a45.54,45.54,0,0,0-7.27-6.28,29.74,29.74,0,0,0-7.87-3.61,56.48,56.48,0,0,0-5.57-1.47l-1.82-9.58,1.25-.19c4.59-.7,9.32-1.42,13.94-2.31,1.52-.3,3.07-.54,4.58-.78s3-.48,4.51-.77l.18,0c2.9-.56,5.89-1.13,8.24-3.11a21.78,21.78,0,0,0,7.26-11.85,64.85,64.85,0,0,0,1.29-8.49,37.13,37.13,0,0,0,15.63-8.15,2.93,2.93,0,0,0,1-2.35,3,3,0,0,0-1.22-2.31,43,43,0,0,0-6.18-3.8l8.32-19.79A2.86,2.86,0,0,0,504.83,54.71ZM321.27,80.13a3.12,3.12,0,0,1-2.14,1.07l-24,1.61a3.13,3.13,0,0,1-3-1.78l-6.32-13.25a3.11,3.11,0,0,1,2.16-4.4l29.13-6.25A3.13,3.13,0,0,1,320.84,60L322,77.86A3.09,3.09,0,0,1,321.27,80.13Zm67.42-6.44-21.6-30c5.14,1.29,10.06,3.29,16.65,6h0c9.75,4,23.52,11.53,29,14.59.34.19.68.36,1,.52-3.91,5.23-13.17,9.1-18.45,11a5.69,5.69,0,0,1-1.91.33A5.83,5.83,0,0,1,388.69,73.69Zm4.68,3h0Zm-.35,0-.33,0Zm-.4,0-.27,0Zm-.35,0-.31-.07Zm-.38-.09-.27-.07Zm-.34-.09-.31-.1Zm-.38-.13-.25-.1Zm-.33-.13-.29-.14Zm-.35-.17-.24-.13Zm-.31-.17-.28-.18Zm-.33-.21a1.88,1.88,0,0,1-.23-.16A1.88,1.88,0,0,0,389.85,75.56Zm-.3-.21-.26-.21Zm-14-.4a5.12,5.12,0,0,1-4.27,2.83l-36.16,2.38a5.21,5.21,0,0,1-3.89-1.38A5.16,5.16,0,0,1,329.57,75l-.26-15.32a5.33,5.33,0,0,1,4.77-5.4l23.15-2.51a9.58,9.58,0,0,1,9.11,4.31l9,13.75A5.11,5.11,0,0,1,375.58,75Zm12.87-.67a3.17,3.17,0,0,1-.21-.27A3.17,3.17,0,0,0,388.45,74.28Zm.27.32-.21-.25Zm0,0,.24.24Zm.53.51-.23-.21Zm4.19,1.53h0Zm1.81-.28.25-.08Zm-1.55.27h0Zm.26,0h0Zm.26,0,.14,0Zm.26,0,.15,0Zm.26,0,.15,0Zm.25-.07.17,0Zm44.66,54.37-3.46-1.25,5.23-4.35,1.93,2.46Z"/></g></g></svg>`;
+        const forestImg = new Image();
+        forestImg.src = 'wald.png';
+        const bergeImgs = [new Image(), new Image(), new Image(), new Image()];
+        bergeImgs[0].src = 'berge1.png';
+        bergeImgs[1].src = 'berge2.png';
+        bergeImgs[2].src = 'berge3.png';
+        bergeImgs[3].src = 'berge4.png';
+        const wolkeImgs = [new Image(), new Image(), new Image()];
+        wolkeImgs[0].src = 'wolke1.png';
+        wolkeImgs[1].src = 'wolke2.png';
+        wolkeImgs[2].src = 'wolke3.png';
+        const rwolkeImgs = [new Image(), new Image()];
+        rwolkeImgs[0].src = 'rwolke1.png';
+        rwolkeImgs[1].src = 'rwolke2.png';
+        window.forestScale = 0.4;
+        window.cleanedForestCanvas = null;
+        const planeImg = new Image();
+        planeImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(planeSVG);
+
+        const trafficImages = [];
+        const trafficColors = ['#e74c3c', '#3498db', '#f1c40f', '#9b59b6']; // Red, Blue, Yellow, Purple
+        trafficColors.forEach(color => {
+            let coloredSVG = planeSVG.replace(/fill:#231f20/g, 'fill:' + color);
+            let img = new Image();
+            img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(coloredSVG);
+            trafficImages.push(img);
+        });
+        const treeImages = [];
+        const treeFiles = ['baum1.png', 'baum2.png', 'baum3.png', 'baumgruppe.png'];
+        treeFiles.forEach(file => {
+            let img = new Image();
+            img.src = file;
+            treeImages.push(img);
+        });
+
+        const G = 9.81;
+        const DT = 1/60;
+        
+        // --- ATMOSPHÄREN-KONSTANTEN (ISA) ---    
+        const P0 = 101325;      
+        const L_lapse = 0.0065; 
+        const R_spec = 287.05;  
+        
+        // --- GLOBAL STATE HOISTING ---
+        let currentZoom = 15; 
+        let isAutoZoom = true;
+        let manualZoomLevel = 15;
+        let windVX = 0;
+        let windVY = 0;
+        
+        window.flightScore = 0; 
+        window.lastPlaneVy = 0; 
+        window.wasOnGround = true;
+        window.fpl = [];
+        window.engineAbused = false;
+        window.scoredTakeoffATC = false;
+        window.scoredLandingATC = false;
+        
+        let audioCtx = null;
+        let engineOsc = null;
+        let engineFilter = null;
+        let engineGain = null;
+        let windFilter = null;
+        let windGain = null;
+        let loopId = null;
+        
+        let isStalled = false;
+        let visualCloudTimer = 0;
+        let overspeedTimer = 0;
+        let isGameOver = false;
+        let isBraking = false;
+        let touchdownMessage = "";
+        let touchdownTimer = 0;
+
+        window.weatherMode = 'easy'; 
+        window.precipitation = 'none'; 
+        const particles = [];
+        let flightPlan = {};
+        let runways = [];
+        let clouds = [];
+        let worldObstacles = [];
+        let worldLinear = [];
+        let worldLandmarks = [];
+        let worldWeatherZones = [];
+        let worldAirspaces = [];
+        let aiPlanes = [];
+        let trees = [];
+        let sceneParticles = [];
+        let weatherParticles = [];
+        
+        let isTCAS = false;
+        let tcasAlt = 0;
+        let isInCTR = false;
+        let needsAudioResume = false;
+        let atcState = 0;
+        let isCtrCleared = false;
+        let hasTakeoffClearance = false;
+        let simRate = 1;
+        let routeScale = 2;
+        
+        let camX = 0;
+        let camY = 1.5;
+        let panOffsetX = 0;
+        let panOffsetY = 0;
+        window.isAglMode = false;
+
+        const keys = {};
+        const keyJustPressed = {};
+
+        window.toggleATC = function() {
+            let rMenu = document.getElementById('radioMenu');
+            if (rMenu) {
+                if (atcState === 0) { atcState = 1; rMenu.style.display = 'block'; updateRadioUI(); }
+                else { atcState = 0; rMenu.style.display = 'none'; }
+            }
+        };
+
+        window.manualZoom = function(amount) {
+            isAutoZoom = false;
+            let btn = document.getElementById('btn-auto-zoom'); if(btn) btn.innerText = "Auto Zoom: OFF";
+            manualZoomLevel = Math.max(2, Math.min(40, currentZoom + amount));
+        };
+
+        function getVisualX(fplX) {
+            let vX = 0, lastX = 0;
+            let sortedR = [...runways].sort((a,b) => a.startX - b.startX);
+            for (let r of sortedR) {
+                if (fplX <= r.startX) break;
+                vX += (r.startX - lastX) / routeScale;
+                let end = Math.min(fplX, r.endX);
+                vX += (end - r.startX);
+                lastX = end;
+                if (fplX <= r.endX) return vX;
+            }
+            vX += (fplX - lastX) / routeScale;
+            return vX;
+        }
+
+        function getFplX(vX) {
+            let fX = 0, lastVX = 0, lastFX = 0;
+            let sortedR = [...runways].sort((a,b) => a.startX - b.startX);
+            for (let r of sortedR) {
+                let vGap = (r.startX - lastFX) / routeScale;
+                if (vX <= lastVX + vGap) return lastFX + (vX - lastVX) * routeScale;
+                lastVX += vGap; lastFX = r.startX;
+                let rLen = r.endX - r.startX;
+                if (vX <= lastVX + rLen) return lastFX + (vX - lastVX);
+                lastVX += rLen; lastFX = r.endX;
+            }
+            return lastFX + (vX - lastVX) * routeScale;
+        }
+
+        function recalculateAllVisualX() {
+            worldLandmarks.forEach(l => l.visualX = getVisualX(l.x));
+            worldObstacles.forEach(o => o.visualX = getVisualX(o.x));
+            worldLinear.forEach(f => f.visualX = getVisualX(f.x));
+            worldWeatherZones.forEach(z => z.visualX = getVisualX(z.x));
+            worldAirspaces.forEach(as => {
+                as.visualStartX = getVisualX(as.startX);
+                as.visualEndX = getVisualX(as.endX);
+            });
+            aiPlanes.forEach(ai => ai.visualX = getVisualX(ai.x));
+        }
+
+        function setRouteScale(scale) {
+            let absoluteX = getFplX(plane.x);
+            routeScale = scale;
+            recalculateAllVisualX();
+            plane.x = getVisualX(absoluteX);
+            document.querySelectorAll('#routeScaleControls button').forEach(b => {
+                b.style.background = (b.innerText === scale + 'x') ? '#2196F3' : '#444';
+            });
+        }
+        
+        // Initial UI sync for default scale
+        window.addEventListener('load', () => {
+            document.querySelectorAll('#routeScaleControls button').forEach(b => {
+                if (b.innerText === routeScale + 'x') b.style.background = '#2196F3';
+            });
+        });
+
+        function restartGame() {
+            // Flag so bootstrapper is shown on reload, but FPL stays in localStorage
+            sessionStorage.setItem('showBootstrapper', '1');
+            window.location.reload();
+        }
+
+        window.carbHeatOn = false;
+        window.imcTimer = 60; // Seconds before penalty
+        window.OAT = 15; // Outside Air Temp in Celsius
+
+        const plane = {
+            x: 0, y: 1.5, vx: 0, vy: 0,
+            pitch: 0, pitchRate: 0, facingRight: true,
+            throttle: 0, propLever: 1.0,
+            map: 10, rpm: 800, hp: 0, mixture: 1.0, engineHealth: 100, engineTemp: 15,
+            carbIce: 0, airframeIce: 0,
+            elevatorInput: 0, trim: 0.05, flaps: 0, overspeedTimer: 0,
+            mass: 1000, 
+            inertia: 2500, wingArea: 16.2, 
+            length: 9.936, height: 3.624
+        };
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                engineOsc = audioCtx.createOscillator();
+                engineOsc.type = 'sawtooth';
+                engineFilter = audioCtx.createBiquadFilter();
+                engineFilter.type = 'lowpass';
+                engineGain = audioCtx.createGain();
+                engineGain.gain.value = 0;
+                
+                engineOsc.connect(engineFilter);
+                engineFilter.connect(engineGain);
+                engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+
+                let bufferSize = audioCtx.sampleRate * 2;
+                let noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                let output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                windSource = audioCtx.createBufferSource();
+                windSource.buffer = noiseBuffer;
+                windSource.loop = true;
+                
+                windFilter = audioCtx.createBiquadFilter();
+                windFilter.type = 'lowpass';
+                windGain = audioCtx.createGain();
+                windGain.gain.value = 0;
+
+                windSource.connect(windFilter);
+                windFilter.connect(windGain);
+                windGain.connect(audioCtx.destination);
+                windSource.start();
+                
+                if (audioCtx.state === 'suspended') {
+                    needsAudioResume = true;
+                }
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+                needsAudioResume = false;
+            }
+        }
+
+        window.addEventListener('click', () => {
+            if (needsAudioResume && audioCtx) {
+                audioCtx.resume().then(() => {
+                    if (audioCtx.state === 'running') needsAudioResume = false;
+                });
+            }
+        });
+
+        window.startGame = function(mode) {
+            window.weatherMode = mode;
+            document.getElementById('weatherMenu').style.display = 'none';
+            applyWeather();
+            loop();
+        };
+
+        window.applyWeather = function() {
+            clouds.length = 0; particles.length = 0;
+            window.weatherZones = [];
+            
+            // Hard & Easy = ~3NM = ~5556m real, compressed by routeScale
+            // Real = ~5NM = ~9260m real, compressed by routeScale
+            let realZoneWidthM = window.weatherMode === 'real' ? 9260 : 5556;
+            let visualZoneWidth = realZoneWidthM / routeScale; // Compressed to match visual world
+            let totalZones = Math.ceil(300000 / realZoneWidthM); // Cover ~300km of real route
+            
+            for (let i = 0; i < totalZones; i++) {
+                let zoneStartX = i * visualZoneWidth; // Visual coordinates
+                let precipType = 'none';
+                let cloudCount = 3;
+                
+                if (window.weatherMode === 'hard') {
+                    let r = Math.random();
+                    if (r > 0.5) precipType = 'rain'; // 50% chance
+                    else if (r > 0.2) precipType = 'snow'; // 30% chance
+                    cloudCount = precipType !== 'none' ? 15 : 5;
+                } else if (window.weatherMode === 'real') {
+                    let r = Math.random();
+                    if (r > 0.75) precipType = 'rain';
+                    cloudCount = 8;
+                } else {
+                    // Easy mode: 25% of Hard mode amounts
+                    let r = Math.random();
+                    // Hard rain chance = 50% -> Easy rain chance = 12.5%
+                    if (r > 0.875) precipType = 'rain';
+                    // Hard snow chance = 30% -> Easy snow chance = 7.5%
+                    else if (r > 0.8) precipType = 'snow';
+                    
+                    // Cloud count: ~25% of Hard mode (15 -> 4, 5 -> 2)
+                    cloudCount = precipType !== 'none' ? 4 : 2;
+                }
+                
+                window.weatherZones.push({ startX: zoneStartX, endX: zoneStartX + visualZoneWidth, precip: precipType });
+                
+                // Spawn Clouds for this zone
+                // Weather happens mainly between GND (~0m) and ~600m (2000ft)
+                for (let c = 0; c < cloudCount; c++) {
+                    let cloudAGL; // Cloud height ABOVE GROUND LEVEL
+                    if (precipType !== 'none') {
+                        cloudAGL = 100 + Math.random() * 300;
+                    } else if (window.weatherMode === 'hard') {
+                        cloudAGL = 150 + Math.random() * 450;
+                    } else if (window.weatherMode === 'real') {
+                        cloudAGL = 200 + Math.random() * 500;
+                    } else {
+                        cloudAGL = 200 + Math.random() * 400;
+                    }
+
+                    // Cloud radius: smaller for navigability
+                    let cloudRadiusH = precipType !== 'none' ? (100 + Math.random() * 150) : (50 + Math.random() * 80);
+                    // Vertical extent: 100-500ft = 30-150m
+                    let cloudRadiusV = 15 + Math.random() * 60; // 15m to 75m half-height
+
+                    // Cloud X in visual space, then get FPL X to find terrain height
+                    let cloudVisualX = zoneStartX + (Math.random() * visualZoneWidth);
+                    let cloudFplX = typeof getFplX === 'function' ? getFplX(cloudVisualX) : cloudVisualX;
+                    let terrainAtCloud = typeof getTerrainHeight === 'function' ? getTerrainHeight(cloudFplX) : 0;
+
+                    clouds.push({
+                        x: cloudVisualX,
+                        y: terrainAtCloud + cloudAGL, // AGL: terrain + height above ground
+                        radius: cloudRadiusH,
+                        radiusV: cloudRadiusV,
+                        speed: 0.2 + Math.random() * 0.8,
+                        hasPrecip: precipType !== 'none',
+                        imgIdx: Math.floor(Math.random() * (precipType !== 'none' ? rwolkeImgs.length : wolkeImgs.length))
+                    });
+                }
+            }
+            
+            // Pre-fill particles for memory allocation
+            for(let i=0; i<300; i++) {
+                particles.push({ active: false, x: 0, y: 0, vy: 0, vx: 0, l: 0, type: 'none' });
+            }
+        };
+
+
+        function parseAndStartFPL(jsonStr) {
+            try {
+                initAudio();
+                flightPlan = JSON.parse(jsonStr);
+                window.fpl = flightPlan.waypoints;
+                window.fplAltWaypoints = flightPlan.altWaypoints || [];
+                
+                document.getElementById('startOverlay').style.display = 'none';
+                document.getElementById('weatherMenu').style.display = 'flex';
+                
+                windVX = flightPlan.weather.windVX;
+                windVY = flightPlan.weather.windVY;
+                
+                let fObs = flightPlan.obstacles || [];
+                worldObstacles = fObs.filter(o => o.x > 300).map(o => ({...o, heightM: Math.min(o.heightM, 50)}));
+                
+                let fLin = flightPlan.linearFeatures || [];
+                worldLinear = fLin.filter(f => f.x > 300);
+                
+                let fLms = flightPlan.landmarks || [];
+                worldLandmarks = fLms.filter(l => l.x > 300);
+                
+                worldWeatherZones = flightPlan.weatherZones || [];
+                worldAirspaces = flightPlan.airspaces || [];
+                
+                runways = [];
+                flightPlan.waypoints.forEach(wp => {
+                    if (wp.type === 'runway') runways.push({ startX: wp.x, endX: wp.x + wp.length, height: wp.elevation });
+                });
+                
+                recalculateAllVisualX(); 
+
+                clouds = [];
+                worldWeatherZones.forEach(z => {
+                    if (z.clouds) {
+                        z.clouds.forEach(c => {
+                            let sizeMult = c.type === 'OVC' ? 4 : (c.type === 'BKN' ? 3 : (c.type === 'SCT' ? 2 : 1));
+                            let numPuffs = 3 * sizeMult + Math.floor(Math.random() * 3 * sizeMult);
+                            let puffs = [];
+                            for (let i = 0; i < numPuffs; i++) {
+                                puffs.push({
+                                    offsetX: (Math.random() - 0.5) * 60 * sizeMult,
+                                    offsetY: (Math.random() - 0.5) * 20 * sizeMult,
+                                    radius: (20 + Math.random() * 30) * sizeMult
+                                });
+                            }
+                            // Derive radius/radiusV from puffs for collision + PNG sizing
+                            let maxRH = 0, maxRV = 0;
+                            puffs.forEach(p => {
+                                maxRH = Math.max(maxRH, Math.abs(p.offsetX) + p.radius);
+                                maxRV = Math.max(maxRV, Math.abs(p.offsetY) + p.radius);
+                            });
+                            let isPrecip = !!(z.hasRain || z.hasSnow || z.hasTS);
+                            clouds.push({
+                                x: z.x + (Math.random()-0.5)*1000, y: c.baseM,
+                                puffs: puffs,
+                                radius: maxRH, radiusV: maxRV,
+                                hasPrecip: isPrecip,
+                                imgIdx: Math.floor(Math.random() * (isPrecip ? rwolkeImgs.length : wolkeImgs.length))
+                            });
+                        });
+                    }
+                });
+                
+                if (runways.length > 0) {
+                    let absoluteX = runways[0].startX + 50; 
+                    plane.x = getVisualX(absoluteX);
+                    plane.y = runways[0].height + 1.5;
+                }
+                camX = plane.x;
+                camY = plane.y;
+            } catch (e) {
+                alert("Invalid JSON FPL: " + e.message);
+                document.getElementById('startOverlay').style.display = 'flex';
+            }
+        }
+
+        function startDemoWorld() {
+            let waypoints = [];
+            // Start Airport
+            waypoints.push({ x: 0, elevation: 0, type: "runway", length: 1200 });
+            
+            // Smooth ramp up from Runway
+            waypoints.push({ x: 1400, elevation: 5, type: "terrain" });
+            waypoints.push({ x: 1700, elevation: 15, type: "terrain" });
+            
+            // Rolling Hills
+            for (let i = 2000; i <= 8000; i += 200) {
+                waypoints.push({ x: i, elevation: 15 + Math.abs(Math.sin((i-2000)/1500)*80 + Math.sin((i-2000)/800)*40), type: "terrain" });
+            }
+            
+            // Smooth ramp up to Plateau
+            waypoints.push({ x: 8500, elevation: 120, type: "terrain" });
+            waypoints.push({ x: 8900, elevation: 150, type: "terrain" });
+            
+            // Midway Airport (Elevated Plateau)
+            waypoints.push({ x: 9000, elevation: 150, type: "runway", length: 900 });
+            
+            // Smooth ramp down from Plateau
+            waypoints.push({ x: 10000, elevation: 150, type: "terrain" });
+            waypoints.push({ x: 10500, elevation: 100, type: "terrain" });
+            
+            // Flatter terrain leading to mountains
+            for (let i = 11000; i <= 18000; i += 200) {
+                waypoints.push({ x: i, elevation: 50 + Math.abs(Math.sin(i/2000)*120 + Math.sin(i/900)*40), type: "terrain" });
+            }
+            
+            // Destination Airport
+            waypoints.push({ x: 18000, elevation: 20, type: "runway", length: 1500 });
+            
+            parseAndStartFPL(JSON.stringify({
+                weather: { windVX: -10, windVY: 0, oat: 18, qnh: 1013, cloudBase: 1500 },
+                waypoints: waypoints,
+                weatherZones: [
+                    { x: 3000, clouds: [{baseM: 600, type: "SCT"}, {baseM: 1000, type: "FEW"}] },
+                    { x: 11000, hasRain: true, clouds: [{baseM: 500, type: "BKN"}] },
+                    { x: 15000, hasTS: true, clouds: [{baseM: 400, type: "OVC"}] }
+                ],
+                landmarks: [
+                    { x: 4000, name: "Riverside", type: "town" },
+                    { x: 9000, name: "Midway Airfield", type: "apt" },
+                    { x: 13000, name: "Metro City", type: "city" },
+                    { x: 18000, name: "Intl Airport", type: "apt" }
+                ],
+                linearFeatures: [
+                    { x: 3800, type: "river" },
+                    { x: 12500, type: "highway" }
+                ]
+            }));
+        }
+
+        document.getElementById('startFlightBtn').addEventListener('click', () => {
+            parseAndStartFPL(document.getElementById('fplInput').value);
+        });
+        document.getElementById('startDemoWorldBtn').addEventListener('click', startDemoWorld);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let savedFPL = localStorage.getItem('autoSimFlightPlan');
+            let showBootstrapper = sessionStorage.getItem('showBootstrapper');
+            sessionStorage.removeItem('showBootstrapper');
+
+            if (savedFPL) {
+                // Always populate textarea with last dispatcher FPL
+                document.getElementById('fplInput').value = savedFPL;
+            }
+
+            if (savedFPL && !showBootstrapper) {
+                // Auto-start with saved FPL (coming from dispatcher)
+                parseAndStartFPL(savedFPL);
+            } else {
+                // Show bootstrapper (first visit, or after restart)
+                document.getElementById('startOverlay').style.display = 'flex';
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if(!keys[e.code]) {
+                keyJustPressed[e.code] = true;
+                if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+                    let rMenu = document.getElementById('radioMenu');
+                    if (rMenu) {
+                        if (atcState === 0) {
+                            atcState = 1;
+                            rMenu.style.display = 'block';
+                            updateRadioUI();
+                        } else {
+                            atcState = 0;
+                            rMenu.style.display = 'none';
+                        }
+                    }
+                }
+                if (e.code === 'KeyQ') {
+                    let btn = document.getElementById('btn-carbheat');
+                    if(btn) btn.click();
+                }
+                
+                if (atcState > 0) {
+                    if (e.code === 'Digit1') handleRadioOption(1);
+                    if (e.code === 'Digit2') handleRadioOption(2);
+                    if (e.code === 'Digit3') handleRadioOption(3);
+                }
+            }
+            keys[e.code] = true;
+        });
+
+        function updateRadioUI() {
+            let hist = document.getElementById('radioHistory');
+            let opts = document.getElementById('radioOptions');
+            if(!hist || !opts) return;
+            let buttons = opts.querySelectorAll('button');
+            
+            // Find nearest airport in the flight plan
+            let currentFplX = typeof getFplX === 'function' ? getFplX(plane.x) : plane.x;
+            let airports = worldLandmarks.filter(l => l.type === 'apt' || l.type === 'airport');
+            let nearestApt = airports.length > 0 ? airports.reduce((prev, curr) => Math.abs(curr.x - currentFplX) < Math.abs(prev.x - currentFplX) ? curr : prev) : {name: "Local"};
+            let aptName = nearestApt.name;
+            
+            switch(atcState) {
+                case 1:
+                    hist.innerHTML = `Tune to ${aptName} Tower Frequency...`;
+                    buttons[0].style.display = 'block'; buttons[0].innerText = `1. ${aptName} Tower, D-EXYY, erbitten Startfreigabe.`;
+                    buttons[1].style.display = 'block'; buttons[1].innerText = `2. ${aptName} Tower, D-EXYY, erbitten Einflug in CTR.`;
+                    buttons[2].style.display = 'block'; buttons[2].innerText = `3. ${aptName} Tower, D-EXYY, erbitten Landefreigabe.`;
+                    break;
+                case 2:
+                    hist.innerHTML = `D-EXYY, ${aptName} Tower, Wind 250 degrees 10 knots, Runway free, cleared for takeoff.`;
+                    buttons[0].style.display = 'block'; buttons[0].innerText = "1. Cleared for takeoff, D-EXYY.";
+                    buttons[1].style.display = 'none'; buttons[2].style.display = 'none';
+                    break;
+                case 3:
+                    hist.innerHTML = `D-EXYY, ${aptName} Tower, cleared to enter CTR, squawk 7000.`;
+                    buttons[0].style.display = 'block'; buttons[0].innerText = "1. Cleared to enter, squawk 7000, D-EXYY.";
+                    buttons[1].style.display = 'none'; buttons[2].style.display = 'none';
+                    break;
+                case 4:
+                    hist.innerHTML = `D-EXYY, ${aptName} Tower, you are number one, cleared to land.`;
+                    buttons[0].style.display = 'block'; buttons[0].innerText = "1. Cleared to land, D-EXYY.";
+                    buttons[1].style.display = 'none'; buttons[2].style.display = 'none';
+                    break;
+            }
+        }
+
+        function handleRadioOption(opt) {
+            if (atcState === 1) {
+                if (opt === 1) atcState = 2;
+                if (opt === 2) atcState = 3;
+                if (opt === 3) atcState = 4;
+                updateRadioUI();
+            } else if (atcState > 1 && opt === 1) {
+                if (atcState === 2) {
+                    hasTakeoffClearance = true;
+                    if (!window.scoredTakeoffATC) {
+                        window.flightScore += 100;
+                        window.scoredTakeoffATC = true;
+                        if (typeof showFeedbackText === 'function') showFeedbackText("ATC TAKEOFF +100", "#00FF00");
+                    }
+                }
+                if (atcState === 3) isCtrCleared = true;
+                if (atcState === 4) {
+                    let fplX = typeof getFplX === 'function' ? getFplX(plane.x) : plane.x;
+                    let targetRwy = runways.find(r => r.startX > fplX - 2000);
+                    if (!targetRwy && runways.length > 0) targetRwy = runways[runways.length - 1];
+                    if (targetRwy) {
+                        window.activeGlidePath = {
+                            rwy: targetRwy,
+                            approachFromLeft: fplX < targetRwy.startX + (targetRwy.endX - targetRwy.startX) / 2
+                        };
+                        
+                        // Scoring logic for landing clearance
+                        if (!window.scoredLandingATC) {
+                            window.flightScore += 100;
+                            window.scoredLandingATC = true;
+                            if (typeof showFeedbackText === 'function') showFeedbackText("ATC LANDING +100", "#00FF00");
+                        }
+                    }
+                }
+                atcState = 0;
+                document.getElementById('radioMenu').style.display = 'none';
+            }
+        }
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        document.getElementById('sl-thr').addEventListener('input', e => plane.throttle = parseFloat(e.target.value));
+        document.getElementById('sl-prop').addEventListener('input', e => plane.propLever = parseFloat(e.target.value));
+        document.getElementById('sl-mix').addEventListener('input', e => plane.mixture = parseFloat(e.target.value));
+        document.getElementById('sl-flap').addEventListener('input', e => plane.flaps = parseInt(e.target.value));
+        document.getElementById('btn-trim-dn').addEventListener('click', () => plane.trim = Math.min(0.2, plane.trim + 0.001));
+        document.getElementById('btn-trim-up').addEventListener('click', () => plane.trim = Math.max(-0.2, plane.trim - 0.001));
+
+
+        
+
+
+        const btnAltMode = document.getElementById('btn-alt-mode');
+        // Managed by inline JS now
+
+        window.addEventListener('wheel', (e) => {
+            isAutoZoom = false;
+            let btn = document.getElementById('btn-auto-zoom'); if(btn) btn.innerText = "Auto Zoom: OFF";
+            manualZoomLevel = Math.max(2, Math.min(40, currentZoom + (e.deltaY > 0 ? -2 : 2)));
+        }, {passive: false});
+
+        const flightView = document.getElementById('mobile-flight-view');
+        if (flightView) {
+            let initialPinchDist = null;
+            let initialZoom = null;
+            let lastTouchX = null;
+            let lastTouchY = null;
+            flightView.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 2) {
+                    let dx = e.touches[0].clientX - e.touches[1].clientX;
+                    let dy = e.touches[0].clientY - e.touches[1].clientY;
+                    initialPinchDist = Math.hypot(dx, dy);
+                    initialZoom = currentZoom;
+                    lastTouchX = null; lastTouchY = null;
+                } else if (e.touches.length === 1) {
+                    lastTouchX = e.touches[0].clientX;
+                    lastTouchY = e.touches[0].clientY;
+                }
+            }, {passive: false});
+            flightView.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 2 && initialPinchDist) {
+                    isAutoZoom = false; document.getElementById('btn-auto-zoom').innerText = 'Auto Zoom: OFF';
+                    let dx = e.touches[0].clientX - e.touches[1].clientX;
+                    let dy = e.touches[0].clientY - e.touches[1].clientY;
+                    let dist = Math.hypot(dx, dy);
+                    manualZoomLevel = Math.max(2, Math.min(40, initialZoom * (dist / initialPinchDist)));
+                } else if (e.touches.length === 1 && lastTouchX !== null) {
+                    window.isCameraDetached = true;
+                    isAutoZoom = false;
+                    document.getElementById('btn-auto-zoom').innerText = "Auto Zoom: OFF";
+                    let dx = e.touches[0].clientX - lastTouchX;
+                    let dy = e.touches[0].clientY - lastTouchY;
+                    panOffsetX -= dx / currentZoom;
+                    panOffsetY += dy / currentZoom;
+                    lastTouchX = e.touches[0].clientX;
+                    lastTouchY = e.touches[0].clientY;
+                }
+            }, {passive: false});
+            flightView.addEventListener('touchend', (e) => {
+                if (e.touches.length < 2) initialPinchDist = null;
+                if (e.touches.length === 1) {
+                    lastTouchX = e.touches[0].clientX;
+                    lastTouchY = e.touches[0].clientY;
+                } else if (e.touches.length === 0) {
+                    lastTouchX = null; lastTouchY = null;
+                }
+            });
+        }
+
+        function manageParticles() {
+            if (plane.engineHealth < 70) {
+                if (Math.random() < (100 - plane.engineHealth) / 100) {
+                    sceneParticles.push({ x: plane.x, y: plane.y, life: 1.0, type: 'smoke' });
+                }
+            }
+
+            sceneParticles = sceneParticles.filter(p => p.life > 0 || (Math.abs(p.x - plane.x) < 500 && Math.abs(p.y - plane.y) < 500));
+            
+            while(sceneParticles.length < 100) {
+                sceneParticles.push({
+                    x: plane.x + (Math.random() - 0.5) * 1000,
+                    y: plane.y + (Math.random() - 0.5) * 1000,
+                    type: 'speed',
+                    life: 1.0
+                });
+            }
+            sceneParticles.forEach(p => {
+                if (p.type === 'smoke') {
+                    p.life -= DT;
+                    p.x += (windVX - plane.vx) * DT;
+                    p.y += 5 * DT; 
+                } else if (p.type === 'td_smoke') {
+                    p.life -= DT;
+                    p.x += (p.vx + windVX - plane.vx) * DT;
+                    p.y += p.vy * DT;
+                    p.vx *= 0.98; // Drag on particle
+                } else {
+                    p.x += windVX * DT;
+                    p.y += windVY * DT;
+                }
+            });
+
+            let activeZone = null;
+            if (worldWeatherZones.length > 0) {
+                activeZone = worldWeatherZones.reduce((prev, curr) => Math.abs(curr.x - plane.x) < Math.abs(prev.x - plane.x) ? curr : prev);
+            }
+            if (activeZone) {
+                if (activeZone.hasRain || activeZone.hasSnow) {
+                    let type = activeZone.hasRain ? 'rain' : 'snow';
+                    while(weatherParticles.length < 200) {
+                        weatherParticles.push({
+                            x: plane.x + (Math.random() - 0.5) * 1000,
+                            y: plane.y + (Math.random() - 0.5) * 1000,
+                            type: type
+                        });
+                    }
+                }
+            }
+            weatherParticles = weatherParticles.filter(p => Math.abs(p.x - plane.x) < 500 && Math.abs(p.y - plane.y) < 500);
+            weatherParticles.forEach(p => {
+                p.x += windVX * DT;
+                if (p.type === 'rain') {
+                    p.y -= 25 * DT;
+                } else {
+                    p.y -= 5 * DT;
+                }
+            });
+        }
+
+        function getTerrainHeight(x) {
+            let pts = flightPlan.waypoints;
+            if (!pts || pts.length === 0) return 0;
+            if (x <= pts[0].x) return pts[0].elevation;
+            if (x >= pts[pts.length-1].x) return pts[pts.length-1].elevation;
+            
+            let wp1 = pts[0], wp2 = pts[1];
+            for (let i = 0; i < pts.length - 1; i++) {
+                if (x >= pts[i].x && x <= pts[i+1].x) {
+                    wp1 = pts[i];
+                    wp2 = pts[i+1];
+                    break;
+                }
+            }
+            
+            let tDist = Math.max(1, wp2.x - wp1.x);
+            let t = (x - wp1.x) / tDist;
+            let baseH = wp1.elevation * (1 - t) + wp2.elevation * t;
+
+            for (let r of runways) {
+                if (x >= r.startX && x <= r.endX) {
+                    return r.height; // Perfectly flat
+                }
+            }
+            return baseH;
+        }
+
+        function getTargetAltitudeAtX(x) {
+            let pts = window.fpl || [];
+            if (pts.length === 0) return 0;
+            if (x <= pts[0].x) return pts[0].alt || (pts[0].elevation / 0.3048 + 1000);
+            if (x >= pts[pts.length-1].x) return pts[pts.length-1].alt || (pts[pts.length-1].elevation / 0.3048 + 1000);
+
+            let wp1 = pts[0], wp2 = pts[1];
+            for (let i = 0; i < pts.length - 1; i++) {
+                if (x >= pts[i].x && x <= pts[i+1].x) {
+                    wp1 = pts[i];
+                    wp2 = pts[i+1];
+                    break;
+                }
+            }
+            let tDist = Math.max(1, wp2.x - wp1.x);
+            let t = (x - wp1.x) / tDist;
+            let alt1 = wp1.alt || (wp1.elevation / 0.3048 + 1000);
+            let alt2 = wp2.alt || (wp2.elevation / 0.3048 + 1000);
+            return alt1 * (1 - t) + alt2 * t;
+        }
+
+        function manageTrees() {
+            let currentFplX = getFplX(plane.x);
+            trees = trees.filter(t => Math.abs(t.x - currentFplX) < 10000);
+            let maxTreeX = trees.length > 0 ? Math.max(...trees.map(t=>t.x)) : currentFplX;
+            
+            while (maxTreeX < currentFplX + 10000) {
+                maxTreeX += 40 + Math.random() * 60; 
+                let onRunway = runways.some(r => maxTreeX > r.startX - 100 && maxTreeX < r.endX + 100);
+                if (!onRunway && Math.random() > 0.4) {
+                    trees.push({ x: maxTreeX, y: getTerrainHeight(maxTreeX), height: 6 + Math.random() * 8, width: 4 + Math.random() * 3 });
+                }
+            }
+        }
+
+        function updatePhysics() {
+            // 1. Controls
+            if (keys['KeyW']) plane.throttle = Math.min(1, plane.throttle + 0.01);
+            if (keys['KeyS']) plane.throttle = Math.max(0, plane.throttle - 0.01);
+            
+            // Constant Speed Propeller Control (Blauer Hebel)
+            if (keys['KeyE']) plane.propLever = Math.min(1, plane.propLever + 0.01);
+            if (keys['KeyD']) plane.propLever = Math.max(0, plane.propLever - 0.01);
+
+            if (keys['KeyR']) plane.mixture = Math.min(1, plane.mixture + 0.002);
+            if (keys['KeyF']) plane.mixture = Math.max(0, plane.mixture - 0.002);
+
+            if (keyJustPressed['Digit1']) {
+                plane.flaps = Math.max(0, plane.flaps - 1);
+                keyJustPressed['Digit1'] = false;
+            }
+            if (keyJustPressed['Digit2']) {
+                plane.flaps = Math.min(3, plane.flaps + 1);
+                keyJustPressed['Digit2'] = false;
+            }
+
+            let shiftPressed = keys['ShiftLeft'] || keys['ShiftRight'];
+            let pitchSlider = document.getElementById('mobile-pitch');
+            plane.elevatorInput = pitchSlider ? parseFloat(pitchSlider.value) : 0;
+
+            if (keys['ArrowDown']) {
+                if (shiftPressed) plane.trim = Math.min(0.5, plane.trim + 0.0005);
+                else plane.elevatorInput = -1;
+            }
+            if (keys['ArrowUp']) {
+                if (shiftPressed) plane.trim = Math.max(-0.5, plane.trim - 0.0005);
+                else plane.elevatorInput = 1;
+            }
+            
+            if (keys['ArrowLeft'] && plane.facingRight) {
+                plane.facingRight = false;
+                plane.vx *= -1;
+                plane.pitch *= -1;
+            } else if (keys['ArrowRight'] && !plane.facingRight) {
+                plane.facingRight = true;
+                plane.vx *= -1;
+                plane.pitch *= -1;
+            }
+
+            let isMirrored = !plane.facingRight;
+            let simVx = isMirrored ? -plane.vx : plane.vx;
+            let simPitch = isMirrored ? -plane.pitch : plane.pitch;
+
+            let trueAirspeedX = simVx - windVX;
+            let trueAirspeedY = plane.vy - windVY;
+            let trueSpeed = Math.sqrt(trueAirspeedX**2 + trueAirspeedY**2);
+            let fpa = (trueSpeed === 0) ? 0 : Math.atan2(trueAirspeedY, trueAirspeedX); 
+            let aoa = simPitch - fpa; 
+            let aoaDeg = aoa * 180 / Math.PI;
+
+            // --- 2. WEATHER & ATMOSPHÄRE & ENGINE MODELL (Constant Speed) ---
+            windVX = flightPlan.weather.windVX;
+            windVY = flightPlan.weather.windVY;
+            let T0 = flightPlan.weather.oat + 273.15;
+            let tempK = T0 - L_lapse * plane.y;
+            let tempC = tempK - 273.15;
+            
+            let pressurePa = P0 * Math.pow(tempK / T0, G / (L_lapse * R_spec));
+            let rho = pressurePa / (R_spec * tempK);
+            let pressureInHg = pressurePa * 0.0002953; 
+
+            // Manifold Pressure (MAP)
+            let idleMAP = 10;
+            let targetMAP = idleMAP + plane.throttle * (pressureInHg - idleMAP);
+            plane.map += (targetMAP - plane.map) * 0.1; 
+
+            // RPM Governor Logic (Verstellpropeller)
+            let governorRPM = 2000 + (plane.propLever * 700); // Target RPM (2000 bis 2700)
+            
+            let ramAirEffect = trueSpeed * 4;
+            let maxRpmForMap = 800 + ((plane.map - 10) / 20) * 1750 + ramAirEffect;
+            
+            let targetRPM = Math.min(governorRPM, maxRpmForMap);
+            if (trueSpeed > 70) targetRPM += (trueSpeed - 70) * 5; // Windmilling effect in dives
+            plane.rpm += (targetRPM - plane.rpm) * 0.1;
+
+            // --- ENGINE HEALTH & MIXTURE MODIFIERS ---
+            if (plane.rpm > 2750) {
+                plane.overspeedTimer += DT;
+                if (plane.overspeedTimer > 1) { // Much faster overspeed damage
+                    plane.engineHealth = Math.max(0, plane.engineHealth - 0.2);
+                }
+            } else {
+                plane.overspeedTimer = Math.max(0, plane.overspeedTimer - DT);
+            }
+            
+            let idealMixture = Math.max(0.3, rho / 1.225);
+            let mixtureError = Math.abs(plane.mixture - idealMixture);
+            
+            if (plane.mixture > idealMixture + 0.15 && plane.map > 15) {
+                plane.engineHealth -= 0.2 * DT;
+                window.mixtureWarning = true;
+            } else {
+                window.mixtureWarning = false;
+            }
+            
+            plane.engineHealth = Math.max(0, Math.min(100, plane.engineHealth));
+            if (plane.rpm > 2750 || plane.engineHealth < 99.9 || (plane.mixture > idealMixture + 0.15 && plane.map > 15)) {
+                window.engineAbused = true;
+            }
+            
+            let healthFactor = plane.engineHealth / 100;
+            let mixtureFactor = mixtureError > 0.1 ? Math.max(0, 1 - (mixtureError * 2)) : 1.0;
+            let combinedFactor = healthFactor * mixtureFactor;
+
+            // Engine: Power Output (HP)
+            let hpPct = ((plane.map - idleMAP) / 19.92) * (plane.rpm / 2700);
+            plane.hp = Math.max(0, 200 * hpPct) * combinedFactor;
+
+            // --- THERMODYNAMICS ---
+            let powerHeat = (plane.hp / 200) * 260;
+            let mixtureHeatPenalty = Math.max(0, (0.9 - plane.mixture) * 80);
+            let airflowCooling = (trueSpeed + (plane.rpm / 150)) * 1.5;
+            let targetTemp = tempC + powerHeat + mixtureHeatPenalty - airflowCooling;
+            targetTemp = Math.max(tempC, targetTemp);
+            
+            plane.engineTemp += (targetTemp - plane.engineTemp) * 0.002;
+
+            if (plane.engineTemp > 230) {
+                plane.engineHealth = Math.max(0, plane.engineHealth - 0.05);
+            }
+
+            // Engine: Thrust Calculation
+            let powerMultiplier = 1.0 - (plane.carbIce / 100); 
+            if (window.carbHeatOn) powerMultiplier *= 0.9; // 10% loss due to hot intake air
+
+            let densityRatio = rho / 1.225; 
+            let maxStaticThrust = 5400; 
+            
+            let propEfficiency = Math.max(0.6, 1 - (trueSpeed / 150)); 
+            let thrust = (plane.hp / 200) * maxStaticThrust * densityRatio * propEfficiency * powerMultiplier;
+
+            if (plane.throttle < 0.05) thrust = -(trueSpeed * 5); // Windmilling Prop Drag
+
+            // --- 3. AERODYNAMIK ---
+            let dynamicPressure = 0.5 * rho * trueSpeed**2; 
+
+            // Airframe Ice effect on Aero coefficients
+            let icingLiftFactor = 1.0 - (plane.airframeIce / 100) * 0.3; // Up to 30% lift loss
+            let icingDragFactor = 1.0 + (plane.airframeIce / 100) * 0.5; // Up to 50% drag increase 
+
+            let pitchTorque = 0;
+            let stabilityTorque = -aoa * dynamicPressure * 10;
+            let elevatorEffectiveness = isStalled ? 0.4 : 1.0; 
+            let tailAirspeedSq = trueSpeed**2 + (plane.rpm / 100)**2;
+            let tailDynPressure = 0.5 * rho * tailAirspeedSq;
+            let elevatorTorque = -(plane.elevatorInput * 0.2 - plane.trim) * tailDynPressure * 8 * elevatorEffectiveness;
+            let dampingTorque = -(isMirrored ? -plane.pitchRate : plane.pitchRate) * trueSpeed * 250; 
+
+            let cl = 0;
+            let cd = 0.04; // Reduced for better acceleration
+            isStalled = false;
+
+            if (aoaDeg >= -10 && aoaDeg <= 15) {
+                cl = 0.1 * aoaDeg + 0.2;
+            } else {
+                isStalled = true;
+                if (aoaDeg > 15) {
+                    cl = Math.max(0, 1.7 - (aoaDeg - 15) * 0.15);
+                    pitchTorque -= 3000;
+                } else {
+                    cl = Math.min(0, -0.8 + (-10 - aoaDeg) * 0.15); 
+                    pitchTorque += 1500; 
+                }
+                cd += 0.2 + (Math.abs(aoaDeg) - 15) * 0.05; 
+            }
+            
+            cl += plane.flaps * 0.25;
+            cd += plane.flaps * 0.04;
+            if (plane.flaps >= 3) {
+                cd += 0.15;
+            }
+
+            let aglEffect = plane.y - getTerrainHeight(plane.x * routeScale) - 1.5;
+            let groundEffect = aglEffect < 11 ? Math.max(0.5, aglEffect / 11) : 1.0;
+            cd += (0.05 * cl**2) * groundEffect; 
+
+            if (aoaDeg > 8) {
+                cd += (aoaDeg - 8) * 0.02;
+            }
+
+            pitchTorque += stabilityTorque + elevatorTorque + dampingTorque;
+            let pitchAccel = pitchTorque / plane.inertia;
+            let simPitchRate = isMirrored ? -plane.pitchRate : plane.pitchRate;
+            simPitchRate += pitchAccel * DT;
+            plane.pitchRate = isMirrored ? -simPitchRate : simPitchRate;
+            plane.pitch += plane.pitchRate * DT;
+
+            let lift = dynamicPressure * plane.wingArea * cl * icingLiftFactor;
+            let drag = dynamicPressure * plane.wingArea * cd * icingDragFactor;
+
+            let simForceX = thrust * Math.cos(simPitch) - drag * Math.cos(fpa) - lift * Math.sin(fpa);
+            let forceY = thrust * Math.sin(simPitch) - drag * Math.sin(fpa) + lift * Math.cos(fpa) - (plane.mass * G);
+
+            let forceX = isMirrored ? -simForceX : simForceX;
+
+            let currentX = getFplX(plane.x);
+            let turbulenceIntensity = 0.5;
+            let inCloudForTurb = clouds.some(c => {
+                let dx = (plane.x - c.x) / c.radius;
+                let dy = (plane.y - c.y) / (c.radiusV || c.radius);
+                return (dx*dx + dy*dy) < 1;
+            });
+            if (inCloudForTurb) turbulenceIntensity = 3.0;
+            worldWeatherZones.forEach(z => {
+                if (Math.abs(currentX - z.x) < 5000) {
+                    if (z.hasTS) turbulenceIntensity = 8.0;
+                    else if (z.hasRain || z.hasSnow) turbulenceIntensity = Math.max(turbulenceIntensity, 3.0);
+                }
+            });
+            window.lastTurbulence = turbulenceIntensity;
+            
+            let timeSec = Date.now() / 1000;
+            let isAirborneWind = plane.y > (getTerrainHeight(currentX) + 5);
+            let windGustX = 0, windGustY = 0, windGustPitch = 0;
+            if (isAirborneWind) {
+                windGustY = (Math.sin(timeSec * 2.1) + Math.sin(timeSec * 3.7)) * turbulenceIntensity * 0.8;
+                windGustPitch = (Math.sin(timeSec * 1.5) + Math.cos(timeSec * 2.8)) * turbulenceIntensity * 0.015;
+                windGustX = (Math.random() - 0.5) * turbulenceIntensity * 0.5;
+            }
+
+            plane.vx += (forceX / plane.mass + windGustX) * DT;
+            plane.vy += (forceY / plane.mass + windGustY) * DT;
+            plane.pitch += windGustPitch * DT;
+            plane.x += plane.vx * DT * simRate;
+            plane.y += plane.vy * DT;
+
+            // --- 4. KOLLISION ---
+            let crashed = false;
+
+            if (Math.random() < 0.005) {
+                let isApproaching = Math.random() > 0.5;
+                let altTiers = [400, 800, 1200, 1600, 2000, 2500];
+                let aiY = altTiers[Math.floor(Math.random() * altTiers.length)];
+                aiPlanes.push({
+                    x: currentX + (isApproaching ? 10000 : -10000), 
+                    y: aiY,
+                    vx: isApproaching ? -60 : 60,
+                    img: trafficImages[Math.floor(Math.random() * trafficImages.length)]
+                });
+            }
+            aiPlanes = aiPlanes.filter(ai => Math.abs(ai.x - currentX) < 15000);
+            
+            isTCAS = false;
+            tcasAlt = 0;
+            aiPlanes.forEach(ai => {
+                ai.x += ai.vx * DT * simRate;
+                let dx = Math.abs(currentX - ai.x);
+                let dy = Math.abs(plane.y - ai.y);
+                if (dx < 15 && dy < 10) crashed = true;
+                else if (dx < 2000 && dy < 150) {
+                    isTCAS = true;
+                    tcasAlt = ai.y * 3.28084;
+                }
+            });
+
+            isInCTR = false;
+            worldAirspaces.forEach(as => {
+                let lowerBound = as.isLowerAgl ? as.lowerM + getTerrainHeight(currentX) : as.lowerM;
+                if (currentX >= as.startX && currentX <= as.endX && plane.y >= lowerBound && plane.y <= as.upperM) {
+                    let isAirborne = plane.y > (getTerrainHeight(currentX) + 5);
+                    if (as.isCTR && !isCtrCleared && !hasTakeoffClearance && isAirborne) isInCTR = true;
+                }
+            });
+
+            let hitObs = worldObstacles.find(o => Math.abs(currentX - o.x) < 20 && plane.y < (getTerrainHeight(o.x) + o.heightM - 2));
+            if (hitObs) crashed = true;
+
+            let hitTree = trees.find(t => Math.abs(currentX - t.x) < 15 && plane.y < (t.y + t.height - 2));
+            if (hitTree) crashed = true;
+
+            let groundLevel = getTerrainHeight(currentX);
+            let minFlightHeight = groundLevel + 1.5; 
+            let wasAirborne = plane.y > minFlightHeight + 0.05;
+
+            if (plane.y <= minFlightHeight) {
+                if (crashed) {
+                } else {
+                    let isOnRunway = runways.some(r => currentX >= r.startX - 50 && currentX <= r.endX + 50);
+                    let isHardLanding = plane.vy < -5.0;
+                    let isBadPitch = plane.pitch < -0.15 || plane.pitch > 0.35;
+
+                    if (!isOnRunway || isHardLanding || isBadPitch) {
+                        crashed = true;
+                    } else {
+                        if (wasAirborne) {
+                            let fpm = Math.round(plane.vy * 196.85); // vy is negative
+                            if (fpm > -150) touchdownMessage = "🧈 PERFECT BUTTER! " + fpm + " FPM";
+                            else if (fpm > -350) touchdownMessage = "✅ GOOD LANDING: " + fpm + " FPM";
+                            else if (fpm > -600) touchdownMessage = "⚠️ FIRM TOUCHDOWN: " + fpm + " FPM";
+                            else touchdownMessage = "💥 HARD LANDING! " + fpm + " FPM";
+                            touchdownTimer = 4.0;
+                            window.activeGlidePath = null;
+                            // Spawn Touchdown Smoke
+                            for (let i = 0; i < 20; i++) {
+                                sceneParticles.push({
+                                    x: plane.x - 2 + (Math.random() - 0.5) * 2,
+                                    y: minFlightHeight,
+                                    vx: plane.vx * 0.1 + (Math.random() - 0.5) * 10,
+                                    vy: Math.random() * 8,
+                                    life: 1.0 + Math.random() * 0.5,
+                                    type: 'td_smoke'
+                                });
+                            }
+                        }
+                        plane.y = minFlightHeight;
+                        if (plane.vy < 0) plane.vy = 0;
+                        
+                        // Tricycle gear physics: heavy engine pulls the nose down at low speeds
+                        if (plane.pitch > 0) {
+                            plane.pitchRate -= 0.3 * DT;
+                        }
+
+                        if (plane.pitch < 0) {
+                            plane.pitch = 0;
+                            if (plane.pitchRate < 0) plane.pitchRate = 0;
+                        }
+                        if (plane.throttle < 0.1) { plane.vx *= 0.997; } else { plane.vx *= 0.9996; }
+                        if (keys['Space'] || isBraking) plane.vx *= 0.95;
+                    }
+                }
+            }
+
+            if (crashed) {
+                isGameOver = true;
+                if (loopId) cancelAnimationFrame(loopId);
+                if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+                
+                // Draw manual immediate explosion since we strictly cancelled the frame hook natively
+                draw();
+                return; // Abort physics loop
+            }
+
+            manageTrees();
+            manageParticles();
+            
+            let inCloud = clouds.some(c => {
+                let dx = (plane.x - c.x) / c.radius;
+                let dy = (plane.y - c.y) / (c.radiusV || c.radius);
+                return (dx*dx + dy*dy) < 1;
+            });
+            
+            // --- Icing & IMC Logic ---
+            let altFt = Math.max(0, plane.y * 3.28084); 
+            window.OAT = 15 - (altFt / 1000) * 2;
+            let oatEl = document.getElementById('warn-oat');
+            if (oatEl) oatEl.innerText = Math.round(window.OAT) + '°C';
+            let mobOat = document.getElementById('mobile-oat-display');
+            if (mobOat) mobOat.innerText = 'OAT: ' + Math.round(window.OAT) + '°C';
+            
+            // Check if plane is UNDER a precip cloud (within horizontal range, below its altitude)
+            let underPrecipCloud = clouds.some(c => c.hasPrecip && Math.abs(plane.x - c.x) < c.radius * 1.5 && plane.y < c.y);
+            let currentZone = window.weatherZones ? window.weatherZones.find(z => plane.x >= z.startX && plane.x < z.endX) : null;
+            let zonePrecipType = currentZone ? currentZone.precip : 'none';
+            window.precipitation = (underPrecipCloud && zonePrecipType !== 'none') ? zonePrecipType : 'none';
+            
+            // Reactivate/Deactivate particles based on being under a precip cloud
+            particles.forEach(p => {
+                if (window.precipitation !== 'none' && !p.active && Math.random() > 0.9) {
+                    p.active = true;
+                    p.x = Math.random() * window.innerWidth;
+                    p.y = -20 - Math.random() * 100;
+                    p.type = window.precipitation;
+                    p.vy = p.type === 'rain' ? 15 + Math.random()*10 : 3 + Math.random()*4;
+                    p.vx = p.type === 'rain' ? -2 + Math.random()*1 : -1 + Math.random()*2;
+                    p.l = p.type === 'rain' ? 15 : 3;
+                } else if (window.precipitation === 'none') {
+                    p.active = false;
+                }
+            });
+
+            let inVisibleMoisture = inCloud || window.precipitation !== 'none';
+  
+            // IMC Timer Penalty
+            if (inCloud) {
+                visualCloudTimer = 5.0; // Keep existing visual effect
+                window.imcTimer = Math.max(0, window.imcTimer - 0.016); 
+                let warnImc = document.getElementById('warn-imc');
+                if (warnImc) {
+                    warnImc.style.display = 'block';
+                    let timerSpan = document.getElementById('imc-timer');
+                    if (timerSpan) timerSpan.innerText = Math.ceil(window.imcTimer);
+                }
+                if (window.imcTimer === 0) window.flightScore -= 0.1; // Reduced bleed for realism
+            } else {
+                visualCloudTimer = Math.max(0, visualCloudTimer - DT);
+                window.imcTimer = Math.min(60, window.imcTimer + 0.05); 
+                let warnImc = document.getElementById('warn-imc');
+                if (window.imcTimer === 60 && warnImc) warnImc.style.display = 'none';
+            }
+            
+            // Carburetor Icing
+            if (inVisibleMoisture && window.OAT >= -5 && window.OAT <= 15) {
+                plane.carbIce = Math.min(100, plane.carbIce + 0.05);
+            } else {
+                plane.carbIce = Math.max(0, plane.carbIce - 0.02); 
+            }
+            if (window.carbHeatOn) plane.carbIce = Math.max(0, plane.carbIce - 0.5); 
+            
+            // Airframe Icing
+            if (inVisibleMoisture && window.OAT >= -20 && window.OAT <= 2) {
+                plane.airframeIce = Math.min(100, plane.airframeIce + 0.02);
+            } else if (window.OAT > 2) {
+                plane.airframeIce = Math.max(0, plane.airframeIce - 0.05); 
+            }
+            
+            let warnCarb = document.getElementById('warn-carbice');
+            if (warnCarb) warnCarb.style.display = plane.carbIce > 15 ? 'block' : 'none';
+            let warnAir = document.getElementById('warn-airframeice');
+            if (warnAir) warnAir.style.display = plane.airframeIce > 10 ? 'block' : 'none';
+            if (touchdownTimer > 0) touchdownTimer -= DT;
+
+            // --- 5. KAMERA ZOOM ---
+            if (isAutoZoom) {
+                let speedZoom = Math.max(3.5, 15 - (trueSpeed / 4)); 
+                let maxAllowedZoomForAlt = (canvas.height * 0.3) / Math.max(1.5, plane.y);
+                let targetZoom = Math.max(7.0, Math.min(speedZoom, maxAllowedZoomForAlt)); 
+                currentZoom += (targetZoom - currentZoom) * 0.02; 
+            } else {
+                currentZoom += (manualZoomLevel - currentZoom) * 0.1;
+            }
+
+            if (audioCtx && audioCtx.state === 'running') {
+                engineOsc.frequency.setTargetAtTime((plane.rpm / 60) * 1.5, audioCtx.currentTime, 0.1);
+                engineFilter.frequency.setTargetAtTime(150 + (plane.rpm / 10), audioCtx.currentTime, 0.1);
+                engineGain.gain.setTargetAtTime(Math.max(0, ((plane.map - 10) / 40) * 0.4), audioCtx.currentTime, 0.1);
+                let timeSec = Date.now() / 1000;
+                let turbBoost = (window.lastTurbulence > 1.0) ? (window.lastTurbulence * 0.15) : 0;
+                // Create an organic wave multiplier (0.0 to 1.0) simulating random gusts
+                let gustWave = Math.max(0, Math.sin(timeSec * 0.8) * 0.5 + Math.sin(timeSec * 1.9) * 0.5 + 0.2);
+                let dynamicTurb = turbBoost * gustWave;
+                
+                // Apply with a longer time constant (0.5 instead of 0.1) for smooth fading
+                windFilter.frequency.setTargetAtTime(100 + (trueSpeed * 10) + (dynamicTurb * 800), audioCtx.currentTime, 0.5);
+                windGain.gain.setTargetAtTime(Math.max(0, (trueSpeed - 15) / 100) + dynamicTurb, audioCtx.currentTime, 0.5);
+            }
+
+            updateUI(aoaDeg, trueSpeed, groundLevel, tempC);
+        }
+
+        function updateUI(aoaDeg, speed, groundLevel, tempC) {
+            let agl = plane.y - groundLevel - 1.5; 
+            let msl = plane.y - 1.5; 
+            let kts = speed * 1.94384;
+            let mslFeet = msl * 3.28;
+            let vsi = plane.vy * 196.85;
+
+            // Null-safe UI Helpers
+            const updateText = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
+            const updateRotate = (id, deg) => { const el = document.getElementById(id); if(el) el.style.transform = `rotate(${deg}deg)`; };
+            const updateTranslateY = (id, y) => { const el = document.getElementById(id); if(el) el.style.transform = `translateY(${y}px)`; };
+            const updateWidth = (id, w) => { const el = document.getElementById(id); if(el) el.style.width = w; };
+            const updateValue = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+            const updateColor = (id, col) => { const el = document.getElementById(id); if(el) el.style.color = col; };
+            const updateBg = (id, bg) => { const el = document.getElementById(id); if(el) el.style.background = bg; };
+            const updateDisplay = (id, disp) => { const el = document.getElementById(id); if(el) el.style.display = disp; };
+
+            updateText('val-spd', Math.round(kts));
+            updateRotate('ndl-spd', kts * 1.5);
+            updateTranslateY('ndl-att', plane.pitch * 50);
+            updateText('val-alt', Math.round(mslFeet));
+            updateRotate('ndl-alt', (mslFeet / 1000) * 360);
+            
+            updateText('val-vsi', Math.round(vsi));
+            let vsiAngle = Math.max(-170, Math.min(170, vsi * 0.05));
+            updateRotate('ndl-vsi', vsiAngle);
+
+            updateValue('sl-thr', plane.throttle);
+            updateValue('sl-prop', plane.propLever);
+            updateValue('sl-mix', plane.mixture);
+            updateValue('sl-flap', plane.flaps);
+            updateText('val-trim', plane.trim.toFixed(3));
+
+            updateText('val-rpm', Math.round(plane.rpm));
+            let rpmColor = '#0f0';
+            if (plane.rpm > 2750) {
+                let flash = (Date.now() % 400) < 200;
+                rpmColor = flash ? 'red' : '#0f0';
+            }
+            updateColor('val-rpm', rpmColor);
+
+            updateWidth('bar-rpm', Math.min(100, (plane.rpm / 2700) * 100) + "%");
+            updateBg('bar-rpm', plane.rpm > 2750 ? 'red' : (plane.rpm >= 2600 ? 'orange' : '#4CAF50'));
+
+            updateText('val-map', plane.map.toFixed(1));
+            updateWidth('bar-map', Math.max(0, Math.min(100, ((plane.map - 10) / 20) * 100)) + "%");
+            
+            updateText('val-tmp', Math.round(plane.engineTemp));
+            updateWidth('bar-tmp', Math.max(0, Math.min(100, ((plane.engineTemp - 15) / 235) * 100)) + "%");
+            updateBg('bar-tmp', plane.engineTemp > 240 ? 'red' : (plane.engineTemp >= 220 ? 'orange' : '#4CAF50'));
+            let visualPowerMultiplier = 1.0 - (plane.carbIce / 100);
+            if (window.carbHeatOn) visualPowerMultiplier *= 0.9;
+            let effectiveHP = Math.max(0, plane.hp * visualPowerMultiplier);
+
+            updateWidth('bar-hp', Math.min(100, (effectiveHP / 200) * 100) + "%");
+            updateText('val-hp', Math.round(effectiveHP));
+
+            const mixLabel = document.querySelector('.lever-col.mix label');
+            if (!mixLabel) { var mixLabel2 = document.querySelector('.slider-col.mix label'); }
+            if (mixLabel) {
+                if (window.mixtureWarning) {
+                    let flash = (Date.now() % 500) < 250;
+                    mixLabel.style.color = flash ? 'red' : 'white';
+                } else {
+                    mixLabel.style.color = 'white';
+                }
+            }
+
+            updateWidth('bar-hlt', plane.engineHealth + "%");
+            updateText('val-hlt', Math.round(plane.engineHealth));
+            updateBg('bar-hlt', plane.engineHealth < 40 ? 'red' : (plane.engineHealth < 75 ? 'orange' : '#4CAF50'));
+            
+            updateDisplay('stallWarn', (isStalled && plane.y > groundLevel + 2) ? 'block' : 'none');
+        }
+
+        function drawWorld(targetCtx, targetWidth, targetHeight, zoomX, zoomY, screenOffsetX, screenOffsetY, screenOffsetXUnstretched, drawPlaneHighlight = false, drawUnstretchedFPL = false) {
+            let altRatio = Math.min(1, Math.max(0, plane.y / 3000));
+            let bR = Math.round(224 + altRatio * (74 - 224));
+            let bG = Math.round(246 + altRatio * (144 - 246));
+            let bB = Math.round(255 + altRatio * (226 - 255));
+            let tR = Math.round(135 + altRatio * (0 - 135));
+            let tG = Math.round(206 + altRatio * (0 - 206));
+            let tB = Math.round(235 + altRatio * (51 - 235));
+
+            let grad = targetCtx.createLinearGradient(0, 0, 0, targetHeight);
+            grad.addColorStop(0, `rgb(${tR}, ${tG}, ${tB})`);
+            grad.addColorStop(1, `rgb(${bR}, ${bG}, ${bB})`);
+            targetCtx.fillStyle = grad;
+            targetCtx.fillRect(0, 0, targetWidth, targetHeight);
+
+            if (!drawPlaneHighlight) {
+                const bgZoom = 2.5;
+                // Use visual camX (not getFplX) so parallax speed stays constant across runways
+                let bgOffsetX = (targetWidth * 0.3) - (camX * bgZoom);
+
+                // Background Layer: Pale Clouds
+                targetCtx.save();
+                targetCtx.translate(bgOffsetX * 0.05, screenOffsetY);
+                targetCtx.scale(1, -1);
+                targetCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                for (let i = 0; i < 100; i++) {
+                    let cloudX = i * 600 * bgZoom;
+                    let cloudY = (400 + Math.abs(Math.sin(i * 3.1) * 300)) * bgZoom;
+                    targetCtx.beginPath();
+                    targetCtx.arc(cloudX, cloudY, 60 * bgZoom, 0, Math.PI * 2);
+                    targetCtx.arc(cloudX + 40 * bgZoom, cloudY + 10 * bgZoom, 50 * bgZoom, 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+                targetCtx.restore();
+
+                // Parallax Mountain Layers: 2 depth layers using berge1-4.png in random tiled sequence
+                // All 4 images share the same height, placed side by side in shuffled order
+                {
+                    let allReady = bergeImgs.every(img => img.complete && img.naturalWidth > 0);
+                    if (allReady) {
+                        let forestRefH = (forestImg.complete && forestImg.naturalHeight > 0) ? forestImg.naturalHeight * 0.75 : 300;
+                        let isMobBg = window.innerWidth <= 800 || window.innerHeight > window.innerWidth;
+                        let mountainTargetH = forestRefH * (isMobBg ? 1.6 : 2.0);
+
+                        // Build shuffled tile sequences once (seeded, deterministic per layer)
+                        if (!window._bergeSeqs) {
+                            function seededShuffle(arr, seed) {
+                                let s = seed;
+                                function rng() { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646; }
+                                let out = [];
+                                // Repeat pattern enough times to cover any scroll distance
+                                for (let r = 0; r < 40; r++) {
+                                    let copy = [...arr];
+                                    for (let i = copy.length - 1; i > 0; i--) {
+                                        let j = Math.floor(rng() * (i + 1));
+                                        [copy[i], copy[j]] = [copy[j], copy[i]];
+                                    }
+                                    out.push(...copy);
+                                }
+                                return out;
+                            }
+                            window._bergeSeqs = [
+                                seededShuffle([0,1,2,3], 42),   // back layer
+                                seededShuffle([0,1,2,3], 137)   // front layer
+                            ];
+                        }
+                        // Calculate tile widths for current mountainTargetH (adapts to screen size)
+                        let tileWidths = bergeImgs.map(img => (img.naturalWidth / img.naturalHeight) * mountainTargetH);
+
+                        // Mountains follow terrain (like forest) using smoothMinElev.
+                        // They sink below screen as plane climbs AGL above terrain.
+                        // Front layer sinks faster → you "look over" it first.
+                        // Uses smoothMinElev (computed by forest layer) for terrain-relative positioning.
+                        let terrainAtCam = typeof getTerrainHeight === 'function' ? getTerrainHeight(typeof getFplX === 'function' ? getFplX(camX) : camX) : 0;
+                        let aglM = Math.max(0, camY - terrainAtCam);
+                        let maxAglM = 610; // 2000ft AGL in meters
+
+                        // Own ultra-slow smoother for mountains (much lazier than forest)
+                        if (typeof window.smoothMountainElev === 'undefined') window.smoothMountainElev = terrainAtCam;
+                        let mtnElevDiff = terrainAtCam - window.smoothMountainElev;
+                        if (mtnElevDiff > 0) {
+                            // Rising terrain: extremely lazy follow (0.3% per frame)
+                            window.smoothMountainElev += mtnElevDiff * 0.003;
+                        } else {
+                            // Falling terrain: slightly faster but still very gentle (1% per frame)
+                            window.smoothMountainElev += mtnElevDiff * 0.01;
+                        }
+                        let terrainScreenY = screenOffsetY - (window.smoothMountainElev * zoomY);
+
+                        let layers = [
+                            // back: barely sinks with AGL, hugs terrain horizon
+                            { seq: window._bergeSeqs[0], parallax: 0.10, alpha: 0.85, ySinkRate: 0.3 },
+                            // front: sinks faster, you look over it first
+                            { seq: window._bergeSeqs[1], parallax: 0.25, alpha: 0.95, ySinkRate: 0.7 }
+                        ];
+
+                        let drawH = mountainTargetH;
+
+                        for (let layer of layers) {
+                            // Gentle fade: start at 60% of maxAGL, fully gone at 100%
+                            let aglRatio = Math.min(1, aglM / maxAglM);
+                            let fadeStart = 0.6;
+                            let fadeFactor = aglRatio <= fadeStart ? 1.0 : 1.0 - ((aglRatio - fadeStart) / (1 - fadeStart));
+                            let layerAlpha = layer.alpha * fadeFactor;
+                            if (layerAlpha <= 0.01) continue;
+
+                            // Anchor to terrain line (like forest), then sink down based on AGL
+                            let sinkPixels = aglRatio * drawH * layer.ySinkRate;
+                            let drawY = terrainScreenY - drawH + (drawH * 0.15) + sinkPixels;
+
+                            let shiftX = bgOffsetX * layer.parallax;
+
+                            targetCtx.save();
+                            targetCtx.globalAlpha = layerAlpha;
+
+                            // Find the total width of one period (all tiles in sequence)
+                            let periodW = 0;
+                            for (let idx of layer.seq) periodW += tileWidths[idx];
+
+                            // Normalize shiftX into one period
+                            let startX = shiftX % periodW;
+                            if (startX > 0) startX -= periodW;
+
+                            // Draw tiles until we exceed screen width
+                            let x = startX;
+                            let tileIdx = 0;
+                            while (x < targetWidth + 500) {
+                                let imgIdx = layer.seq[tileIdx % layer.seq.length];
+                                let tw = tileWidths[imgIdx];
+                                if (x + tw > -500) {
+                                    targetCtx.drawImage(bergeImgs[imgIdx], x, drawY, tw, drawH);
+                                }
+                                x += tw;
+                                tileIdx++;
+                                if (tileIdx > layer.seq.length) break;
+                            }
+                            targetCtx.restore();
+                        }
+                    }
+                }
+
+                // Parallax Layer 3: Tiled Forest (wald.png)
+                if (typeof forestImg !== 'undefined' && forestImg.complete && forestImg.naturalWidth > 0) {
+                    targetCtx.save();
+                    let isMobForest = window.innerWidth <= 800 || window.innerHeight > window.innerWidth;
+                    let drawScale = isMobForest ? 0.5 : 0.75;
+                    let scaledW = forestImg.width * drawScale;
+                    let scaledH = forestImg.height * drawScale;
+                    
+                    // Parallax X shift - closer than green hills
+                    let forestShiftX = (bgOffsetX * 0.6) % scaledW;
+                    if (forestShiftX > 0) forestShiftX -= scaledW;
+                    
+                    let leftWorldX = -screenOffsetX / zoomX;
+                    let rightWorldX = (targetWidth - screenOffsetX) / zoomX;
+                    let minTerrainElev = Infinity;
+                    // Scan visible screen at coarser step for performance
+                    let scanStep = Math.max(100, (rightWorldX - leftWorldX) / 10);
+                    for (let scanX = leftWorldX; scanX <= rightWorldX + scanStep; scanX += scanStep) {
+                        let realX = typeof getFplX === 'function' ? getFplX(scanX) : scanX;
+                        let elev = typeof getTerrainHeight === 'function' ? getTerrainHeight(realX) : 0;
+                        if (elev < minTerrainElev) minTerrainElev = elev;
+                    }
+                    if (minTerrainElev === Infinity) minTerrainElev = 0;
+                    
+                    // Initialize the smooth elevation tracker if it doesn't exist yet
+                    if (typeof window.smoothMinElev === 'undefined') window.smoothMinElev = minTerrainElev;
+                    
+                    // Asymmetric interpolation (Lerping)
+                    let elevDiff = minTerrainElev - window.smoothMinElev;
+                    if (elevDiff > 0) {
+                        // Moving UP (Mountain): extremely soft, almost lazy follow (1% per frame)
+                        window.smoothMinElev += elevDiff * 0.01;
+                    } else {
+                        // Moving DOWN (Valley): smooth but responsive enough to not float (5% per frame)
+                        window.smoothMinElev += elevDiff * 0.05;
+                    }
+                    
+                    // Use the smoothed elevation for the final Y calculation
+                    let localTerrainY = window.smoothMinElev * zoomY;
+                    let groundScreenY = screenOffsetY - localTerrainY;
+                    
+                    // Draw image right-side up, anchored just below the terrain line
+                    let drawY = groundScreenY - scaledH + (scaledH * 0.3); // Bury 30% to hide gaps
+                    
+                    targetCtx.globalAlpha = 1.0;
+                    for (let i = -1; i < (targetWidth / scaledW) + 2; i++) {
+                        targetCtx.drawImage(forestImg, forestShiftX + i * scaledW, drawY, scaledW, scaledH);
+                    }
+                    targetCtx.restore();
+                }
+            }
+
+            // PNG Cloud Rendering (wolke1-3 for normal, rwolke1-2 for precipitation)
+            for (let i = 0; i < clouds.length; i++) {
+                let c = clouds[i];
+                let cX = c.x * zoomX + screenOffsetX;
+                let cY = screenOffsetY - (c.y * zoomY);
+                let rH = c.radius * zoomX;
+                let rV = (c.radiusV || c.radius) * zoomY;
+
+                // Bounding-box culling
+                if (cX + rH < 0 || cX - rH > targetWidth || cY + rV < 0 || cY - rV > targetHeight) continue;
+
+                // Pick image: precip → rwolkeImgs, normal → wolkeImgs
+                let imgArr = c.hasPrecip ? rwolkeImgs : wolkeImgs;
+                let img = imgArr[(c.imgIdx || 0) % imgArr.length];
+                if (!img || !img.complete || !img.naturalWidth) continue;
+
+                // Draw size matches collision ellipse
+                // Double-draw with screen blending for stronger opacity
+                let dx = cX - rH, dy = cY - rV, dw = rH * 2, dh = rV * 2;
+                targetCtx.save();
+                targetCtx.globalCompositeOperation = 'screen';
+                targetCtx.drawImage(img, dx, dy, dw, dh);
+                targetCtx.drawImage(img, dx, dy, dw, dh);
+                targetCtx.restore();
+            }
+            
+            targetCtx.save();
+            targetCtx.translate(screenOffsetX, screenOffsetY);
+            targetCtx.scale(1, -1); 
+
+
+            worldAirspaces.forEach(as => {
+                let groundY1 = as.isLowerAgl ? getTerrainHeight(as.startX) : 0;
+                let lowerBound = as.lowerM + groundY1; 
+                let height = as.upperM - lowerBound;
+                
+                let isClearedZone = as.isCTR && isCtrCleared;
+                targetCtx.fillStyle = as.isCTR && !isCtrCleared ? 'rgba(200, 50, 50, 0.15)' : (isClearedZone ? 'rgba(50, 200, 50, 0.15)' : 'rgba(50, 50, 200, 0.1)');
+                targetCtx.strokeStyle = as.isCTR && !isCtrCleared ? 'rgba(200, 50, 50, 0.5)' : (isClearedZone ? 'rgba(50, 200, 50, 0.5)' : 'rgba(50, 50, 200, 0.5)');
+                
+                targetCtx.lineWidth = 1;
+                targetCtx.setLineDash([10 * zoomX, 10 * zoomX]);
+                targetCtx.fillRect(as.visualStartX * zoomX, lowerBound * zoomY, (as.visualEndX - as.visualStartX) * zoomX, height * zoomY);
+                targetCtx.strokeRect(as.visualStartX * zoomX, lowerBound * zoomY, (as.visualEndX - as.visualStartX) * zoomX, height * zoomY);
+                targetCtx.setLineDash([]);
+                
+                if (!drawPlaneHighlight) {
+                    targetCtx.save();
+                    targetCtx.scale(1, -1);
+                    targetCtx.fillStyle = as.isCTR && !isClearedZone ? 'rgba(200, 50, 50, 0.8)' : (isClearedZone ? 'rgba(50, 200, 50, 0.8)' : 'rgba(50, 50, 200, 0.8)');
+                    targetCtx.textAlign = 'center';
+                    targetCtx.font = 'bold ' + Math.max(12, 14 * zoomX) + 'px sans-serif';
+                    targetCtx.fillText(as.name, (as.visualStartX + (as.visualEndX-as.visualStartX)/2) * zoomX, -(as.upperM - 20) * zoomY);
+                    targetCtx.restore();
+                }
+            });
+
+            aiPlanes.forEach(ai => {
+                let drawX = getVisualX(ai.x);
+                let drawY = ai.y * zoomY;
+                
+                targetCtx.save();
+                targetCtx.translate(drawX * zoomX, drawY);
+                if (ai.vx < 0) { targetCtx.scale(-1, 1); }
+                targetCtx.scale(1, -1);
+                let tW = plane.length * zoomX;
+                let tH = plane.height * zoomY;
+                if (ai.img && ai.img.complete) {
+                    targetCtx.drawImage(ai.img, -tW/2, -tH/2, tW, tH);
+                } else {
+                    // Fallback to triangle if image not loaded
+                    targetCtx.fillStyle = ai.vx < 0 ? '#e74c3c' : '#3498db';
+                    targetCtx.beginPath();
+                    let dir = ai.vx > 0 ? 1 : -1;
+                    targetCtx.moveTo(dir * 15 * zoomX, 0);
+                    targetCtx.lineTo(-dir * 15 * zoomX, 6 * zoomY);
+                    targetCtx.lineTo(-dir * 10 * zoomX, 0);
+                    targetCtx.lineTo(-dir * 15 * zoomX, -6 * zoomY);
+                    targetCtx.closePath();
+                    targetCtx.fill();
+                }
+                targetCtx.restore();
+                
+                if (!drawPlaneHighlight) {
+                    let altDiffFt = Math.round((ai.y - plane.y) * 3.28 / 100);
+                    let altText = (altDiffFt >= 0 ? "+" : "") + altDiffFt.toString();
+                    if (altDiffFt === 0) altText = "00";
+                    targetCtx.save();
+                    targetCtx.scale(1, -1);
+                    targetCtx.fillStyle = '#00FFFF';
+                    targetCtx.font = 'bold ' + Math.max(10, 12 * zoomX) + 'px monospace';
+                    targetCtx.fillText(altText, drawX * zoomX, - (ai.y + 15) * zoomY);
+                    targetCtx.restore();
+                }
+
+                let currentFplX = getFplX(plane.x);
+                let dx = Math.abs(currentFplX - ai.x);
+                let dy = Math.abs(plane.y - ai.y);
+                if (dx < 2000 && dy < 150) {
+                    targetCtx.strokeStyle = 'red';
+                    targetCtx.lineWidth = 2 * zoomX;
+                    targetCtx.strokeRect((drawX - 20) * zoomX, (ai.y - 20) * zoomY, 40 * zoomX, 40 * zoomY);
+                }
+            });
+
+            if (!drawPlaneHighlight) {
+                targetCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+                targetCtx.lineWidth = 1 * zoomX;
+                sceneParticles.forEach(p => {
+                    if (p.type === 'smoke') {
+                        targetCtx.fillStyle = `rgba(50, 50, 50, ${p.life * 0.8})`;
+                        targetCtx.beginPath();
+                        targetCtx.arc(p.x * zoomX, p.y * zoomY, (2 - p.life) * 10 * zoomX, 0, Math.PI * 2);
+                        targetCtx.fill();
+                    } else if (p.type === 'td_smoke') {
+                        targetCtx.fillStyle = `rgba(200, 200, 200, ${p.life * 0.5})`;
+                        targetCtx.beginPath();
+                        targetCtx.arc(p.x * zoomX, p.y * zoomY, (2.5 - p.life) * 6 * zoomX, 0, Math.PI * 2);
+                        targetCtx.fill();
+                    } else {
+                        targetCtx.beginPath();
+                        targetCtx.moveTo(p.x * zoomX, p.y * zoomY);
+                        let relVx = windVX - plane.vx;
+                        let relVy = windVY - plane.vy;
+                        targetCtx.lineTo((p.x + relVx * 0.05) * zoomX, (p.y + relVy * 0.05) * zoomY);
+                        targetCtx.stroke();
+                    }
+                });
+
+                weatherParticles.forEach(p => {
+                    targetCtx.beginPath();
+                    if (p.type === 'rain') {
+                        targetCtx.strokeStyle = 'rgba(100, 150, 255, 0.6)';
+                        targetCtx.moveTo(p.x * zoomX, p.y * zoomY);
+                        targetCtx.lineTo((p.x + windVX*0.1) * zoomX, (p.y - 1) * zoomY);
+                        targetCtx.stroke();
+                    } else {
+                        targetCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                        targetCtx.arc(p.x * zoomX, p.y * zoomY, 2 * zoomX, 0, Math.PI*2);
+                        targetCtx.fill();
+                    }
+                });
+            }
+
+            if (!drawPlaneHighlight) {
+                worldLinear.forEach(lf => {
+                    let groundY = getTerrainHeight(lf.x);
+                    targetCtx.save();
+                    targetCtx.translate(lf.visualX * zoomX, groundY * zoomY);
+                    if (lf.type === 'river') {
+                        targetCtx.fillStyle = '#4A90E2';
+                        targetCtx.fillRect(-20 * zoomX, -2 * zoomY, 40 * zoomX, 5 * zoomY);
+                    } else if (lf.type === 'highway') {
+                        targetCtx.fillStyle = '#444';
+                        targetCtx.fillRect(-5 * zoomX, 0, 10 * zoomX, 2 * zoomY);
+                    }
+                    targetCtx.restore();
+                });
+            }
+
+            worldLandmarks.forEach(lm => {
+                let groundY = getTerrainHeight(lm.x);
+                targetCtx.save();
+                targetCtx.translate(lm.visualX * zoomX, groundY * zoomY);
+                
+                let maxHeight = 10;
+                
+                if (lm.type === 'city' || lm.type === 'town') {
+                    let seed = Math.floor(lm.x);
+                    function srnd() {
+                        let t = seed += 0x6D2B79F5;
+                        t = Math.imul(t ^ t >>> 15, t | 1);
+                        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+                    }
+                    
+                    let numB = 15 + Math.floor(srnd() * 15);
+                    let spread = 800 + srnd() * 700;
+                    
+                    for (let i=0; i<numB; i++) {
+                        let bx = (srnd() - 0.5) * spread;
+                        let bw = 20 + srnd() * 40;
+                        let bh = 10 + srnd() * 30;
+                        
+                        // Calculate precise ground height for this specific building's X coordinate
+                        let bFplX = lm.x + bx;
+                        let bVisX = typeof getVisualX === 'function' ? getVisualX(bFplX) : bFplX;
+                        let bGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(bFplX) : groundY;
+                        
+                        // Calculate relative coordinates to the landmark's translated center
+                        let relX = (bVisX - lm.visualX) * zoomX;
+                        let relY = (bGroundY - groundY) * zoomY;
+                        let drawW = bw * zoomX;
+                        let drawH = bh * zoomY;
+                        let roofH = (bw / 2) * 0.577 * zoomY; // 30-degree pitch (tan(30) = 0.577)
+                        let embed = 50 * zoomY; // Extend 50m underground to hide floating edges
+                        
+                        // Ensure the landmark label clears the highest roof on the highest hill
+                        let absoluteTopY = (bGroundY - groundY) + bh + (bw/2)*0.577;
+                        if (absoluteTopY > maxHeight) maxHeight = absoluteTopY;
+                        
+                        if (!drawPlaneHighlight) {
+                            // Main View: Draw Building Body (anchored into the earth)
+                            let shades = ['#2c3e50', '#34495e', '#7f8c8d'];
+                            targetCtx.fillStyle = shades[Math.floor(srnd()*shades.length)];
+                            targetCtx.beginPath();
+                            targetCtx.moveTo(relX - drawW/2, relY - embed);
+                            targetCtx.lineTo(relX + drawW/2, relY - embed);
+                            targetCtx.lineTo(relX + drawW/2, relY + drawH);
+                            targetCtx.lineTo(relX - drawW/2, relY + drawH);
+                            targetCtx.closePath();
+                            targetCtx.fill();
+                            
+                            // Draw 30-Degree Pitched Roof
+                            targetCtx.fillStyle = '#1a252f'; 
+                            targetCtx.beginPath();
+                            targetCtx.moveTo(relX - drawW/2, relY + drawH);
+                            targetCtx.lineTo(relX + drawW/2, relY + drawH);
+                            targetCtx.lineTo(relX, relY + drawH + roofH);
+                            targetCtx.closePath();
+                            targetCtx.fill();
+                        } else {
+                            // Minimap View: Fixed small size to prevent distortion (no scale-matching)
+                            let miniW = 2; // Fixed 2 pixels wide
+                            let miniH = 3 + (bh / 40) * 3; // Fixed 3 to 6 pixels high
+                            targetCtx.fillStyle = '#7f8c8d';
+                            targetCtx.fillRect(relX - miniW/2, relY, miniW, miniH);
+                        }
+                    }
+                } else {
+                    targetCtx.fillStyle = '#ccc';
+                    targetCtx.fillRect(-5 * zoomX, 0, 10 * zoomX, 10 * zoomY); 
+                }
+
+                targetCtx.scale(1, -1); 
+                if (!drawPlaneHighlight) {
+                    targetCtx.fillStyle = '#fff';
+                    targetCtx.textAlign = 'center';
+                    targetCtx.font = 'bold ' + Math.max(10, 12 * zoomX) + 'px sans-serif';
+                    targetCtx.fillText(lm.name, 0, -(maxHeight + 5) * zoomY);
+                }
+                targetCtx.restore();
+            });
+
+            let timeSec = Date.now() / 1000;
+            if (!drawPlaneHighlight) {
+                worldObstacles.forEach(obs => {
+                    let groundY = getTerrainHeight(obs.x);
+                    let topY = groundY + obs.heightM;
+                    targetCtx.save();
+                    targetCtx.strokeStyle = '#c00';
+                    targetCtx.lineWidth = Math.max(1, 2 * zoomX);
+                    targetCtx.beginPath();
+                    let drawX = obs.visualX;
+                    targetCtx.moveTo(drawX * zoomX, groundY * zoomY);
+                    targetCtx.lineTo(drawX * zoomX, topY * zoomY);
+                    targetCtx.stroke();
+                    
+                    if (obs.type === 'wind') {
+                        targetCtx.translate(drawX * zoomX, topY * zoomY);
+                        targetCtx.strokeStyle = '#eee';
+                        for (let i = 0; i < 3; i++) {
+                            let angle = timeSec * 2 + (i * Math.PI * 2 / 3);
+                            targetCtx.beginPath();
+                            targetCtx.moveTo(0, 0);
+                            targetCtx.lineTo(Math.cos(angle) * obs.heightM * 0.4 * zoomX, Math.sin(angle) * obs.heightM * 0.4 * zoomY);
+                            targetCtx.stroke();
+                        }
+                    }
+                    targetCtx.restore();
+                });
+            }
+
+            if (plane.y > 762) {
+                targetCtx.globalAlpha = Math.max(0, 1 - ((plane.y - 762) / 1000));
+            }
+
+            runways.forEach(r => {
+                let visualStartX = getVisualX(r.startX);
+                let visualEndX = getVisualX(r.endX);
+                targetCtx.fillStyle = drawPlaneHighlight ? '#00FFFF' : '#333333';
+                targetCtx.fillRect(visualStartX * zoomX, 0, (visualEndX - visualStartX) * zoomX, (r.height + (drawPlaneHighlight ? 100 : 0.5)) * zoomY);
+                
+                if (!drawPlaneHighlight) {
+                    targetCtx.strokeStyle = '#FFFFFF';
+                    targetCtx.lineWidth = 0.2 * zoomY;
+                    targetCtx.setLineDash([3 * zoomX, 3 * zoomX]);
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(visualStartX * zoomX, (r.height + 0.25) * zoomY);
+                    targetCtx.lineTo(visualEndX * zoomX, (r.height + 0.25) * zoomY);
+                    targetCtx.stroke();
+                    targetCtx.setLineDash([]);
+
+                    // PAPI Lights Array Logic (Left approach focus)
+                    let currentFplX = getFplX(plane.x);
+                    let dxL = currentFplX - r.startX;
+                    let dyL = plane.y - r.height;
+                    let angleDegL = Math.atan2(dyL, -dxL) * (180 / Math.PI); 
+                    
+                    if (dxL > -8000 && dxL < 0) {
+                        let colors = ['red', 'red', 'red', 'red'];
+                        if (angleDegL > 3.5) colors = ['white', 'white', 'white', 'white'];
+                        else if (angleDegL > 3.2) colors = ['white', 'white', 'white', 'red'];
+                        else if (angleDegL > 2.8) colors = ['white', 'white', 'red', 'red'];
+                        else if (angleDegL > 2.5) colors = ['white', 'red', 'red', 'red'];
+                        
+                        targetCtx.save();
+                        targetCtx.translate(getVisualX(r.startX + 20) * zoomX, (r.height + 0.5) * zoomY);
+                        for (let i = 0; i < 4; i++) {
+                            targetCtx.fillStyle = colors[i];
+                            targetCtx.beginPath();
+                            targetCtx.arc(i * 4 * zoomX, 0, Math.max(1, 1.5 * zoomX), 0, Math.PI * 2);
+                            targetCtx.fill();
+                        }
+                        targetCtx.restore();
+                    }
+                }
+            });
+
+            if (window.activeGlidePath && !drawPlaneHighlight) {
+                let gp = window.activeGlidePath;
+                let touchX = gp.approachFromLeft ? gp.rwy.startX + 100 : gp.rwy.endX - 100; // Touchdown zone
+                let touchY = gp.rwy.height;
+                let visualTouchX = typeof getVisualX === 'function' ? getVisualX(touchX) : touchX;
+                
+                let angleRad = 3.5 * (Math.PI / 180); // 3.5 degree steep approach for obstacle clearance
+                let lengthM = 3000; // 3km long path
+                let dir = gp.approachFromLeft ? -1 : 1;
+                
+                let startVisX = (typeof getVisualX === 'function' ? getVisualX(touchX + dir * lengthM) : touchX + dir * lengthM);
+                let startY = touchY + (lengthM * Math.tan(angleRad));
+                
+                // Check if plane is on glidepath to determine color
+                let currentPlaneFplX = getFplX(plane.x);
+                let planeDistToTouch = Math.abs(currentPlaneFplX - touchX);
+                let idealPlaneY = touchY + (planeDistToTouch * Math.tan(angleRad));
+                let deviation = plane.y - idealPlaneY;
+                let pathColor = 'rgba(255, 200, 0, 0.6)'; // Yellow (Too High)
+                if (deviation < -10) pathColor = 'rgba(255, 50, 50, 0.6)'; // Red (Too Low)
+                else if (Math.abs(deviation) <= 10) pathColor = 'rgba(50, 255, 50, 0.6)'; // Green (On Glidepath)
+                
+                targetCtx.save();
+                targetCtx.strokeStyle = pathColor;
+                targetCtx.lineWidth = 4 * zoomX;
+                targetCtx.setLineDash([20 * zoomX, 15 * zoomX]);
+                targetCtx.beginPath();
+                targetCtx.moveTo(startVisX * zoomX, startY * zoomY);
+                targetCtx.lineTo(visualTouchX * zoomX, touchY * zoomY);
+                targetCtx.stroke();
+                targetCtx.setLineDash([]);
+                
+                // Running Rabbit Light
+                let t = (Date.now() % 2000) / 2000; // Loops every 2 seconds
+                let dotX = startVisX + (visualTouchX - startVisX) * t;
+                let dotY = startY + (touchY - startY) * t;
+                
+                targetCtx.fillStyle = 'white';
+                targetCtx.shadowColor = 'white';
+                targetCtx.shadowBlur = 10 * zoomX;
+                targetCtx.beginPath();
+                targetCtx.arc(dotX * zoomX, dotY * zoomY, 5 * Math.max(zoomX, zoomY), 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+            }
+
+            targetCtx.beginPath();
+            
+            let cLeft = -screenOffsetX / zoomX;
+            let startX = cLeft - 200; // Allow terrain to extend left of origin
+            let endX = startX + (targetWidth / zoomX) + 400;
+            
+            targetCtx.moveTo(startX * zoomX, -2000 * zoomY); 
+            targetCtx.lineTo(startX * zoomX, getTerrainHeight(getFplX(startX)) * zoomY);
+            
+            // Adaptive terrain detail: finer when zoomed in, coarser when zoomed out
+            let terrainStep = Math.max(3, Math.min(20, 1 / zoomX * 50));
+            for (let x = startX; x <= endX; x += terrainStep) {
+                targetCtx.lineTo(x * zoomX, getTerrainHeight(getFplX(x)) * zoomY);
+            }
+            
+            targetCtx.lineTo(endX * zoomX, -2000 * zoomY); 
+            targetCtx.closePath();
+
+             // 1. Fill the entire terrain block with Dirt (Brown)
+            targetCtx.fillStyle = '#4a3020'; // Earth/Dirt color
+            targetCtx.fill();
+            
+            // 2. Stroke the top edge with Grass (Green)
+            targetCtx.lineWidth = 4; // Fixed pixel width, NO zoom scaling!
+            targetCtx.strokeStyle = '#3a6b2c'; // Fresh Grass color
+            targetCtx.lineJoin = 'round'; // Smooth rolling grass over hills
+            targetCtx.stroke();
+
+            targetCtx.globalAlpha = 1.0;
+
+
+            if (typeof window.fpl !== 'undefined' && window.fpl.length > 0) {
+                // Inside ctx.translate(screenOffsetX,screenOffsetY) + scale(1,-1) transform.
+                // Use pure world coordinates: ptX in visual-X * zoomX, ptY in altitude * zoomY.
+                // The transform already adds screenOffsetX/Y and flips Y — don't add them manually.
+                targetCtx.save();
+                targetCtx.strokeStyle = 'rgba(255, 50, 50, 0.7)';
+                targetCtx.lineWidth = 2;
+                targetCtx.lineJoin = 'round';
+                targetCtx.setLineDash([12, 8]);
+                targetCtx.beginPath();
+                for (let i = 0; i < window.fpl.length; i++) {
+                    let fplRawX = window.fpl[i].x != null ? window.fpl[i].x : window.fpl[i].dist;
+                    let ptX = drawUnstretchedFPL
+                        ? fplRawX * zoomX + (screenOffsetXUnstretched - screenOffsetX)
+                        : (typeof getVisualX === 'function' ? getVisualX(fplRawX) : fplRawX) * zoomX;
+                    let wp = window.fpl[i];
+                    let targetAltMeters = wp.alt != null
+                        ? wp.alt * 0.3048
+                        : (wp.type === 'runway' ? wp.elevation : wp.elevation + 304.8);
+                    let ptY = targetAltMeters * zoomY;
+                    if (i === 0) targetCtx.moveTo(ptX, ptY);
+                    else targetCtx.lineTo(ptX, ptY);
+                }
+                targetCtx.stroke();
+                targetCtx.setLineDash([]);
+
+                // Dispatcher altitude waypoints als Diamant-Marker anzeigen
+                let awps = window.fplAltWaypoints;
+                if (awps && awps.length > 0) {
+                    awps.forEach(wp => {
+                        let wpX = drawUnstretchedFPL
+                            ? wp.x * zoomX + (screenOffsetXUnstretched - screenOffsetX)
+                            : (typeof getVisualX === 'function' ? getVisualX(wp.x) : wp.x) * zoomX;
+                        let wpY = wp.altFt * 0.3048 * zoomY;
+                        let s = 5 / zoomX; // Feste Pixel-Größe, unabhängig vom Zoom
+                        targetCtx.beginPath();
+                        targetCtx.moveTo(wpX, wpY + s * zoomX);
+                        targetCtx.lineTo(wpX + s * zoomX, wpY);
+                        targetCtx.lineTo(wpX, wpY - s * zoomX);
+                        targetCtx.lineTo(wpX - s * zoomX, wpY);
+                        targetCtx.closePath();
+                        targetCtx.fillStyle = 'rgba(255, 200, 0, 1)';
+                        targetCtx.fill();
+                        targetCtx.strokeStyle = 'rgba(200, 100, 0, 1)';
+                        targetCtx.lineWidth = 1.5;
+                        targetCtx.stroke();
+
+                        // Höhenangabe (Text muss Y-Flip rückgängig machen)
+                        targetCtx.save();
+                        targetCtx.scale(1, -1);
+                        targetCtx.font = 'bold 11px monospace';
+                        targetCtx.fillStyle = 'rgba(255, 220, 0, 1)';
+                        targetCtx.textAlign = 'center';
+                        targetCtx.fillText(Math.round(wp.altFt) + 'ft', wpX, -(wpY + 10 * zoomY));
+                        targetCtx.restore();
+                    });
+                }
+                targetCtx.restore();
+            }
+
+            if (drawPlaneHighlight) {
+                targetCtx.fillStyle = 'red';
+                targetCtx.beginPath();
+                targetCtx.arc(plane.x * zoomX, plane.y * zoomY, 4, 0, Math.PI * 2);
+                targetCtx.fill();
+            } else {
+                targetCtx.save();
+                targetCtx.translate(plane.x * zoomX, plane.y * zoomY);
+                targetCtx.rotate(plane.pitch); 
+                if (!plane.facingRight) {
+                    targetCtx.scale(-1, 1);
+                }
+                
+                let drawW = plane.length * zoomX;
+                let drawH = plane.height * zoomY;
+
+                targetCtx.scale(1, -1); 
+                
+                if(planeImg.complete) {
+                    targetCtx.drawImage(planeImg, -drawW/2, -drawH/2 - (drawH*0.1), drawW, drawH);
+                }
+                targetCtx.restore(); 
+            }
+            targetCtx.restore(); 
+
+            // Procedural Foreground Tree Decorations (Optimized)
+            if (treeImages.length > 0 && !drawPlaneHighlight) {
+                // Adaptive tree step: fewer trees when zoomed out (more visible area)
+                let visibleWorldWidth = targetWidth / zoomX;
+                let treeStep = visibleWorldWidth > 2000 ? 60 : visibleWorldWidth > 800 ? 40 : 20;
+                let leftWorldX = -screenOffsetX / zoomX;
+                let rightWorldX = (targetWidth - screenOffsetX) / zoomX;
+
+                let sDrawX = Math.floor(leftWorldX / treeStep) * treeStep;
+                let eDrawX = Math.floor(rightWorldX / treeStep) * treeStep + treeStep;
+
+                // Pre-build runway clearance intervals for O(1) lookup
+                let rwClear = runways.map(r => ({ s: r.startX - 100, e: r.endX + 100 }));
+
+                for (let x = sDrawX; x <= eDrawX; x += treeStep) {
+                    let realX = typeof getFplX === 'function' ? getFplX(x) : x;
+
+                    // Fast pseudo-random first (cheapest check)
+                    let rand = Math.abs(Math.sin(realX * 12.9898) * 100);
+                    if (rand <= 40) continue;
+
+                    // Runway clearance check (pre-built array)
+                    let isOnRunway = false;
+                    for (let i = 0; i < rwClear.length; i++) {
+                        if (realX >= rwClear[i].s && realX <= rwClear[i].e) { isOnRunway = true; break; }
+                    }
+                    if (isOnRunway) continue;
+
+                    let imgIndex = Math.floor(rand) % treeImages.length;
+                    let selectedImg = treeImages[imgIndex];
+
+                    if (selectedImg.complete && selectedImg.naturalHeight > 0) {
+                        let tGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(realX) : 0;
+                        let treeBaseY = screenOffsetY - (tGroundY * zoomY) + (5 * zoomY);
+
+                        let sScale = 0.6 + (rand % 10) / 20;
+                        let finalH = 30 * sScale * zoomY;
+                        let aspectRatio = selectedImg.naturalWidth / selectedImg.naturalHeight;
+                        let finalW = finalH * aspectRatio;
+
+                        let drawX = (x * zoomX + screenOffsetX) - (finalW / 2);
+                        let drawY = treeBaseY - finalH;
+
+                        targetCtx.drawImage(selectedImg, drawX, drawY, finalW, finalH);
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const mobileFontScale = Math.min(1, canvas.width / 800);
+
+            // Show/hide re-center button based on camera state
+            const rcBtn = document.getElementById('btn-recenter');
+            if (rcBtn) rcBtn.style.display = window.isCameraDetached ? 'flex' : 'none';
+
+            if (!window.isCameraDetached) {
+                camX += (plane.x - camX) * 0.5;
+                camY += (plane.y - camY) * 0.05;
+            } else {
+                camX += window.panOffsetX;
+                camY += window.panOffsetY;
+            }
+            window.panOffsetX = 0;
+            window.panOffsetY = 0;
+            
+            let fplCamX = getFplX(camX);
+            let screenOffsetXUnstretched = canvas.width * 0.3 - (fplCamX * currentZoom);
+
+            let screenOffsetX = canvas.width * 0.3 - (camX * currentZoom);
+            let isMobile = window.innerWidth <= 800 || window.innerHeight > window.innerWidth;
+
+            // Get terrain height below camera for AGL-relative camera positioning
+            let groundRef = (typeof getTerrainHeight === 'function' && typeof getFplX === 'function')
+                ? getTerrainHeight(getFplX(camX)) : 0;
+            // Position plane lower in frame when near ground, higher when cruising
+            let aglMeters = Math.max(0, camY - groundRef);
+            let t = Math.min(1, aglMeters / 300); // 0 = on ground, 1 = ≥300m AGL
+            let maxFraction = isMobile ? 0.65 : 0.75;
+            let targetFraction = maxFraction - t * 0.40; // ground: 0.75 from top → cruise: 0.35
+            let screenOffsetY = canvas.height * targetFraction + camY * currentZoom;
+
+            drawWorld(ctx, canvas.width, canvas.height, currentZoom, currentZoom, screenOffsetX, screenOffsetY, screenOffsetXUnstretched, false);
+
+            // --- Altitude Grid Layer ---
+            ctx.save();
+            ctx.font = 'bold 12px sans-serif'; // Bolder text
+            ctx.textAlign = 'left';
+            
+            let ftToM = 0.3048;
+            let stepFt = 100;
+            let stepM = stepFt * ftToM;
+            let leftWorldX = -screenOffsetX / currentZoom;
+            let rightWorldX = (canvas.width - screenOffsetX) / currentZoom;
+            
+            let currentAltFt = plane.y / ftToM;
+            // Draw from 2000ft below up to exactly 1000ft above current altitude
+            let minGridFt = Math.max(100, Math.floor((currentAltFt - 2000) / 100) * 100);
+            let maxGridFt = Math.floor((currentAltFt + 3000) / 100) * 100;
+            
+            for (let altFt = minGridFt; altFt <= maxGridFt; altFt += stepFt) {
+                let altM = altFt * ftToM;
+                let isThick = (altFt % 1000 === 0);
+                let showLabel = (altFt % 500 === 0);
+
+                ctx.strokeStyle = isThick ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)';
+                ctx.fillStyle = isThick ? 'rgba(255, 255, 255, 0.7)' : 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = isThick ? 2 : 1;
+
+                ctx.beginPath();
+                if (!window.isAglMode) {
+                    // MSL Mode
+                    let screenY = screenOffsetY - (altM * currentZoom);
+                    if (screenY > -50 && screenY < canvas.height + 50) { 
+                        ctx.moveTo(0, screenY);
+                        ctx.lineTo(canvas.width, screenY);
+                        ctx.stroke();
+                        if (showLabel) ctx.fillText(altFt + " ft", 10, screenY - 5);
+                    }
+                } else {
+                    // AGL Mode
+                    let first = true;
+                    let stepX = 50;
+                    let minScreenY = 9999; let maxScreenY = -9999;
+                    for (let x = leftWorldX; x <= rightWorldX + stepX; x += stepX) {
+                        let realX = typeof getFplX === 'function' ? getFplX(x) : x;
+                        let groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(realX) : 0;
+                        let y = groundY + altM;
+                        let screenX = x * currentZoom + screenOffsetX;
+                        let screenY = screenOffsetY - (y * currentZoom);
+                        
+                        if (screenY < minScreenY) minScreenY = screenY;
+                        if (screenY > maxScreenY) maxScreenY = screenY;
+                        
+                        if (first) { ctx.moveTo(screenX, screenY); first = false; }
+                        else { ctx.lineTo(screenX, screenY); }
+                    }
+                    if (maxScreenY > 0 && minScreenY < canvas.height) {
+                        ctx.stroke();
+                        let realLeftX = typeof getFplX === 'function' ? getFplX(leftWorldX) : leftWorldX;
+                        let leftGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(realLeftX) : 0;
+                        let leftScreenY = screenOffsetY - ((leftGroundY + altM) * currentZoom);
+                        if (showLabel) ctx.fillText(altFt + " ft AGL", 10, leftScreenY - 5);
+                    }
+                }
+            }
+            ctx.restore();
+
+            if (visualCloudTimer > 0) {
+                let alpha = Math.min(0.98, visualCloudTimer);
+                ctx.fillStyle = `rgba(220, 225, 230, ${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = 'red';
+                ctx.font = 'bold ' + Math.floor(24 * mobileFontScale) + 'px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("WARNING: IMC - NO VISIBILITY", canvas.width / 2, 50);
+            }
+            
+            // --- AR HUD ---
+            let isMobileUI = window.innerWidth <= 800 || isMobile;
+            let safeCanvasWidth = isMobileUI ? canvas.width : canvas.width - 300;
+            let currentFplX = getFplX(plane.x);
+            worldLandmarks.forEach(lm => {
+                let distM = lm.x - currentFplX;
+                if (distM > 0 && distM < 40000) {
+                    let visualDist = getVisualX(lm.x) - plane.x;
+                    let screenX = visualDist * currentZoom + canvas.width * 0.3;
+                    let clampedX = Math.min(screenX, safeCanvasWidth - 50);
+                    
+                    let groundY = getTerrainHeight(lm.x);
+                    let screenY = screenOffsetY - groundY * currentZoom;
+                    let clampedY = Math.max(50, Math.min(screenY, canvas.height - 50));
+                    
+                    let distNM = (distM / 1852).toFixed(1);
+                    let text = `✈️ ${lm.name} ${distNM} NM ➔`;
+                    
+                    ctx.font = 'bold 12px sans-serif';
+                    let tw = ctx.measureText(text).width;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(clampedX - tw/2 - 5, clampedY - 15, tw + 10, 20);
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text, clampedX, clampedY);
+                }
+            });
+
+            worldObstacles.forEach(obs => {
+                let distM = obs.x - currentFplX;
+                if (distM > 0 && distM < 8000) {
+                    let obsTopY = getTerrainHeight(obs.x) + obs.heightM;
+                    if (plane.y <= obsTopY + 30) {
+                        let visualDist = getVisualX(obs.x) - plane.x;
+                        let screenX = visualDist * currentZoom + canvas.width * 0.3;
+                        let clampedX = Math.min(screenX, safeCanvasWidth - 50);
+                        
+                        let screenY = screenOffsetY - obsTopY * currentZoom;
+                        let clampedY = Math.max(50, Math.min(screenY, canvas.height - 50));
+                        
+                        let distNM = (distM / 1852).toFixed(1);
+                        let isBlink = (Date.now() % 500) < 250;
+                        let text = `⚠️ ${obs.type.toUpperCase()} ${distNM} NM ➔`;
+                        
+                        ctx.font = 'bold 13px sans-serif';
+                        let tw = ctx.measureText(text).width;
+                        ctx.fillStyle = isBlink ? 'rgba(255, 0, 0, 0.8)' : 'rgba(100, 0, 0, 0.8)';
+                        ctx.fillRect(clampedX - tw/2 - 5, clampedY - 15, tw + 10, 20);
+                        ctx.fillStyle = isBlink ? 'white' : '#ccc';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(text, clampedX, clampedY);
+                    }
+                }
+            });
+
+            if ((keys['Space'] || isBraking) && plane.y <= getTerrainHeight(currentFplX) + 1.6) {
+                ctx.fillStyle = 'red';
+                ctx.font = 'bold ' + Math.floor(40 * mobileFontScale) + 'px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('BRAKES', canvas.width / 2, canvas.height - 50);
+            }
+
+            if (isTCAS) {
+                let isBlink = (Date.now() % 500) < 250;
+                ctx.fillStyle = isBlink ? 'red' : 'yellow';
+                ctx.font = 'bold ' + Math.floor(40 * mobileFontScale) + 'px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('TRAFFIC PROXIMITY - ALT: ' + Math.floor(tcasAlt) + ' FT', canvas.width / 2, 80);
+            }
+
+            if (isInCTR) {
+                let isBlink = (Date.now() % 500) < 250;
+                if (isBlink) {
+                    ctx.fillStyle = 'red';
+                    ctx.font = 'bold ' + Math.floor(36 * mobileFontScale) + 'px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('AIRSPACE VIOLATION: CTR', canvas.width / 2, 130);
+                }
+            }
+
+            if (needsAudioResume) {
+                let isBlink = (Date.now() % 1000) < 500;
+                if (isBlink) {
+                    ctx.fillStyle = 'yellow';
+                    ctx.font = 'bold ' + Math.floor(30 * mobileFontScale) + 'px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('CLICK ANYWHERE TO START AUDIO', canvas.width / 2, canvas.height / 2 - 100);
+                }
+            }
+
+            let activeParticles = particles.filter(p => p.active);
+            if (activeParticles.length > 0) {
+                ctx.save();
+                for(let i=0; i<activeParticles.length; i++) {
+                    let p = activeParticles[i];
+                    ctx.fillStyle = p.type === 'snow' ? 'rgba(255,255,255,0.8)' : 'rgba(150,200,255,0.6)';
+                    ctx.strokeStyle = 'rgba(150,200,255,0.6)';
+                    ctx.lineWidth = 2;
+                    if (p.type === 'snow') {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.l, 0, Math.PI*2);
+                        ctx.fill();
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p.x + p.vx * 2, p.y + p.vy * 1.5);
+                        ctx.stroke();
+                    }
+                    // Animate
+                    p.y += p.vy;
+                    p.x += p.vx - (plane.vx * 0.1); 
+                    if (p.y > canvas.height) p.y = -20;
+                    if (p.x < 0) p.x = canvas.width;
+                    if (p.x > canvas.width) p.x = 0;
+                }
+                ctx.restore();
+            }
+
+            if (simRate > 1) {
+                ctx.fillStyle = 'yellow';
+                ctx.font = 'bold ' + Math.floor(24 * mobileFontScale) + 'px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`TIME WARP ${simRate}x`, canvas.width / 2, 40);
+            }
+
+            if (isGameOver) {
+                ctx.save();
+                ctx.translate(screenOffsetX, screenOffsetY);
+                ctx.scale(1, -1);
+                ctx.translate(plane.x * currentZoom, plane.y * currentZoom);
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                for (let i = 0; i < 16; i++) {
+                    let r = (20 + Math.random() * 40) * currentZoom * 0.1;
+                    let angle = (i * Math.PI * 2) / 16;
+                    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+
+                let flash = Math.floor(Date.now() / 500) % 2 === 0;
+                if (flash) {
+                    ctx.fillStyle = 'red';
+                    ctx.font = 'bold ' + Math.floor(80 * mobileFontScale) + 'px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('GAME OVER!', canvas.width / 2, canvas.height / 2);
+                }
+            }
+
+            if (touchdownTimer > 0) {
+                ctx.fillStyle = touchdownMessage.includes('BUTTER') ? '#FFD700' : (touchdownMessage.includes('HARD') ? '#FF0000' : '#00FF00');
+                ctx.font = 'bold ' + Math.floor(30 * mobileFontScale) + 'px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(touchdownMessage, canvas.width / 2, canvas.height / 2 - 50);
+            }
+
+            drawMinimap();
+
+            // --- FPS Debug Overlay (HTML element, always visible) ---
+            let _fpsEl = document.getElementById('fps-debug');
+            if (_fpsEl) {
+                let fplX = getFplX(plane.x);
+                let onRwy = runways.some(r => fplX >= r.startX && fplX <= r.endX);
+                let fpsColor = _fpsDisplay >= 50 ? '#0f0' : (_fpsDisplay >= 30 ? '#ff0' : '#f00');
+                _fpsEl.style.color = fpsColor;
+                _fpsEl.innerHTML = _fpsDisplay + ' FPS<br><span style="color:#aaa;font-size:10px;">X:' + Math.round(fplX) + (onRwy ? ' <b style="color:#0ff">[RWY]</b>' : '') + ' Z:' + currentZoom.toFixed(1) + '</span>';
+            }
+        }
+
+        function drawMinimap() {
+            const mCanvas = document.getElementById('minimap');
+            const mCtx = mCanvas.getContext('2d');
+            
+            let miniZoomX = mCanvas.width / 15000;
+            let maxVisibleMeters = Math.max(300, plane.y + 304.8);
+            let miniZoomY = mCanvas.height / maxVisibleMeters;
+            let miniOffsetX = (mCanvas.width / 3) - (plane.x * miniZoomX);
+            let miniOffsetY = mCanvas.height;
+
+            mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+            drawWorld(mCtx, mCanvas.width, mCanvas.height, miniZoomX, miniZoomY, miniOffsetX, miniOffsetY, (mCanvas.width / 3) - (getFplX(plane.x) * miniZoomX), true, true);
+
+            worldLandmarks.forEach(lm => {
+                let miniX = (getVisualX(lm.x) - plane.x) * miniZoomX + (400 / 3);
+                if (miniX > 0 && miniX < mCanvas.width) {
+                    let groundY = getTerrainHeight(lm.x);
+                    let miniY = mCanvas.height - (groundY * miniZoomY);
+                    
+                    mCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    mCtx.lineWidth = 1;
+                    mCtx.beginPath();
+                    mCtx.moveTo(miniX, miniY);
+                    mCtx.lineTo(miniX, miniY - 15);
+                    mCtx.stroke();
+                    
+                    mCtx.font = '9px sans-serif';
+                    mCtx.fillStyle = lm.type === 'apt' ? '#00FFFF' : '#ffffff';
+                    mCtx.textAlign = 'center';
+                    mCtx.fillText(lm.name, miniX, miniY - 18);
+                }
+            });
+
+            mCtx.fillStyle = '#7A6A4C';
+            mCtx.fillRect(0, mCanvas.height - 2, mCanvas.width, 2);
+        }
+
+
+
+        function showFeedbackText(text, color) {
+            let fb = document.createElement('div');
+            fb.innerText = text;
+            fb.style.cssText = 'position:absolute; top: max(80px, 25%); left:50%; transform:translate(-50%,-50%); font-size:clamp(20px, 6vw, 40px); font-weight:bold; color:'+color+'; text-shadow:2px 2px 5px #000; z-index:3000; pointer-events:none; animation: fadeUp 2s forwards;';
+            document.body.appendChild(fb);
+            if (!document.getElementById('fadeUpStyle')) {
+                let style = document.createElement('style');
+                style.id = 'fadeUpStyle';
+                style.innerHTML = '@keyframes fadeUp { 0% { opacity:1; transform: translate(-50%, -50%); } 100% { opacity:0; transform: translate(-50%, -100%); } }';
+                document.head.appendChild(style);
+            }
+            setTimeout(() => fb.remove(), 2000);
+        }
+
+        function loop() {
+            // FPS measurement
+            _fpsFrames++;
+            let now = performance.now();
+            if (now - _fpsLast >= 500) {
+                _fpsDisplay = Math.round(_fpsFrames / ((now - _fpsLast) / 1000));
+                _fpsFrames = 0;
+                _fpsLast = now;
+            }
+
+            if (isGameOver) {
+                draw();
+                loopId = requestAnimationFrame(loop);
+                return;
+            }
+            updatePhysics();
+            
+            // Scoring Logic
+            let currentScoreDelta = 0;
+            
+            // 1. G-Force / Smoothness Reward
+            let verticalAccel = Math.abs(plane.vy - window.lastPlaneVy);
+            if (verticalAccel < 0.05 && plane.y > getTerrainHeight(getFplX(plane.x)) + 10) {
+                currentScoreDelta += 0.05; // Reward for very smooth pitch control in the air
+            }
+            
+            // 2. Altitude Tracking Reward
+            if (typeof fpl !== 'undefined' && fpl.length > 1 && plane.y > getTerrainHeight(getFplX(plane.x)) + 50) {
+                let targetAltMeters = getTargetAltitudeAtX(getFplX(plane.x)) * 0.3048; 
+                let altDiff = Math.abs(plane.y - targetAltMeters);
+                if (altDiff < 15) currentScoreDelta += 0.1; // Within ~50ft
+            }
+            
+            // 3. Landing Evaluation
+            let isCurrentlyOnGround = plane.y <= getTerrainHeight(getFplX(plane.x)) + 2; 
+            if (isCurrentlyOnGround && !window.wasOnGround) {
+                // Touchdown moment!
+                let touchdownSpeed = Math.abs(plane.vy);
+                if (touchdownSpeed < 0.5) {
+                    window.flightScore += 500; // BUTTER LANDING!
+                    showFeedbackText("BUTTER! +500", "#00FF00");
+                } else if (touchdownSpeed < 1.5) {
+                    window.flightScore += 200; // Good landing
+                    showFeedbackText("GOOD LANDING +200", "#AAFF00");
+                } else if (touchdownSpeed > 3.0) {
+                    window.flightScore -= 300; // Hard landing penalty
+                    showFeedbackText("HARD LANDING! -300", "#FF0000");
+                }
+
+                // Airmanship Bonus: Engine Handling
+                if (!window.engineAbused && touchdownSpeed < 1.5) {
+                    window.flightScore += 500;
+                    setTimeout(() => { showFeedbackText("PERFECT ENGINE +500", "#00FFFF"); }, 1000); 
+                }
+                
+                // Reset trackers for the next flight/leg
+                window.engineAbused = false;
+                window.scoredTakeoffATC = false;
+                window.scoredLandingATC = false;
+            }
+            
+            window.flightScore += currentScoreDelta;
+            window.lastPlaneVy = plane.vy;
+            window.wasOnGround = isCurrentlyOnGround;
+            let scoreEl = document.getElementById('score-display');
+            if (scoreEl) scoreEl.innerText = 'Score: ' + Math.floor(window.flightScore);
+
+            draw();
+            loopId = requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>

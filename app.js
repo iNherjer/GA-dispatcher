@@ -1,4 +1,45 @@
 /* =========================================================
+   GLOBAL HELPERS
+   ========================================================= */
+if (!document.getElementById('vp-pulse-style')) {
+    const style = document.createElement('style');
+    style.id = 'vp-pulse-style';
+    style.innerHTML = `@keyframes vpPulse { 0% {opacity:1; transform:scale(1);} 50% {opacity:0.4; transform:scale(0.85);} 100% {opacity:1; transform:scale(1);} } .vp-loading-pulse { animation: vpPulse 1.2s infinite; pointer-events: none; }`;
+    document.head.appendChild(style);
+}
+
+window.formatAsLimit = function(lim) {
+    if (!lim) return '?';
+    if (lim.referenceDatum === 0 && lim.value === 0) return 'GND';
+    if (lim.unit === 6) return `FL ${lim.value}`;
+    let u = lim.unit === 1 ? 'FT' : 'M';
+    let r = lim.referenceDatum === 1 ? ' MSL' : (lim.referenceDatum === 0 ? ' AGL' : '');
+    return `${lim.value} ${u}${r}`;
+};
+
+// V77: Globale Flag – true, solange der Nutzer irgendeinen Slider/Knob berührt
+window.vpUIInteractionActive = false;
+document.addEventListener('DOMContentLoaded', () => {
+    // Erkennt, wenn der Nutzer an einem klassischen Slider zieht
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+        slider.addEventListener('mousedown', () => window.vpUIInteractionActive = true);
+        slider.addEventListener('touchstart', () => window.vpUIInteractionActive = true, {passive: true});
+        const onEnd = () => {
+            window.vpUIInteractionActive = false;
+            if (slider.id === 'altSlider' || slider.id === 'rateSlider') {
+                if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
+                if (typeof vpDrawClouds === 'function' && document.getElementById('verticalProfileCanvas')) {
+                    renderMapProfile(); renderVerticalProfile('verticalProfileCanvas');
+                }
+            }
+        };
+        slider.addEventListener('mouseup', onEnd);
+        slider.addEventListener('touchend', onEnd);
+        slider.addEventListener('touchcancel', onEnd); // Verhindert Einfrieren beim Scrollen
+    });
+});
+
+/* =========================================================
    1. THEME TOGGLE & NOTIZEN TOGGLE
    ========================================================= */
 function changeThemeFromSlider(val) {
@@ -38,6 +79,17 @@ function setTheme(mode) {
     updateDynamicColors();
     refreshAllDrums();
     syncGPSWithTheme(mode, wasNavcom);
+
+    // --- NEU: Wetter-Widgets beim Theme-Wechsel sofort neu rendern ---
+    if (typeof currentStartICAO !== 'undefined' && currentStartICAO) {
+        const depP = routeWaypoints && routeWaypoints.length > 0 ? routeWaypoints[0] : null;
+        loadMetarWidget(currentStartICAO, 'metarContainerDep', depP?.lat, depP?.lng || depP?.lon);
+    }
+    if (typeof currentDestICAO !== 'undefined' && currentDestICAO) {
+        const isPOI = document.getElementById("destRwyContainer")?.style.display === "none";
+        const destP = routeWaypoints && routeWaypoints.length > 1 ? routeWaypoints[routeWaypoints.length - 1] : null;
+        loadMetarWidget(isPOI ? null : currentDestICAO, 'metarContainerDest', destP?.lat, destP?.lng || destP?.lon);
+    }
 }
 
 function syncGPSWithTheme(newMode, wasNavcom) {
@@ -131,8 +183,14 @@ function cycleRadioOption(selectId) {
 }
 
 function toggleNotes(event) {
-    // Wenn wir auf einen Link oder Button klicken, nichts tun
-    if (event && (event.target.tagName === 'A' || event.target.tagName === 'BUTTON')) return;
+    // Wenn wir auf einen Link, Button oder ein Pin-Icon klicken, umblättern hart blockieren
+    if (event && event.target && (
+        event.target.tagName === 'A' ||
+        event.target.tagName === 'BUTTON' ||
+        event.target.classList.contains('briefing-save-pin') ||
+        event.target.classList.contains('briefing-export-pin') ||
+        event.target.classList.contains('briefing-pdf-pin')
+    )) return;
 
     const pages = ['notePage1', 'notePage2', 'notePage3', 'notePage4', 'notePage5'].map(id => document.getElementById(id)).filter(Boolean);
     if (pages.length < 2) return;
@@ -347,6 +405,7 @@ let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissi
 let currentDepFreq = "";
 let currentDestFreq = "";
 let globalAirports = null, runwayCache = {}, freqCache = {};
+window.drumCache = {};
 
 /* =========================================================
    PWA UPDATE TRIGGER & SOFT AUTO SYNC EVENTS
@@ -425,10 +484,11 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
     let currentRotation = 0;
 
     function onStart(e) {
+        window.vpUIInteractionActive = true;
         isDragging = true;
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         startX = e.touches ? e.touches[0].clientX : e.clientX;
-        // ALT knob in rate mode: use rate value
+
         if (type === 'alt' && navcomAltMode === 'rate') {
             startVal = vpClimbRate || 500;
         } else {
@@ -436,6 +496,12 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
         }
         document.body.style.cursor = 'ns-resize';
         e.preventDefault();
+        // Listener NUR WÄHREND des Drags aktivieren
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchend', onEnd);
+        document.addEventListener('touchcancel', onEnd);
     }
 
     function onMove(e) {
@@ -443,7 +509,6 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
 
-        // ALT knob in rate mode: different range and sensitivity
         if (type === 'alt' && navcomAltMode === 'rate') {
             let delta = Math.round((startY - clientY) + (clientX - startX));
             delta = Math.round(delta * 3);
@@ -465,7 +530,6 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
         if (newVal < min) newVal = min;
         if (newVal > max) newVal = max;
 
-        // Snap to slider step
         const step = parseInt(slider.step) || 1;
         if (step > 1) newVal = Math.round(newVal / step) * step;
 
@@ -485,30 +549,36 @@ function initDragKnob(knobId, displayId, sliderId, min, max, type) {
     }
 
     function onEnd() {
+        if (!isDragging) return;
+        window.vpUIInteractionActive = false;
         isDragging = false;
         document.body.style.cursor = 'default';
         knob.style.transition = 'transform 0.3s ease';
         knob.style.transform = `rotate(0deg)`;
         setTimeout(() => knob.style.transition = '', 300);
+
+        if (type === 'alt' || (type === 'alt' && typeof navcomAltMode !== 'undefined' && navcomAltMode === 'rate')) {
+            if (typeof renderVerticalProfile === 'function') renderVerticalProfile('verticalProfileCanvas');
+            if (typeof renderMapProfile === 'function') renderMapProfile();
+            if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
+        }
+        // Listener nach dem Drag wieder entfernen, um Konflikte zu vermeiden
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('mouseup', onEnd);
+        document.removeEventListener('touchend', onEnd);
+        document.removeEventListener('touchcancel', onEnd);
     }
 
     knob.addEventListener('mousedown', onStart);
     knob.addEventListener('touchstart', onStart, { passive: false });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('mouseup', onEnd);
-    document.addEventListener('touchend', onEnd);
 }
 
 window.onload = () => {
-    // iOS 10+ ignoriert user-scalable=no im Viewport-Tag.
-    // Pinch-to-Zoom auf dem gesamten Dokument per JS sperren (passive:false erforderlich).
-    document.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-    document.addEventListener('touchmove',  e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-
     const savedTheme = localStorage.getItem('ga_theme') || 'retro';
     setTheme(savedTheme);
     applySavedPanelTheme();
+    setTimeout(() => { loadGlobalAirports(); }, 2000);
 
     const lastDest = localStorage.getItem('last_icao_dest');
     if (lastDest) document.getElementById('startLoc').value = lastDest;
@@ -549,7 +619,7 @@ window.onload = () => {
 
     initDragKnob('tasDragKnob', 'tasRadioDisplay', 'tasSlider', 80, 260, 'tas');
     initDragKnob('gphDragKnob', 'gphRadioDisplay', 'gphSlider', 5, 35, 'gph');
-    initDragKnob('altDragKnob', 'altRadioDisplay', 'altSlider', 1500, 9500, 'alt');
+    initDragKnob('altDragKnob', 'altRadioDisplay', 'altSlider', 1500, 13500, 'alt');
     syncToNavCom('altRadioDisplay', document.getElementById('altSlider') ? document.getElementById('altSlider').value : '4500');
 
     if (aiToggleBtn && aiToggleBtn.checked) {
@@ -586,6 +656,14 @@ function saveAiToggle() { const t = document.getElementById('aiToggle'); if (t) 
 /* =========================================================
    3. PERSISTENZ (SPEICHERN, LADEN & RESET)
    ========================================================= */
+let saveMissionTimeout = null;
+window.debouncedSaveMissionState = function() {
+    if (saveMissionTimeout) clearTimeout(saveMissionTimeout);
+    saveMissionTimeout = setTimeout(() => {
+        saveMissionState();
+    }, 800);
+};
+
 function saveMissionState() {
     if (document.getElementById("briefingBox").style.display !== "block") return;
 
@@ -749,7 +827,7 @@ function resetApp() {
     localStorage.removeItem('ga_active_mission'); document.getElementById("briefingBox").style.display = "none";
     currentMissionData = null; routeWaypoints = [];
     vpAltWaypoints = []; vpSegmentAlts = [];
-    if (map) { routeMarkers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline); if (window.hitBoxPolyline) map.removeLayer(window.hitBoxPolyline); clearAirspaceMapLayers(); }
+    if (map) { routeMarkers.forEach(m => map.removeLayer(m)); if (polyline) { map.removeLayer(polyline); polyline = null; } if (window.hitBoxPolyline) { map.removeLayer(window.hitBoxPolyline); window.hitBoxPolyline = null; } clearAirspaceMapLayers(); if (typeof wxMapMarkers !== 'undefined') { wxMapMarkers.forEach(m => map.removeLayer(m)); wxMapMarkers = []; } }
     if (miniMap) { if (miniRoutePolyline) miniMap.removeLayer(miniRoutePolyline); miniMapMarkers.forEach(m => miniMap.removeLayer(m)); miniMapMarkers = []; }
 
     const destLocEl = document.getElementById('destLoc');
@@ -789,26 +867,92 @@ function resetApp() {
 function setDrumCounter(elementId, valueStr) {
     const container = document.getElementById(elementId);
     if (!container) return;
+
     if (!document.body.classList.contains('theme-retro')) {
-        container.innerHTML = `<span class="theme-color-text" style="font-weight:bold;">${valueStr}</span>`;
-        updateDynamicColors(); return;
+        if (container.dataset.lastVal !== valueStr.toString()) {
+            let span = container.querySelector('span');
+            if (!span) {
+                container.innerHTML = `<span class="theme-color-text" style="font-weight:bold;">${valueStr}</span>`;
+                updateDynamicColors(); // Nur einmalig beim Erstellen formatieren!
+            } else {
+                span.textContent = valueStr;
+            }
+            container.dataset.lastVal = valueStr.toString();
+        }
+        return;
     }
+
     let numericValue = valueStr.toString().replace(/[^0-9]/g, '');
     if (numericValue === "") numericValue = "0";
-    const digits = numericValue.split(''), digitHeight = 22;
-    let windowEl = container.querySelector('.drum-window');
-    if (!windowEl) { container.innerHTML = '<div class="drum-window"></div>'; windowEl = container.querySelector('.drum-window'); }
-    const existingStrips = windowEl.querySelectorAll('.drum-strip'), neededStrips = digits.length;
-    if (existingStrips.length < neededStrips) {
-        for (let i = 0; i < (neededStrips - existingStrips.length); i++) {
-            const strip = document.createElement('div'); strip.className = 'drum-strip';
-            strip.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `<div class="drum-digit">${d}</div>`).join('');
-            windowEl.appendChild(strip);
+    const digits = numericValue.split('');
+    const digitHeight = 22;
+
+    let cache = window.drumCache[elementId];
+    
+    // Wenn Element nicht im Cache ist oder der Container geleert wurde: Neu aufbauen
+    if (!cache || !cache.windowEl || !container.contains(cache.windowEl)) {
+        container.innerHTML = '<div class="drum-window"></div>';
+        cache = {
+            windowEl: container.querySelector('.drum-window'),
+            strips: []
+        };
+        window.drumCache[elementId] = cache;
+    }
+
+    const neededStrips = digits.length;
+
+    // Fehlende Streifen hinzufügen
+    while (cache.strips.length < neededStrips) {
+        const strip = document.createElement('div');
+        strip.className = 'drum-strip';
+        strip.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `<div class="drum-digit">${d}</div>`).join('');
+        cache.windowEl.appendChild(strip);
+        cache.strips.push(strip);
+    }
+
+    // Überschüssige Streifen entfernen
+    while (cache.strips.length > neededStrips) {
+        const strip = cache.strips.pop();
+        cache.windowEl.removeChild(strip);
+    }
+
+    // Werte (CSS Transform) aktualisieren
+    digits.forEach((digit, index) => {
+        const translateY = -(parseInt(digit) * digitHeight);
+        const transformStr = `translateY(${translateY}px)`;
+        if (cache.strips[index].style.transform !== transformStr) {
+            cache.strips[index].style.transform = transformStr;
         }
-    } else if (existingStrips.length > neededStrips) { for (let i = neededStrips; i < existingStrips.length; i++) { windowEl.removeChild(existingStrips[i]); } }
-    const finalStrips = windowEl.querySelectorAll('.drum-strip');
-    digits.forEach((digit, index) => { const translateY = -(parseInt(digit) * digitHeight); finalStrips[index].style.transform = `translateY(${translateY}px)`; });
+    });
 }
+let vpRenderPending = false;
+window.throttledRenderProfiles = function() {
+    if (vpRenderPending) return;
+    vpRenderPending = true;
+    requestAnimationFrame(() => {
+        // PERFORMANCE: Nur das aktive Profil rendern, nicht beide gleichzeitig!
+        const mapTable = document.getElementById('mapTableOverlay');
+        if (mapTable && mapTable.classList.contains('active')) {
+            if (typeof renderMapProfile === 'function') renderMapProfile();
+        } else {
+            if (document.getElementById('verticalProfileCanvas')) renderVerticalProfile('verticalProfileCanvas');
+        }
+        vpRenderPending = false;
+    });
+};
+
+window.vpIsFastRendering = false;
+let vpFastRenderTimeout = null;
+window.activateFastRender = function() {
+    window.vpIsFastRendering = true;
+    window.vpBgNeedsUpdate = true; // Zwingt Layer 1 zum Update
+    if (vpFastRenderTimeout) clearTimeout(vpFastRenderTimeout);
+    vpFastRenderTimeout = setTimeout(() => {
+        window.vpIsFastRendering = false;
+        window.vpBgNeedsUpdate = true; 
+        if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+    }, 350);
+};
 
 function handleSliderChange(type, val) {
     let drumVal = val;
@@ -821,8 +965,13 @@ function handleSliderChange(type, val) {
     syncToNavCom(type + 'Radio', val);
     if (type === 'alt') {
         syncToNavCom('altRadioDisplay', val);
-        triggerVerticalProfileUpdate();
-        if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
+        const mInp = document.getElementById('altMapInput');
+        if (mInp && mInp.innerText != val) mInp.innerText = val;
+
+        // Direkter Render-Aufruf! KEIN 3-Sekunden triggerVerticalProfileUpdate() mehr!
+        if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+        // Lufträume nur prüfen, wenn wir nicht gerade aktiv ziehen
+        if (!window.vpUIInteractionActive && typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
     }
 }
 
@@ -836,18 +985,17 @@ function handleRateChange(val) {
     if (rateMapDisplay) rateMapDisplay.textContent = val;
     // Sync sliders
     const rateSlider = document.getElementById('rateSlider');
-    const rateSliderMap = document.getElementById('rateSliderMap');
+    const rateMapInp = document.getElementById('rateMapInput');
     if (rateSlider) rateSlider.value = val;
-    if (rateSliderMap) rateSliderMap.value = val;
+    if (rateMapInp && rateMapInp.innerText != val) rateMapInp.innerText = val;
     // Sync NAVCOM if in rate mode
     if (typeof navcomAltMode !== 'undefined' && navcomAltMode === 'rate') {
         const altRadioDisplay = document.getElementById('altRadioDisplay');
         if (altRadioDisplay) altRadioDisplay.textContent = val;
     }
     // Re-render profiles
-    if (typeof renderMapProfile === 'function') renderMapProfile();
-    if (typeof renderVerticalProfile === 'function') renderVerticalProfile('verticalProfileCanvas');
-    if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
+    if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+    if (!window.vpUIInteractionActive && typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
 }
 
 function recalculatePerformance() {
@@ -855,7 +1003,7 @@ function recalculatePerformance() {
     const tas = parseInt(document.getElementById("tasSlider").value), gph = parseInt(document.getElementById("gphSlider").value), dist = currentMissionData.dist;
     setDrumCounter('timeDrum', Math.round((dist / tas) * 60)); setDrumCounter('fuelDrum', Math.ceil((dist / tas * gph) + (0.75 * gph)));
     if (gpsState.visible && gpsState.mode === 'FPL') renderGPS();
-    setTimeout(() => saveMissionState(), 500);
+    window.debouncedSaveMissionState();
 }
 
 function refreshAllDrums() {
@@ -900,11 +1048,21 @@ function resetBtn(btn) {
     }
 }
 
-async function loadMetarWidget(icao, containerId, lat, lon) {
+async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    container.innerHTML = '<div style="padding:20px; text-align:center; color:#888; font-size:12px; background:#1a1a1a; border-radius:6px;">Sucht lokales Wetter...</div>';
+    // Zwingt das Widget ins "Modern"-Design, auch wenn das Retro-Theme aktiv ist (wichtig für Karten-Popups)
+    const isRetro = !forceModern && document.body.classList.contains('theme-retro');
+    if (isRetro) {
+        container.style.boxShadow = 'none';
+        container.style.background = 'transparent';
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#555; font-family: \'Caveat\', cursive; font-size:22px; transform: rotate(-1deg);">Sucht lokales Wetter...</div>';
+    } else {
+        container.style.boxShadow = '';
+        container.style.background = '';
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#888; font-size:12px; background:#1a1a1a; border-radius:6px;">Sucht lokales Wetter...</div>';
+    }
 
     if (!icao || icao === 'POI') {
         container.style.display = 'none';
@@ -917,63 +1075,86 @@ async function loadMetarWidget(icao, containerId, lat, lon) {
         let isFallback = false;
         let foundIcao = icao;
 
-        // Hilfsfunktion: Versucht direkten Fetch, bei CORS-Blockade (Catch) nutzt sie einen schnellen, rohen Proxy
-        async function safeFetch(urlObj) {
-            try {
-                const r = await fetch(urlObj);
-                if (r.ok && r.status !== 204) return await r.text();
-            } catch (err) {
-                try {
-                    const proxyUrl = `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(urlObj)}`;
-                    const pr = await fetch(proxyUrl);
-                    if (pr.ok && pr.status !== 204) return await pr.text();
-                } catch (pxErr) {
-                    console.error("Proxy fetch failed", pxErr);
-                }
-            }
-            return null;
-        }
+        // --- CACHE LOGIK: Bulk-Daten aus dem Profil nutzen oder Theme-Wechsel abfangen ---
+        const cacheKey = icao + (lat ? `_${lat.toFixed(2)}` : '') + (lon ? `_${lon.toFixed(2)}` : '');
+        const cachedEntry = gpsState.metarCache[cacheKey] || gpsState.metarCache[icao];
+        if (cachedEntry) {
+            metarDataList = cachedEntry.data;
+            isFallback = cachedEntry.isFallback;
+            foundIcao = cachedEntry.foundIcao;
+        } else {
 
-        const directUrl = `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&t=${Date.now()}`;
-        const mainText = await safeFetch(directUrl);
-        if (mainText) {
-            try { metarDataList = JSON.parse(mainText); } catch (e) { }
-        }
-
-        // Falls kein METAR da ist, Fallback auf Umkreissuche
-        if ((!metarDataList || metarDataList.length === 0) && lat !== undefined && lon !== undefined) {
-            const latMin = lat - 0.6, latMax = lat + 0.6;
-            const lonMin = lon - 0.8, lonMax = lon + 0.8;
-            const fbUrl = `https://aviationweather.gov/api/data/metar?bbox=${latMin},${lonMin},${latMax},${lonMax}&format=json&t=${Date.now()}`;
-            const fbText = await safeFetch(fbUrl);
-
-            if (fbText) {
-                try {
-                    const fbData = JSON.parse(fbText);
-                    if (fbData && fbData.length > 0) {
-                        let closest = fbData[0];
-                        let minDist = calcNav(lat, lon, closest.lat, closest.lon).dist;
-                        for (let i = 1; i < fbData.length; i++) {
-                            let d = calcNav(lat, lon, fbData[i].lat, fbData[i].lon).dist;
-                            if (d < minDist) { minDist = d; closest = fbData[i]; }
+            async function safeFetch(urlObj, retries = 3) {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const r = await fetch(urlObj);
+                        if (r.ok && r.status !== 204) return await r.text();
+                    } catch (err) {
+                        try {
+                            const proxyUrl = `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(urlObj)}`;
+                            const pr = await fetch(proxyUrl);
+                            if (pr.ok && pr.status !== 204) return await pr.text();
+                        } catch (pxErr) {
+                            if (i === retries - 1) console.error("Metar Fetch endgültig gescheitert nach", retries, "Versuchen", pxErr);
                         }
-                        metarDataList = [closest];
-                        foundIcao = closest.icaoId;
-                        isFallback = true;
                     }
-                } catch (parseErr) {
-                    console.error("Failed to parse fallback JSON", parseErr);
+                    if (i < retries - 1) await new Promise(res => setTimeout(res, 600));
+                }
+                return null;
+            }
+
+            const directUrl = `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&t=${Date.now()}`;
+            const mainText = await safeFetch(directUrl);
+            if (mainText) {
+                try { metarDataList = JSON.parse(mainText); } catch (e) { }
+            }
+
+            if ((!metarDataList || metarDataList.length === 0) && lat !== undefined && lon !== undefined) {
+                const latMin = lat - 0.6, latMax = lat + 0.6;
+                const lonMin = lon - 0.8, lonMax = lon + 0.8;
+                const fbUrl = `https://aviationweather.gov/api/data/metar?bbox=${latMin},${lonMin},${latMax},${lonMax}&format=json&t=${Date.now()}`;
+                const fbText = await safeFetch(fbUrl);
+                if (fbText) {
+                    try {
+                        const fbData = JSON.parse(fbText);
+                        if (fbData && fbData.length > 0) {
+                            let closest = fbData[0];
+                            let minDist = calcNav(lat, lon, closest.lat, closest.lon).dist;
+                            for (let i = 1; i < fbData.length; i++) {
+                                let d = calcNav(lat, lon, fbData[i].lat, fbData[i].lon).dist;
+                                if (d < minDist) { minDist = d; closest = fbData[i]; }
+                            }
+                            metarDataList = [closest];
+                            foundIcao = closest.icaoId;
+                            isFallback = true;
+                        }
+                    } catch (parseErr) {
+                        console.error("Failed to parse fallback JSON", parseErr);
+                    }
                 }
             }
-        }
+
+            // Ergebnis in den Cache legen
+            gpsState.metarCache[cacheKey] = { data: metarDataList, isFallback, foundIcao };
+
+        } // Ende der Cache-Else-Bedingung
 
         if (!metarDataList || metarDataList.length === 0) {
-            container.innerHTML = `
-                <div style="background:#1a1a1a; border-radius:6px; padding:15px; text-align:center; border: 1px solid #333;">
-                    <div style="color:#d93829; font-weight:bold; margin-bottom:5px;">Kein METAR in der Nähe von ${icao}</div>
-                    <div style="font-size:11px; color:#888; margin-bottom:12px;">Für diesen Bereich steht kein automatisches Wetter zur Verfügung.</div>
-                    <a href="https://metar-taf.com/de/${icao}" target="_blank" style="display:inline-block; background:#4da6ff; color:#111; padding:6px 12px; border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition: background 0.2s;">Manuell suchen ➔</a>
-                </div>`;
+            if (isRetro) {
+                container.innerHTML = `
+                    <div style="padding:15px; text-align:center; font-family: 'Caveat', cursive; transform: rotate(1deg);">
+                        <div style="color:#d93829; font-weight:bold; font-size: 22px; margin-bottom:5px;">Kein METAR in der Nähe von ${icao}</div>
+                        <div style="font-size:18px; color:#555; margin-bottom:12px;">Kein automatisches Wetter verfügbar.</div>
+                        <a href="https://metar-taf.com/de/${icao}" target="_blank" style="display:inline-block; color:#0b1f65; font-size:20px; font-weight:bold; text-decoration:underline;">Manuell suchen ➔</a>
+                    </div>`;
+            } else {
+                container.innerHTML = `
+                    <div style="background:#1a1a1a; border-radius:6px; padding:15px; text-align:center; border: 1px solid #333;">
+                        <div style="color:#d93829; font-weight:bold; margin-bottom:5px;">Kein METAR in der Nähe von ${icao}</div>
+                        <div style="font-size:11px; color:#888; margin-bottom:12px;">Für diesen Bereich steht kein automatisches Wetter zur Verfügung.</div>
+                        <a href="https://metar-taf.com/de/${icao}" target="_blank" style="display:inline-block; background:#4da6ff; color:#111; padding:6px 12px; border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold; transition: background 0.2s;">Manuell suchen ➔</a>
+                    </div>`;
+            }
             return;
         }
 
@@ -981,8 +1162,6 @@ async function loadMetarWidget(icao, containerId, lat, lon) {
         const raw = metar.rawOb || "";
         const temp = metar.temp !== null ? metar.temp + '°C' : '--';
         const dewp = metar.dewp !== null ? metar.dewp + '°C' : '--';
-
-        // Parse Flight Category color
         let catColor = "#fff";
         let catText = metar.fltCat || "N/A";
         if (catText === "VFR") catColor = "#33ff33";
@@ -993,128 +1172,205 @@ async function loadMetarWidget(icao, containerId, lat, lon) {
         let cover = metar.cover || "--";
         if (cover === "Clear") cover = "CLR";
 
+        let visib = metar.visib !== undefined && metar.visib !== null ? metar.visib + ' sm' : '--';
+        const visMatch = raw.match(/\s(\d{4})\s/);
+        if (raw.includes(' 9999 ')) visib = '> 10 km';
+        else if (visMatch && !visMatch[1].startsWith('0000')) visib = parseInt(visMatch[1], 10) + ' m';
+        let wx = metar.wxString ? metar.wxString.replace(/,/g, ' ') : 'NIL';
+
         let qnhStr = "--";
         const qMatch = raw.match ? raw.match(/Q(\d{4})/) : null;
         const aMatch = raw.match ? raw.match(/A(\d{4})/) : null;
         if (qMatch) qnhStr = qMatch[1] + ' hPa';
         else if (aMatch) qnhStr = Math.round((parseInt(aMatch[1]) / 100) * 33.8639) + ' hPa';
 
-        let wdir = metar.wdir;
-        let wspd = metar.wspd || 0;
-        let wgst = metar.wgst ? `G${metar.wgst}` : '';
+        let wdir = metar.wdir, wspd = metar.wspd || 0, wgst = metar.wgst ? `G${metar.wgst}` : '';
         let isVRB = raw.match ? /VRB\d{2,3}KT/.test(raw) : (wdir === "VRB");
-
         let windText = isVRB ? `VRB / ${wspd}${wgst} kt` : `${wdir}° / ${wspd}${wgst} kt`;
         if (wspd === 0) windText = "Calm (0 kt)";
 
+        const isMini = containerId.startsWith('wxPopup');
+        
+        // PERFORMANCE FIX: Wait-Schleife für Pisten-Daten nur ausführen, wenn es kein Mini-Popup ist!
         let retries = 0;
-        while (!runwayCache[foundIcao] && !runwayCache[icao] && retries < 15) {
-            await new Promise(r => setTimeout(r, 200));
-            retries++;
-        }
-
-        let rwyHdg = 0;
-        let rwy1 = "";
-        let rwy2 = "";
-        const rData = runwayCache[foundIcao] || runwayCache[icao];
-        if (rData && !rData.includes('Keine Daten')) {
-            const match = rData.match(/(?:^|\s|\n|<br\s*\/?>)(0[1-9]|[12]\d|3[0-6])([LRC]?)\s*\/\s*((?:0[1-9]|[12]\d|3[0-6])[LRC]?)/);
-            if (match) {
-                rwyHdg = parseInt(match[1], 10) * 10;
-                rwy1 = match[1] + match[2];
-                rwy2 = match[3];
+        if (!isMini) {
+            while (!runwayCache[foundIcao] && !runwayCache[icao] && retries < 15) {
+                await new Promise(r => setTimeout(r, 200));
+                retries++;
             }
         }
 
-        let svgTicks = '';
-        for (let i = 0; i < 360; i += 5) {
-            const isCard = i % 90 === 0;
-            const isLong = i % 10 === 0;
-            const len = isCard ? 8 : (isLong ? 5 : 3);
-            const sw = isCard ? 2 : 1;
-            const col = isCard ? '#111' : '#888';
-            svgTicks += `<line x1="80" y1="2" x2="80" y2="${2 + len}" stroke="${col}" stroke-width="${sw}" transform="rotate(${i} 80 80)" />`;
-
-            if (i % 30 === 0 && !isCard) {
-                const angleRad = (i - 90) * Math.PI / 180;
-                const r = 61; // Radius for the numbers
-                const tx = 80 + r * Math.cos(angleRad);
-                const ty = 80 + r * Math.sin(angleRad);
-                svgTicks += `<text x="${tx}" y="${ty}" font-family="sans-serif" font-size="10" fill="#333" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${i / 10}</text>`;
-            } else if (isCard) {
-                const angleRad = (i - 90) * Math.PI / 180;
-                const r = 61; // Radius for the letters
-                const tx = 80 + r * Math.cos(angleRad);
-                const ty = 80 + r * Math.sin(angleRad);
-                let letter = '';
-                if (i === 0) letter = 'N';
-                else if (i === 90) letter = 'O';
-                else if (i === 180) letter = 'S';
-                else if (i === 270) letter = 'W';
-                svgTicks += `<text x="${tx}" y="${ty}" font-family="sans-serif" font-size="14" fill="#111" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${letter}</text>`;
+        let rwyHdg = 0; let rwy1 = ""; let rwy2 = "";
+        
+        // Pisten-Infos nur laden, wenn wir NICHT im Mini-Popup sind (spart Platz & Zeit)
+        if (!isMini) {
+            const rData = runwayCache[foundIcao] || runwayCache[icao];
+            if (rData && !rData.includes('Keine Daten')) {
+                const match = rData.match(/(?:^|\s|\n|<br\s*\/?>)(0[1-9]|[12]\d|3[0-6])([LRC]?)\s*\/\s*((?:0[1-9]|[12]\d|3[0-6])[LRC]?)/);
+                if (match) { rwyHdg = parseInt(match[1], 10) * 10; rwy1 = match[1] + match[2]; rwy2 = match[3]; }
             }
         }
 
-        let arrowHtml = '';
-        if (!isVRB && wspd > 0 && wdir !== null && wdir !== "VRB") {
-            arrowHtml = `
-            <svg viewBox="0 0 160 160" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;">
+        const headerText = isFallback ? `Nearest: ${foundIcao}` : `Station: ${icao}`;
+        const modernHeaderText = isFallback ? `▶ NEAREST: ${foundIcao}` : `▶ STATION: ${icao}`;
+
+        if (isRetro) {
+            let svgTicks = `
+                <circle cx="80" cy="80" r="70" stroke="#444" stroke-width="1.5" fill="none" stroke-dasharray="30.65 6" transform="rotate(2.45 80 80)"/>
+                <circle cx="80" cy="80" r="3" fill="#444" />`;
+            
+            // Füge N, O, S, W und 30-Grad-Schritte rotierend hinzu
+            for (let i = 0; i < 360; i += 30) {
+                const angleRad = (i - 90) * Math.PI / 180;
+                const radius = 61;
+                const tx = 80 + radius * Math.cos(angleRad);
+                const ty = 80 + radius * Math.sin(angleRad);
+                
+                // dx="-2" gleicht den kursiven Schwung (Slant) von Caveat aus, der sonst wie eine Rechtsrotation wirkt
+                if (i % 90 === 0) {
+                    let letter = i === 0 ? 'N' : (i === 90 ? 'O' : (i === 180 ? 'S' : 'W'));
+                    svgTicks += `<text x="${tx}" y="${ty}" dx="-2" font-family="'Caveat', cursive" font-size="22" fill="#222" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${letter}</text>`;
+                } else {
+                    svgTicks += `<text x="${tx}" y="${ty}" dx="-1.5" font-family="'Caveat', cursive" font-size="14" fill="#666" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${i / 10}</text>`;
+                }
+            }
+            
+            let rwyHtml = '';
+            if (rwy1 && rwy2) {
+                // Piste wurde oben und unten gekürzt (y="29", height="102") um Abstand zu den Zahlen zu gewinnen
+                rwyHtml = `
+                    <g transform="translate(80,80) rotate(${rwyHdg}) translate(-80,-80)">
+                        <rect x="68" y="29" width="24" height="102" fill="none" stroke="#222" stroke-width="1.5" stroke-dasharray="30 4 15 4"/>
+                        <text x="80" y="43" font-family="'Caveat', cursive" font-size="14" fill="#111" font-weight="bold" text-anchor="middle" transform="rotate(180 80 39)">${rwy1}</text>
+                        <text x="80" y="125" font-family="'Caveat', cursive" font-size="14" fill="#111" font-weight="bold" text-anchor="middle">${rwy2}</text>
+                    </g>`;
+            }
+
+            let arrowHtml = '';
+            if (!isVRB && wspd > 0 && wdir !== null && wdir !== "VRB") {
+                arrowHtml = `
                 <g transform="rotate(${wdir} 80 80)">
-                    <line x1="80" y1="6" x2="80" y2="70" stroke="#1a73e8" stroke-width="4" stroke-linecap="round"/>
-                    <polygon points="72,55 80,80 88,55" fill="#1a73e8" />
-                </g>
-            </svg>`;
-        }
+                    <path d="M 80 10 C 77 30, 83 50, 80 65" stroke="#1a73e8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                    <path d="M 74 54 L 80 68 L 86 52" stroke="#1a73e8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </g>`;
+            }
 
-        const headerText = isFallback ? `▶ NEAREST: ${foundIcao}` : `▶ STATION: ${icao}`;
-
-        container.innerHTML = `
-            <div style="background:#f0eada; border-radius:12px; padding:15px 15px 20px 15px; border: 3px solid #c2bba8; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.5); font-family: 'Arial', sans-serif; color: #333; position:relative; overflow:hidden;">
-                
-                <div style="position:absolute; top:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
-                <div style="position:absolute; bottom:6px; right:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
-                <div style="position:absolute; top:6px; right:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
-                <div style="position:absolute; bottom:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
-
-                <div style="color: #8a1a12; font-size: 14px; font-weight: bold; margin-bottom: 12px; border-bottom: 2px dashed #c2bba8; padding-bottom: 8px; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px;">
-                    <span>${headerText}</span>
-                    <span style="color:${catColor}; font-size:14px; padding: 2px 8px; border: 2px solid ${catColor}; border-radius: 4px; background: rgba(255,255,255,0.7); box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${catText}</span>
-                </div>
-                
-                <div style="background:#e6e0ce; color:#333; font-family: 'Courier New', Courier, monospace; padding:10px; border-radius:4px; font-size:11.5px; margin-bottom:18px; border: 1px inset #c2bba8; line-height: 1.4; letter-spacing: 0.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                    ${raw}
-                </div>
-                
-                <div style="display:flex; justify-content: space-between; align-items: center; gap: 8px;">
-                    <div style="display:flex; flex-direction:column; gap:8px; font-family: 'Courier New', Courier, monospace; flex-shrink: 1; min-width: 0;">
-                        <div><div style="color:#666; font-size:10px; font-weight:bold; letter-spacing:1px;">WIND</div><div style="color:#1a73e8; font-size:15px; font-weight:bold; white-space: nowrap;">${windText}</div></div>
-                        <div style="display:flex; gap:12px;">
-                            <div><div style="color:#666; font-size:10px; font-weight:bold; letter-spacing:1px;">TEMP</div><div style="color:#111; font-size:15px; font-weight:bold; white-space: nowrap;">${temp}</div></div>
-                            <div><div style="color:#666; font-size:10px; font-weight:bold; letter-spacing:1px;">DEWP</div><div style="color:#111; font-size:15px; font-weight:bold; white-space: nowrap;">${dewp}</div></div>
-                        </div>
-                        <div><div style="color:#666; font-size:10px; font-weight:bold; letter-spacing:1px;">QNH</div><div style="color:#111; font-size:15px; font-weight:bold; white-space: nowrap;">${qnhStr}</div></div>
-                        <div><div style="color:#666; font-size:10px; font-weight:bold; letter-spacing:1px;">COVER</div><div style="color:#111; font-size:15px; font-weight:bold; white-space: nowrap;">${cover}</div></div>
+            container.innerHTML = `
+                <div style="font-family: 'Caveat', cursive; color: #222; padding: 5px; position:relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(0,0,0,0.5); padding-bottom: 2px; margin-bottom: 12px;">
+                        <span style="font-size: 24px; font-weight: bold; color: #0b1f65; transform: rotate(-1deg); display: inline-block;">${headerText}</span>
+                        <span style="font-size: 18px; font-weight: bold; color: ${catColor}; border: 2px solid ${catColor}; padding: 0 6px; border-radius: 3px; transform: rotate(2deg); display: inline-block; box-shadow: 1px 1px 0 rgba(0,0,0,0.1);">${catText}</span>
                     </div>
+                    <div style="font-size: 17px; line-height: 1.25; margin-bottom: 15px; color: #333; padding-left: 12px; border-left: 2px solid rgba(0,0,0,0.2); transform: rotate(0.5deg);">
+                        ${raw}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                        <div style="font-size: 20px; line-height: 1.3; display: flex; flex-direction: column; gap: 2px;">
+                            <div><span style="color:#666; font-size: 16px;">Wind:</span> <b style="color:#1a73e8; font-size:22px;">${windText}</b></div>
+                            <div><span style="color:#666; font-size: 16px;">Vis:</span> <b>${visib}</b> <span style="color:#666; font-size: 16px; margin-left:8px;">Wx:</span> <b>${wx}</b></div>
+                            <div><span style="color:#666; font-size: 16px;">Temp:</span> <b>${temp}</b> <span style="color:#666; font-size: 16px; margin-left:8px;">Dew:</span> <b>${dewp}</b></div>
+                            <div><span style="color:#666; font-size: 16px;">QNH:</span> <b>${qnhStr}</b> <span style="color:#666; font-size: 16px; margin-left:8px;">Cloud:</span> <b>${cover}</b></div>
+                        </div>
+                        <div style="position:relative; width: 130px; height: 130px; flex-shrink: 0;">
+                            <svg viewBox="0 0 160 160" style="width:100%; height:100%; overflow:visible;">
+                                ${svgTicks}${rwyHtml}${arrowHtml}
+                            </svg>
+                        </div>
+                    </div>
+                </div>`;
+        } else {
+            let svgTicks = '';
+            for (let i = 0; i < 360; i += 5) {
+                const isCard = i % 90 === 0, isLong = i % 10 === 0;
+                const len = isCard ? 8 : (isLong ? 5 : 3), sw = isCard ? 2 : 1, col = isCard ? '#111' : '#888';
+                svgTicks += `<line x1="80" y1="2" x2="80" y2="${2 + len}" stroke="${col}" stroke-width="${sw}" transform="rotate(${i} 80 80)" />`;
+                if (i % 30 === 0 && !isCard) {
+                    const angleRad = (i - 90) * Math.PI / 180, tx = 80 + 61 * Math.cos(angleRad), ty = 80 + 61 * Math.sin(angleRad);
+                    svgTicks += `<text x="${tx}" y="${ty}" font-family="sans-serif" font-size="10" fill="#333" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${i / 10}</text>`;
+                } else if (isCard) {
+                    const angleRad = (i - 90) * Math.PI / 180, tx = 80 + 61 * Math.cos(angleRad), ty = 80 + 61 * Math.sin(angleRad);
+                    let letter = i === 0 ? 'N' : (i === 90 ? 'O' : (i === 180 ? 'S' : 'W'));
+                    svgTicks += `<text x="${tx}" y="${ty}" font-family="sans-serif" font-size="14" fill="#111" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(${i} ${tx} ${ty})">${letter}</text>`;
+                }
+            }
+            let arrowHtml = '';
+            if (!isVRB && wspd > 0 && wdir !== null && wdir !== "VRB") {
+                arrowHtml = `
+                <svg viewBox="0 0 160 160" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;">
+                    <g transform="rotate(${wdir} 80 80)">
+                        <line x1="80" y1="6" x2="80" y2="70" stroke="#1a73e8" stroke-width="4" stroke-linecap="round"/>
+                        <polygon points="72,55 80,80 88,55" fill="#1a73e8" />
+                    </g>
+                </svg>`;
+            }
+
+            let rwyHtmlModern = '';
+            if (!isMini && rwy1 && rwy2) {
+                rwyHtmlModern = `
+                <div style="position:absolute; top:50%; left:50%; width:26px; height:105px; background:#444; border:1px solid #111; border-radius: 3px; transform: translate(-50%, -50%) rotate(${rwyHdg}deg); transform-origin: center center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding: 4px 0; box-sizing: border-box; z-index:5; box-shadow: 0 2px 4px rgba(0,0,0,0.4);">
+                    <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; transform: rotate(180deg); font-family: sans-serif;">${rwy1}</div>
+                    <div style="width:2px; flex-grow:1; margin: 4px 0; background: repeating-linear-gradient(to bottom, #d4d4d4 0, #d4d4d4 8px, transparent 8px, transparent 16px);"></div>
+                    <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; font-family: sans-serif;">${rwy2}</div>
+                </div>`;
+            }
+
+            let cSize = isMini ? 90 : 160;
+            let gap = isMini ? 4 : 8;
+            let fVal = isMini ? 12 : 15;
+            let fLbl = isMini ? 9 : 10;
+            let pPad = isMini ? '10px' : '15px 15px 20px 15px';
+
+            container.innerHTML = `
+                <div style="background:#f0eada; border-radius:12px; padding:${pPad}; border: 3px solid #c2bba8; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.5); font-family: 'Arial', sans-serif; color: #333; position:relative; overflow:hidden;">
                     
-                    <div style="position:relative; width:160px; height:160px; flex-shrink: 0; border:4px solid #a8a291; border-radius:50%; background:#fcfaf5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.2);">
-                        <svg viewBox="0 0 160 160" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none;">
-                            ${svgTicks}
-                        </svg>
-                        
-                        <div style="position:absolute; top:50%; left:50%; width:26px; height:105px; background:#444; border:1px solid #111; border-radius: 3px; transform: translate(-50%, -50%) rotate(${rwyHdg}deg); transform-origin: center center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding: 4px 0; box-sizing: border-box; z-index:5; box-shadow: 0 2px 4px rgba(0,0,0,0.4);">
-                            <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; transform: rotate(180deg); font-family: sans-serif;">${rwy1}</div>
-                            <div style="width:2px; flex-grow:1; margin: 4px 0; background: repeating-linear-gradient(to bottom, #d4d4d4 0, #d4d4d4 8px, transparent 8px, transparent 16px);"></div>
-                            <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; font-family: sans-serif;">${rwy2}</div>
-                        </div>
-                        
-                        ${arrowHtml}
+                    ${!isMini ? `
+                    <div style="position:absolute; top:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
+                    <div style="position:absolute; bottom:6px; right:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
+                    <div style="position:absolute; top:6px; right:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
+                    <div style="position:absolute; bottom:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
+                    ` : ''}
+
+                    <div style="color: #8a1a12; font-size: 14px; font-weight: bold; margin-bottom: ${isMini?8:12}px; border-bottom: 2px dashed #c2bba8; padding-bottom: 8px; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px;">
+                        <span>${modernHeaderText}</span>
+                        <span style="color:${catColor}; font-size:14px; padding: 2px 8px; border: 2px solid ${catColor}; border-radius: 4px; background: rgba(255,255,255,0.7); box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${catText}</span>
                     </div>
-                </div>
-            </div>
-        `;
+                    <div style="background:#e6e0ce; color:#333; font-family: 'Courier New', Courier, monospace; padding:10px; border-radius:4px; font-size:11.5px; margin-bottom:${isMini?10:18}px; border: 1px inset #c2bba8; line-height: 1.4; letter-spacing: 0.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                        ${raw}
+                    </div>
+                    <div style="display:flex; justify-content: space-between; align-items: center; gap: 8px;">
+                        <div style="display:flex; flex-direction:column; gap:${gap}px; font-family: 'Courier New', Courier, monospace; flex-shrink: 1; min-width: 0;">
+                            <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">WIND</div><div style="color:#1a73e8; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${windText}</div></div>
+                            <div style="display:flex; gap:12px;">
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">VIS</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${visib}</div></div>
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">WX</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${wx}</div></div>
+                            </div>
+                            <div style="display:flex; gap:12px;">
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">TEMP</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${temp}</div></div>
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">DEWP</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${dewp}</div></div>
+                            </div>
+                            <div style="display:flex; gap:12px;">
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">QNH</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${qnhStr}</div></div>
+                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">COVER</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${cover}</div></div>
+                            </div>
+                        </div>
+                        <div style="position:relative; width:${cSize}px; height:${cSize}px; flex-shrink: 0; border:4px solid #a8a291; border-radius:50%; background:#fcfaf5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.2);">
+                            <svg viewBox="0 0 160 160" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none;">
+                                ${svgTicks}
+                            </svg>
+                            ${rwyHtmlModern}
+                            ${arrowHtml}
+                        </div>
+                    </div>
+                </div>`;
+        }
     } catch (err) {
         console.error("METAR fetch error:", err);
-        container.innerHTML = `<div style="padding:10px; text-align:center; color:#d93829; font-size:12px; background:#1a1a1a;">Fehler beim Laden des METARs: <br/>${err.message || err}</div>`;
+        const isRetro = document.body.classList.contains('theme-retro');
+        if (isRetro) {
+            container.innerHTML = `<div style="padding:10px; text-align:center; color:#d93829; font-family: 'Caveat', cursive; font-size:20px; transform: rotate(-1deg);">Fehler beim Laden des METARs: <br/>${err.message || err}</div>`;
+        } else {
+            container.innerHTML = `<div style="padding:10px; text-align:center; color:#d93829; font-size:12px; background:#1a1a1a;">Fehler beim Laden des METARs: <br/>${err.message || err}</div>`;
+        }
     }
 }
 function calcNav(lat1, lon1, lat2, lon2) {
@@ -1137,7 +1393,7 @@ function getDestinationPoint(lat, lon, distNM, bearing) {
    ========================================================= */
 async function loadGlobalAirports() {
     if (globalAirports) return;
-    try { const res = await fetch('https://raw.githubusercontent.com/mwgg/Airports/master/airports.json'); globalAirports = await res.json(); } catch (e) { globalAirports = {}; }
+    try { const res = await fetch('./airports.json'); globalAirports = await res.json(); } catch (e) { globalAirports = {}; }
 }
 
 async function getAirportData(icao) {
@@ -1671,36 +1927,41 @@ let vpPulsePhase = 0; // 0..1 for pulse animation
 
 function vpStartHighlightPulse() {
     vpStopHighlightPulse();
-    vpPulsePhase = 0;
-    function animate() {
-        vpPulsePhase = (vpPulsePhase + 0.02) % 1;
+    vpPulsePhase = 0.25; // Startet direkt mit voller Leuchtkraft
+
+    function toggleBlink() {
+        vpPulsePhase = (vpPulsePhase === 0.25) ? 0 : 0.25; // Wechselt zwischen 0 und 0.25 (an/aus)
         if (typeof renderMapProfile === 'function') renderMapProfile();
-        vpPulseAnimFrame = requestAnimationFrame(animate);
+        if (document.getElementById('verticalProfileCanvas')) renderVerticalProfile('verticalProfileCanvas');
     }
-    vpPulseAnimFrame = requestAnimationFrame(animate);
+
+    toggleBlink(); // Sofortiges erstes Rendern
+    vpPulseAnimFrame = setInterval(toggleBlink, 700); // Alle 700ms entspannt umschalten statt 60x pro Sekunde
 }
 
 function vpStopHighlightPulse() {
     if (vpPulseAnimFrame) {
-        cancelAnimationFrame(vpPulseAnimFrame);
+        clearInterval(vpPulseAnimFrame);
         vpPulseAnimFrame = null;
     }
+    vpPulsePhase = 0;
 }
 
 function clearAirspaceMapLayers() {
-    if (!map) return;
-    airspaceMapLayers.forEach(l => map.removeLayer(l));
-    airspaceMapLayers = [];
+    if (map) {
+        airspaceMapLayers.forEach(l => map.removeLayer(l));
+        airspaceMapLayers = [];
+    }
     highlightedAirspaceIdx = -1;
     vpHighlightPulseIdx = -1;
     vpStopHighlightPulse();
-    // Remove active styling from all rows
     document.querySelectorAll('.as-row.as-active').forEach(el => el.classList.remove('as-active'));
     if (typeof renderMapProfile === 'function') renderMapProfile();
+    if (document.getElementById('verticalProfileCanvas')) renderVerticalProfile('verticalProfileCanvas');
 }
 
 function toggleAirspaceHighlight(idx) {
-    if (!map || !activeAirspaces[idx]) return;
+    if (!activeAirspaces[idx]) return;
 
     // If same airspace is already highlighted, toggle it off
     if (highlightedAirspaceIdx === idx) {
@@ -1708,55 +1969,48 @@ function toggleAirspaceHighlight(idx) {
         return;
     }
 
-    // Clear previous
-    airspaceMapLayers.forEach(l => map.removeLayer(l));
-    airspaceMapLayers = [];
+    if (map) {
+        airspaceMapLayers.forEach(l => map.removeLayer(l));
+        airspaceMapLayers = [];
+    }
     document.querySelectorAll('.as-row.as-active').forEach(el => el.classList.remove('as-active'));
 
     const airspace = activeAirspaces[idx];
     highlightedAirspaceIdx = idx;
 
-    const coords = airspace.geometry.coordinates;
-    let polys = [];
-    if (airspace.geometry.type === 'Polygon') {
-        polys = [coords[0].map(c => [c[1], c[0]])];
-    } else if (airspace.geometry.type === 'MultiPolygon') {
-        polys = coords.map(pc => pc[0].map(c => [c[1], c[0]]));
+    if (map) {
+        const coords = airspace.geometry.coordinates;
+        let polys = [];
+        if (airspace.geometry.type === 'Polygon') {
+            polys = [coords[0].map(c => [c[1], c[0]])];
+        } else if (airspace.geometry.type === 'MultiPolygon') {
+            polys = coords.map(pc => pc[0].map(c => [c[1], c[0]]));
+        }
+        const info = getAirspaceStyle(airspace);
+        polys.forEach(ring => {
+            const layer = L.polygon(ring, {
+                color: info.mapColor || '#ff4444', weight: 3, fillColor: info.mapColor || '#ff4444',
+                fillOpacity: 0.25, dashArray: '6,4', className: 'airspace-highlight-pulse'
+            }).addTo(map);
+            const displayName = getAirspaceDisplayName(airspace);
+            layer.bindTooltip(`<b>${info.icon} ${displayName}</b>`, { sticky: true, className: 'airspace-tooltip' });
+            airspaceMapLayers.push(layer);
+        });
     }
 
-    const info = getAirspaceStyle(airspace);
-    polys.forEach(ring => {
-        const layer = L.polygon(ring, {
-            color: info.mapColor || '#ff4444',
-            weight: 3,
-            fillColor: info.mapColor || '#ff4444',
-            fillOpacity: 0.25,
-            dashArray: '6,4',
-            className: 'airspace-highlight-pulse'
-        }).addTo(map);
-
-        const displayName = getAirspaceDisplayName(airspace);
-        layer.bindTooltip(`<b>${info.icon} ${displayName}</b>`, { sticky: true, className: 'airspace-tooltip' });
-        airspaceMapLayers.push(layer);
-    });
-
-    // Mark the row as active
     const row = document.querySelector(`.as-row[data-as-idx="${idx}"]`);
     if (row) row.classList.add('as-active');
 
-    // Start pulsing animation in the vertical profile canvas
     vpHighlightPulseIdx = idx;
     vpStartHighlightPulse();
-
-    // Re-render profile to show highlighted airspace
-    if (typeof renderMapProfile === 'function') renderMapProfile();
 }
 
 function getAirspaceDisplayName(a) {
-    const t = a.type;
-    const name = a.name || 'Unbekannt';
-    if (t === 33) return `FIS ${name}`;
-    return name;
+    const style = getAirspaceStyle(a);
+    let name = a.name || 'Unbekannt';
+    // Entferne überflüssige Begriffe, ABER behalte die Klassen-Buchstaben (wie C oder D) bei!
+    name = name.replace(/\b(TMA|CTR|CTA|TMZ|RMZ|FIS)\b/ig, '');
+    return `${name.trim()} [${style.category}]`;
 }
 
 function getAirspaceFreqInfo(a) {
@@ -1779,7 +2033,6 @@ function getAirspaceFreqInfo(a) {
             return `<span style="color:#9966ff; font-weight:bold; font-size:10px;">📻 ${primary.name || 'XPDR'}: ${primary.value}</span>`;
         }
     }
-
     // For RMZ (type 6 or 28) and FIS (type 33): show freq
     if ([6, 28, 33].includes(t)) {
         const primary = a.frequencies.find(f => f.primary) || a.frequencies[0];
@@ -1795,16 +2048,24 @@ function getAirspaceStyle(a) {
     const t = a.type;
     const classLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const cls = (a.icaoClass !== undefined && classLetters[a.icaoClass]) ? '-' + classLetters[a.icaoClass] : '';
+    
     if (t === 1) return { color: '#ff3333', icon: '⛔', mapColor: '#ff3333', category: 'ED-R / Restricted' };
     if (t === 2) return { color: '#ff6600', icon: '⛔', mapColor: '#ff6600', category: 'Danger' };
     if (t === 3) return { color: '#cc0000', icon: '🚫', mapColor: '#cc0000', category: 'Prohibited' };
+    
+    // CTRs (Kontrollzonen am Boden) bleiben gelb
     if (t === 4) return { color: '#f2c12e', icon: '⚠️', mapColor: '#f2c12e', category: `CTR${cls}` };
+    
+    // Class C und D (die keine CTR sind) als eigenständige Lufträume hervorheben (Blautöne)
+    if (a.icaoClass === 2) return { color: '#0055ff', icon: '⚠️', mapColor: '#0055ff', category: 'Class C' };
+    if (a.icaoClass === 3) return { color: '#1a73e8', icon: '⚠️', mapColor: '#1a73e8', category: 'Class D' };
+
     if (t === 7) return { color: '#4da6ff', icon: '⚠️', mapColor: '#4da6ff', category: `TMA${cls}` };
     if (t === 26) return { color: '#4da6ff', icon: '⚠️', mapColor: '#4da6ff', category: `CTA${cls}` };
     if (t === 5 || t === 27) return { color: '#9966ff', icon: '📡', mapColor: '#9966ff', category: 'TMZ' };
     if (t === 6 || t === 28) return { color: '#66cccc', icon: '📡', mapColor: '#66cccc', category: 'RMZ' };
-    if (t === 0 && a.icaoClass === 3) return { color: '#f2c12e', icon: '⚠️', mapColor: '#dda820', category: 'CTR-D (HX)' };
     if (t === 33) return { color: '#888', icon: '🌐', mapColor: '#888', category: 'FIS' };
+    
     return { color: '#aaa', icon: '📋', mapColor: '#aaa', category: `Type ${t}` };
 }
 
@@ -1912,8 +2173,8 @@ async function fetchRouteAirspaces(routePts) {
         for (const as of airspaces) {
             if (addedIds.has(as._id)) continue;
             if (!relevantTypes.has(as.type)) continue;
-            // Type 0: only include CTR sectors (icaoClass 3)
-            if (as.type === 0 && as.icaoClass !== 3) continue;
+            // Type 0: Class C (2) und Class D (3) explizit zulassen
+            if (as.type === 0 && as.icaoClass !== 2 && as.icaoClass !== 3) continue;
 
             let hits = false;
             if (as.geometry && as.geometry.type === 'Polygon') {
@@ -1937,7 +2198,8 @@ async function fetchRouteAirspaces(routePts) {
         // Keep type 4, but inherit frequencies from the duplicate if type 4 has none
         const byName = new Map();
         for (const as of intersecting) {
-            const key = as.name || as._id;
+            // ICAO Klasse in den Key aufnehmen, damit Class D nicht von gleichnamigen CTRs überschrieben wird
+            const key = (as.name || as._id) + '_' + (as.icaoClass || as.type);
             if (!byName.has(key)) {
                 byName.set(key, as);
             } else {
@@ -1965,65 +2227,59 @@ async function fetchRouteAirspaces(routePts) {
 }
 
 function renderAirspaceWarningsList() {
-    const listEl = document.getElementById('routeAirspacesList');
-    if (!listEl) return;
+        // Performance-Fix: Keine schweren DOM-Updates während User-Scroll/Drag!
+        if (window.vpIsFastRendering || window.vpUIInteractionActive) return;
+        const listEl = document.getElementById('routeAirspacesList');
+        if (!listEl) return;
 
-    if (!activeAirspaces || activeAirspaces.length === 0) {
-        listEl.innerHTML = '<span style="color:#33ff33;">✅ Route frei – keine Konflikte erkannt.</span>';
-        return;
-    }
+        if (!activeAirspaces || activeAirspaces.length === 0) {
+            listEl.innerHTML = '<span style="color:#33ff33;">✅ Route frei – keine Konflikte erkannt.</span>';
+            return;
+        }
 
-    const filterCheckbox = document.getElementById('navLogAirspaceFilter');
-    const filterActive = filterCheckbox && filterCheckbox.checked;
+        const filterCheckbox = document.getElementById('navLogAirspaceFilter');
+        const filterActive = filterCheckbox && filterCheckbox.checked;
 
-    let fpResult = null;
-    if (filterActive && typeof vpElevationData !== 'undefined' && vpElevationData && vpElevationData.length >= 2) {
-        const cruiseAlt = parseInt(document.getElementById('altSliderMap')?.value || document.getElementById('altSlider')?.value || 4500);
-        const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-        fpResult = computeFlightProfile(vpElevationData, cruiseAlt, vpClimbRate, vpDescentRate, tas);
-    }
+        // FIX: Wir müssen garantieren, dass wir dasselbe Array (Normal oder High-Res Zoom) nutzen wie das visuelle Profil!
+        const elevDataToUse = (typeof vpZoomLevel !== 'undefined' && vpZoomLevel < 100 && typeof vpHighResData !== 'undefined' && vpHighResData) ? vpHighResData : vpElevationData;
 
-    let finalAirspaces = activeAirspaces;
+        let fpResult = null;
+        if (filterActive && elevDataToUse && elevDataToUse.length >= 2) {
+            const cruiseAlt = parseInt(document.getElementById('altSliderMap')?.value || document.getElementById('altSlider')?.value || 4500);
+            const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
+            fpResult = computeFlightProfile(elevDataToUse, cruiseAlt, vpClimbRate, vpDescentRate, tas);
+        }
 
-    if (filterActive && fpResult && fpResult.profile) {
+        let finalAirspaces = activeAirspaces;
+
+        if (filterActive && fpResult && fpResult.profile) {
+            // PERFORMANCE FIX: Kompletten Polygon-Check entfernt! Wir nutzen den bestehenden 2D-Schnittstellen-Cache.
+            const totalDist = elevDataToUse[elevDataToUse.length - 1].distNM;
+            const cachedAirspaces = getCachedAirspaceIntersections(elevDataToUse, totalDist);
+
         finalAirspaces = activeAirspaces.filter(a => {
-            if (!a.lowerLimit || !a.upperLimit) return true;
-            const lowerFt = airspaceLimitToFt(a.lowerLimit);
-            const upperFt = airspaceLimitToFt(a.upperLimit);
-            if (lowerFt === null || upperFt === null) return true;
+            // 1. Ist der Luftraum überhaupt im 2D-Cache? (Wenn nicht, überfliegen wir ihn in 2D gar nicht)
+            const cached = cachedAirspaces.find(ca => ca.as === a);
+            if (!cached) return false; 
 
-            const isLowerAgl = a.lowerLimit.referenceDatum === 0;
-            const isUpperAgl = a.upperLimit.referenceDatum === 0;
+            // 2. Hat der Luftraum gültige Höhengrenzen?
+            if (cached.lowerFt === null || cached.upperFt === null) return true;
 
             let intersects = false;
-            if (a.geometry) {
-                const polys = [];
-                if (a.geometry.type === 'Polygon') polys.push(a.geometry.coordinates[0]);
-                else if (a.geometry.type === 'MultiPolygon') a.geometry.coordinates.forEach(mc => polys.push(mc[0]));
-
-                for (let i = 0; i < fpResult.profile.length; i++) {
-                    const pp = fpResult.profile[i];
-                    const elev = vpElevationData[i].elevFt;
-                    const realLower = isLowerAgl ? elev + lowerFt : lowerFt;
-                    const realUpper = isUpperAgl ? elev + upperFt : upperFt;
-
-                    if (pp.altFt >= realLower && pp.altFt <= realUpper) {
-                        const pt = vpElevationData[i];
-                        for (const poly of polys) {
-                            if (vpPointInPoly(pt, poly)) {
-                                intersects = true; break;
-                            }
-                        }
-                    }
-                    if (intersects) break;
-                }
-            } else {
-                for (let i = 0; i < fpResult.profile.length; i++) {
-                    const pp = fpResult.profile[i];
-                    const elev = vpElevationData[i].elevFt;
-                    const realLower = isLowerAgl ? elev + lowerFt : lowerFt;
-                    const realUpper = isUpperAgl ? elev + upperFt : upperFt;
-                    if (pp.altFt >= realLower && pp.altFt <= realUpper) { intersects = true; break; }
+            
+            // 3. Prüfe NUR die paar Wegpunkte, die in 2D bereits als "innerhalb des Luftraums" markiert wurden!
+            for (const pt of cached.relevantPts) {
+                // Finde die Flughöhe an diesem spezifischen Punkt
+                const pp = fpResult.profile.find(profPt => profPt.distNM === pt.distNM);
+                if (!pp) continue;
+                
+                const realLower = cached.isLowerAgl ? pt.elevFt + cached.lowerFt : cached.lowerFt;
+                const realUpper = cached.isUpperAgl ? pt.elevFt + cached.upperFt : cached.upperFt;
+                
+                // Wenn unsere Flug-Linie zwischen Boden und Decke des Luftraums liegt -> Konflikt!
+                if (pp.altFt >= realLower && pp.altFt <= realUpper) {
+                    intersects = true; 
+                    break;
                 }
             }
             return intersects;
@@ -2310,465 +2566,14 @@ async function generateMission() {
         else if (dataSource === "Gemini 2.5 Flash Lite") document.getElementById('mkM').classList.add('on');
         else document.getElementById('mkI').classList.add('on');
 
-        setTimeout(() => saveMissionState(), 1000);
+        window.debouncedSaveMissionState();
         refreshGPSAfterDispatch();
         // Position im Profil auf Start zurücksetzen
         vpUpdatePosition(0);
     }, 800);
 }
 
-/* =========================================================
-   7. KARTE (LEAFLET, KARTENTISCH & MESS-WERKZEUG)
-   ========================================================= */
-const hitBoxHtml = (color) => `<div class="pin-hitbox"><div class="pin-dot" style="background-color: ${color};"></div></div>`;
-const hitBoxIcon = (color) => L.divIcon({ className: 'custom-pin', html: hitBoxHtml(color), iconSize: [34, 34], iconAnchor: [17, 17] });
 
-const startIcon = hitBoxIcon('#44ff44'), destIcon = hitBoxIcon('#ff4444');
-const wpIcon = L.divIcon({ className: 'custom-pin', html: `<div class="pin-hitbox" style="cursor: move;"><div class="pin-dot" style="background-color: #fdfd86;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
-const measureIcon = L.divIcon({ className: 'custom-pin', html: `<div class="pin-hitbox" style="cursor: move;"><div class="pin-dot" style="background-color: #fff; width: 12px; height: 12px; min-width: 12px; min-height: 12px;"></div></div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
-
-function toggleMeasureMode() {
-    measureMode = !measureMode; const btn = document.getElementById('measureBtn');
-    if (measureMode) {
-        btn.innerText = '📏 Messen (An)'; btn.style.background = 'var(--piper-yellow)'; btn.style.color = '#000';
-        document.getElementById('map').style.cursor = 'crosshair';
-    } else {
-        btn.innerText = '📏 Messen (Aus)'; btn.style.background = '#444'; btn.style.color = '#fff';
-        document.getElementById('map').style.cursor = '';
-    }
-}
-
-function addMeasurePoint(latlng) {
-    if (measureMarkers.length >= 2) { clearMeasure(); }
-    const marker = L.marker(latlng, { icon: measureIcon, draggable: true }).addTo(map);
-    marker.on('drag', updateMeasureRoute); marker.on('dragend', updateMeasureRoute);
-    measureMarkers.push(marker); updateMeasureRoute();
-}
-
-function updateMeasureRoute() {
-    if (measurePolyline) map.removeLayer(measurePolyline);
-    if (measureTooltip) { map.removeLayer(measureTooltip); measureTooltip = null; }
-    measurePoints = measureMarkers.map(m => m.getLatLng());
-
-    if (measurePoints.length === 2) {
-        measurePolyline = L.polyline(measurePoints, { color: '#f2c12e', weight: 4, dashArray: '6,6' }).addTo(map);
-        const nav = calcNav(measurePoints[0].lat, measurePoints[0].lng || measurePoints[0].lon, measurePoints[1].lat, measurePoints[1].lng || measurePoints[1].lon);
-        const centerLat = (measurePoints[0].lat + measurePoints[1].lat) / 2, centerLng = (measurePoints[0].lng + measurePoints[1].lng) / 2;
-        const labelText = `<div style="font-weight:bold; font-size:14px; color:#111; text-align:center; line-height: 1.2;">${nav.brng}°<br>${nav.dist} NM</div>`;
-        measureTooltip = L.tooltip({ permanent: true, direction: 'center', className: 'measure-label' }).setLatLng([centerLat, centerLng]).setContent(labelText).addTo(map);
-    }
-}
-
-function clearMeasure() {
-    if (measurePolyline) map.removeLayer(measurePolyline);
-    if (measureTooltip) { map.removeLayer(measureTooltip); measureTooltip = null; }
-    measureMarkers.forEach(m => map.removeLayer(m)); measurePoints = []; measureMarkers = [];
-}
-
-window.removeRouteWaypoint = function (index) { routeWaypoints.splice(index, 1); renderMainRoute(); };
-
-function resetMainRoute() {
-    if (routeWaypoints.length > 2) {
-        routeWaypoints = [routeWaypoints[0], routeWaypoints[routeWaypoints.length - 1]];
-        renderMainRoute(); map.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] });
-    }
-}
-
-function renderMainRoute() {
-    if (!map) initMapBase();
-    routeMarkers.forEach(m => map.removeLayer(m)); if (polyline) map.removeLayer(polyline); if (window.hitBoxPolyline) map.removeLayer(window.hitBoxPolyline); routeMarkers = [];
-    if (routeWaypoints.length === 0) return;
-
-    polyline = L.polyline(routeWaypoints, { color: '#ff4444', weight: 8, dashArray: '10,10', interactive: false }).addTo(map);
-    window.hitBoxPolyline = L.polyline(routeWaypoints, { color: 'transparent', weight: 45, opacity: 0, className: 'interactive-route' }).addTo(map);
-
-    window.hitBoxPolyline.on('click', function (e) {
-        let bestIndex = 1, minDiff = Infinity;
-        for (let i = 0; i < routeWaypoints.length - 1; i++) {
-            let p1 = L.latLng(routeWaypoints[i].lat, routeWaypoints[i].lng || routeWaypoints[i].lon), p2 = L.latLng(routeWaypoints[i + 1].lat, routeWaypoints[i + 1].lng || routeWaypoints[i + 1].lon);
-            let d1 = map.distance(p1, e.latlng), d2 = map.distance(e.latlng, p2), d = map.distance(p1, p2), diff = d1 + d2 - d;
-            if (diff < minDiff) { minDiff = diff; bestIndex = i + 1; }
-        }
-        routeWaypoints.splice(bestIndex, 0, e.latlng); renderMainRoute();
-    });
-
-    routeWaypoints.forEach((latlng, index) => {
-        let isStart = (index === 0), isDest = (index === routeWaypoints.length - 1 && routeWaypoints.length > 1);
-        let icon = isStart ? startIcon : (isDest ? destIcon : wpIcon);
-        let draggable = (!isStart && !isDest);
-        let marker = L.marker(latlng, { icon: icon, draggable: draggable }).addTo(map);
-
-        if (isStart) {
-            marker.bindPopup(`<b>DEP:</b> ${currentSName}`);
-        } else if (isDest) {
-            marker.bindPopup(`<b>DEST:</b> ${currentDName}`);
-        } else {
-            let wpName = routeWaypoints[index].name ? `<b>${routeWaypoints[index].name}</b>` : `<b>Wegpunkt</b>`;
-            marker.bindPopup(`<div style="text-align:center;">${wpName}<br><button onclick="removeRouteWaypoint(${index})" style="margin-top:5px; background:#d93829; color:#fff; border:none; padding:4px 8px; cursor:pointer; border-radius: 2px;">🗑️ Löschen</button></div>`);
-        }
-
-        if (draggable) {
-            marker.on('drag', function (e) {
-                if (snapMode && cachedNavData.length > 0) {
-                    let mousePoint = map.latLngToLayerPoint(e.latlng);
-                    let closest = null;
-                    let bestScore = -1;
-
-                    cachedNavData.forEach(nav => {
-                        let navPoint = map.latLngToLayerPoint([nav.lat, nav.lng]);
-                        let d = mousePoint.distanceTo(navPoint);
-                        if (d < 25) {
-                            let score = 25 - d;
-                            // PRIORITÄT: VORs und Airports gewinnen bei Überlappung
-                            if (nav.name.includes('APT ')) score += 100;
-                            else if (nav.name.includes('[')) score += 50;
-
-                            if (score > bestScore) {
-                                bestScore = score;
-                                closest = nav;
-                            }
-                        }
-                    });
-
-                    if (closest) marker.setLatLng([closest.lat, closest.lng]);
-                    else marker.setLatLng(e.latlng);
-                }
-            });
-
-            marker.on('dragend', function (e) {
-                let dropLatLng = marker.getLatLng();
-
-                if (snapMode && cachedNavData.length > 0) {
-                    let mousePoint = map.latLngToLayerPoint(dropLatLng);
-                    let closest = null;
-                    let bestScore = -1;
-
-                    cachedNavData.forEach(nav => {
-                        let navPoint = map.latLngToLayerPoint([nav.lat, nav.lng]);
-                        let d = mousePoint.distanceTo(navPoint);
-                        if (d < 25) {
-                            let score = 25 - d;
-                            if (nav.name.includes('APT ')) score += 100;
-                            else if (nav.name.includes('[')) score += 50;
-
-                            if (score > bestScore) {
-                                bestScore = score;
-                                closest = nav;
-                            }
-                        }
-                    });
-
-                    if (closest) {
-                        routeWaypoints[index].lat = closest.lat;
-                        routeWaypoints[index].lng = closest.lng;
-                        routeWaypoints[index].name = closest.name;
-                    } else {
-                        routeWaypoints[index].lat = dropLatLng.lat;
-                        routeWaypoints[index].lng = dropLatLng.lng;
-                        routeWaypoints[index].name = null;
-                    }
-                } else {
-                    routeWaypoints[index].lat = dropLatLng.lat;
-                    routeWaypoints[index].lng = dropLatLng.lng;
-                    routeWaypoints[index].name = null;
-                }
-                renderMainRoute();
-            });
-        }
-        routeMarkers.push(marker);
-    });
-
-    updateRoutePerformance(); updateMiniMap();
-}
-
-function updateRoutePerformance() {
-    if (routeWaypoints.length < 2 || !currentMissionData) return;
-    let totalNM = 0, wpHTML = '';
-    const tas = parseInt(document.getElementById("tasSlider").value) || 160;
-    const gph = parseInt(document.getElementById("gphSlider").value) || 14;
-
-    let totalTime = 0;
-    let totalFuel = 0;
-
-    let blHTML = '<table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px; font-family:\'Courier New\', monospace; font-weight:bold; color:var(--navlog-text); margin-top:5px;">';
-    blHTML += '<colgroup><col style="width:30%;"><col style="width:20%;"><col style="width:16%;"><col style="width:10%;"><col style="width:10%;"><col style="width:14%;"></colgroup>';
-    blHTML += '<tr style="border-bottom:2px solid var(--navlog-border); color:var(--navlog-heading);"><th>Route</th><th>FREQ</th><th>HDG</th><th>NM</th><th>Min</th><th>Gal</th></tr>';
-
-    for (let i = 0; i < routeWaypoints.length - 1; i++) {
-        let p1 = routeWaypoints[i], p2 = routeWaypoints[i + 1], nav = calcNav(p1.lat, p1.lng || p1.lon, p2.lat, p2.lng || p2.lon);
-        totalNM += nav.dist;
-
-        let isStart = (i === 0);
-        let isEnd = (i === routeWaypoints.length - 2);
-
-        let name1 = isStart ? currentStartICAO : (routeWaypoints[i].name || `WP ${i}`);
-        let name2 = isEnd ? (currentMissionData?.poiName ? 'POI' : currentDestICAO) : (routeWaypoints[i + 1].name || `WP ${i + 1}`);
-
-        let cleanName1 = name1.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '');
-        let cleanName2 = name2.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '');
-
-        // Frequenz aus Namen extrahieren
-        let f1 = "";
-        let m1 = cleanName1.match(/\(([^)]+)\)/);
-        if (m1) { f1 = m1[1]; cleanName1 = cleanName1.replace(/\s*\([^)]+\)/, ''); }
-        else if (isStart && currentDepFreq) { f1 = currentDepFreq; }
-
-        let f2 = "";
-        let m2 = cleanName2.match(/\(([^)]+)\)/);
-        if (m2) { f2 = m2[1]; cleanName2 = cleanName2.replace(/\s*\([^)]+\)/, ''); }
-        else if (isEnd && currentDestFreq) { f2 = currentDestFreq; }
-
-        // VOR Klammern erhalten - nur Kennung nutzen wenn vorhanden
-        let v1 = cleanName1.match(/\[([^\]]+)\]/);
-        let isV1 = !!v1;
-        if (v1) cleanName1 = `[${v1[1].trim().split(/\s+/)[0]}]`;
-        else cleanName1 = cleanName1.trim();
-
-        let v2 = cleanName2.match(/\[([^\]]+)\]/);
-        let isV2 = !!v2;
-        if (v2) cleanName2 = `[${v2[1].trim().split(/\s+/)[0]}]`;
-        else cleanName2 = cleanName2.trim();
-
-        let legTime = Math.round((nav.dist / tas) * 60);
-        let legFuel = parseFloat((nav.dist / tas * gph).toFixed(1));
-
-        totalTime += legTime;
-        totalFuel += legFuel;
-
-        const c1 = isV1 ? 'var(--navlog-text)' : 'var(--navlog-freq)';
-        const c2 = isV2 ? 'var(--navlog-text)' : 'var(--navlog-freq)';
-
-        blHTML += `<tr style="border-bottom:1px dashed var(--navlog-border);">`;
-        blHTML += `<td style="padding:8px 0 8px 8px; color:var(--navlog-text); line-height: 1.4;"><span style="display:inline-block; min-width:20px; text-align:right;">${i + 1}.</span> ${cleanName1}<br><span style="display:inline-block; min-width:20px; text-align:left;">➔</span> ${cleanName2}</td>`;
-        blHTML += `<td style="padding:8px 0 8px 4px; font-size:14px; line-height: 1.6;"><span style="color:${c1}">${f1}</span><br><span style="color:${c2}">${f2}</span></td>`;
-        blHTML += `<td style="padding:8px 0 8px 16px; color:var(--navlog-data); vertical-align:middle;">${nav.brng}°</td>`;
-        blHTML += `<td style="padding:8px 0; color:var(--navlog-data); vertical-align:middle;">${nav.dist}</td>`;
-        blHTML += `<td style="padding:8px 0; color:var(--navlog-data); vertical-align:middle;">${legTime}</td>`;
-        blHTML += `<td style="padding:8px 0; color:var(--navlog-data); vertical-align:middle;">${legFuel.toFixed(1)}</td>`;
-        blHTML += `</tr>`;
-
-        wpHTML += `<div class="wp-row"><span class="wp-name">${cleanName1.replace(/<[^>]+>/g, '').trim()} ➔ ${cleanName2.replace(/<[^>]+>/g, '').trim()}</span><span class="wp-data">${nav.brng}° | ${nav.dist} NM</span></div>`;
-    }
-
-    blHTML += `<tr style="border-top:2px solid var(--navlog-border); color:var(--navlog-heading); font-size:15px;"><td style="padding-top:8px;">TOTAL</td><td style="padding-top:8px;"></td><td style="padding-top:8px;"></td><td style="padding-top:8px;">${totalNM}</td><td style="padding-top:8px;">${totalTime}</td><td style="padding-top:8px;">${totalFuel.toFixed(1)}</td></tr>`;
-    blHTML += '</table>';
-
-    const blDiv = document.getElementById('briefingNavLog');
-    if (blDiv) blDiv.innerHTML = blHTML;
-
-    let initialNav = calcNav(routeWaypoints[0].lat, routeWaypoints[0].lng || routeWaypoints[0].lon, routeWaypoints[1].lat, routeWaypoints[1].lng || routeWaypoints[1].lon);
-
-    if (currentMissionData) {
-        currentMissionData.dist = totalNM;
-        currentMissionData.heading = initialNav.brng;
-    }
-
-    setDrumCounter('distDrum', totalNM);
-    const mHeadingNote = document.getElementById("mHeadingNote"); if (mHeadingNote) mHeadingNote.innerText = `${initialNav.brng}°`;
-    const wpListContainer = document.getElementById("waypointList"); if (wpListContainer) wpListContainer.innerHTML = wpHTML;
-
-    recalculatePerformance();
-    const mDistNote = document.getElementById("mDistNote"); if (mDistNote) mDistNote.innerText = `${totalNM} NM`;
-    const hrs = Math.floor(totalTime / 60), mins = totalTime % 60;
-    const mETENote = document.getElementById("mETENote"); if (mETENote) mETENote.innerText = hrs > 0 ? `${hrs}h ${mins}m` : `${mins} Min.`;
-
-    // Trigger Airspace Check
-    if (window.airspaceFetchTimeout) clearTimeout(window.airspaceFetchTimeout);
-    window.airspaceFetchTimeout = setTimeout(() => {
-        fetchRouteAirspaces(routeWaypoints);
-    }, 800);
-
-    // Trigger Vertical Profile Update
-    triggerVerticalProfileUpdate();
-
-    setTimeout(() => saveMissionState(), 500);
-    if (gpsState.visible && gpsState.mode === 'FPL') renderGPS();
-}
-
-function initMapBase() {
-    if (map) return;
-
-    const topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' });
-    const topoLightMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-    const satMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-    const darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
-    const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: 'CartoDB' });
-
-    const aeroOverlay = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
-        attribution: 'AeroData / Navigraph',
-        opacity: 0.65,
-        maxNativeZoom: 12
-    });
-
-    topoMap.setOpacity(0.5);
-
-    map = L.map('map', { layers: [topoMap, aeroOverlay], attributionControl: false }).setView([51.1657, 10.4515], 6);
-
-    const baseMaps = {
-        "⛰️ Topografie (Mit Text)": topoMap,
-        "🗺️ Terrain (Ohne Text)": topoLightMap,
-        "🛰️ Satellit": satMap,
-        "🌑 Dark Mode (Clean)": darkMap,
-        "📝 Blank Mode (Weiß)": lightMap
-    };
-
-    const overlayMaps = {
-        "🛩️ VFR Lufträume (Overlay)": aeroOverlay
-    };
-
-    L.control.layers(baseMaps, overlayMaps).addTo(map);
-
-    map.on('overlayadd', function (e) {
-        if (e.name === "🛩️ VFR Lufträume (Overlay)") {
-            topoMap.setOpacity(0.5);
-        }
-    });
-
-    map.on('overlayremove', function (e) {
-        if (e.name === "🛩️ VFR Lufträume (Overlay)") {
-            topoMap.setOpacity(1.0);
-        }
-    });
-
-    let fetchTimeout = null;
-    map.on('moveend', function () {
-        if (snapMode) {
-            clearTimeout(fetchTimeout); // Löscht alte, noch nicht ausgeführte Anfragen
-            fetchTimeout = setTimeout(fetchOpenAIPData, 600); // Wartet 0,6 Sekunden Stillstand ab
-        }
-    });
-
-    const fsControl = L.control({ position: 'topleft' });
-    fsControl.onAdd = function () {
-        const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
-        btn.innerHTML = '⛶'; btn.title = 'Vollbildmodus'; btn.style.width = '30px'; btn.style.height = '30px';
-        btn.style.lineHeight = '30px'; btn.style.backgroundColor = '#fff'; btn.style.border = '1px solid #ccc';
-        btn.style.cursor = 'pointer'; btn.style.fontSize = '18px'; btn.style.fontWeight = 'bold'; btn.style.textAlign = 'center'; btn.style.padding = '0';
-
-        btn.onclick = function (e) {
-            e.preventDefault(); document.body.classList.toggle('map-is-fullscreen');
-            if (document.body.classList.contains('map-is-fullscreen')) { btn.innerHTML = '✖'; } else { btn.innerHTML = '⛶'; }
-            setTimeout(() => {
-                if (map) map.invalidateSize();
-                updateMiniMap();
-                if (typeof renderMapProfile === 'function') renderMapProfile();
-            }, 300);
-        };
-        return btn;
-    };
-    fsControl.addTo(map);
-    map.on('click', function (e) { if (!measureMode) return; addMeasurePoint(e.latlng); });
-}
-
-function updateMap(lat1, lon1, lat2, lon2, s, d) {
-    if (!map) initMapBase();
-    currentSName = s || "Start"; currentDName = d || "Ziel";
-    routeWaypoints = [{ lat: lat1, lng: lon1 }, { lat: lat2, lng: lon2 }];
-    renderMainRoute();
-}
-
-async function updateMapFromInputs() {
-    if (!document.getElementById('mapTableOverlay').classList.contains('active')) return;
-    const sIcao = document.getElementById('startLoc').value.toUpperCase(), dIcao = document.getElementById('destLoc').value.toUpperCase();
-    if (!sIcao) return;
-    if (!map) initMapBase();
-    let sData = await getAirportData(sIcao), dData = dIcao ? await getAirportData(dIcao) : null;
-    if (sData && dData) {
-        currentSName = sData.icao; currentDName = dData.icao;
-        if (!currentMissionData) {
-            map.fitBounds(L.latLngBounds([sData.lat, sData.lon], [dData.lat, dData.lon]), { padding: [40, 40] });
-        } else {
-            routeWaypoints = [{ lat: sData.lat, lng: sData.lon }, { lat: dData.lat, lng: dData.lon }];
-            renderMainRoute();
-            map.fitBounds(L.latLngBounds([sData.lat, sData.lon], [dData.lat, dData.lon]), { padding: [40, 40] });
-        }
-    } else if (sData) {
-        currentSName = sData.icao;
-        if (!currentMissionData) {
-            map.panTo([sData.lat, sData.lon]); if (map.getZoom() < 8) map.setZoom(9);
-        } else {
-            routeWaypoints = [{ lat: sData.lat, lng: sData.lon }];
-            renderMainRoute();
-            map.panTo([sData.lat, sData.lon]); if (map.getZoom() < 8) map.setZoom(9);
-        }
-    }
-}
-
-let _scrollLockY = 0;
-function lockBodyScroll() {
-    if (window.innerWidth >= 1250) return;
-    _scrollLockY = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = '-' + _scrollLockY + 'px';
-    document.body.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-}
-function unlockBodyScroll() {
-    if (window.innerWidth >= 1250) return;
-    if (document.body.style.position !== 'fixed') return;
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
-    window.scrollTo(0, _scrollLockY);
-}
-
-function toggleMapTable() {
-    const board = document.getElementById('mapTableOverlay'), pinBoard = document.getElementById('pinboardOverlay');
-    if (pinBoard.classList.contains('active')) { togglePinboard(); }
-    board.classList.toggle('active'); document.body.classList.toggle('maptable-open');
-
-    if (board.classList.contains('active')) {
-        lockBodyScroll();
-        if (!map) initMapBase();
-
-        setTimeout(() => {
-            if (map) {
-                map.invalidateSize();
-                if (routeWaypoints && routeWaypoints.length >= 2) map.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] });
-                else updateMapFromInputs();
-
-                updateSnapButtonUI(); // Button blau machen
-                if (snapMode) fetchOpenAIPData(); // Direkt Punkte für den Ausschnitt laden!
-            }
-        }, 500);
-    } else {
-        unlockBodyScroll();
-        document.body.classList.remove('map-is-fullscreen');
-    }
-}
-
-/* =========================================================
-   8. POLAROID MINIMAP
-   ========================================================= */
-function updateMiniMap() {
-    const miniContainer = document.getElementById('miniMap');
-    if (!miniContainer || miniContainer.offsetParent === null) return;
-
-    // Verzögerung, um UI-Blockierung zu vermeiden
-    setTimeout(() => {
-        if (!miniMap) {
-            miniMap = L.map('miniMap', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false });
-            L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(miniMap);
-            L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
-                opacity: 0.65,
-                maxNativeZoom: 12
-            }).addTo(miniMap);
-        }
-
-        if (routeWaypoints && routeWaypoints.length > 0) {
-            if (miniRoutePolyline) miniMap.removeLayer(miniRoutePolyline);
-            miniRoutePolyline = L.polyline(routeWaypoints, { color: '#d93829', weight: 4 }).addTo(miniMap);
-            miniMapMarkers.forEach(m => miniMap.removeLayer(m)); miniMapMarkers = [];
-
-            const startMarker = L.circleMarker(routeWaypoints[0], { radius: 5, color: '#111', weight: 2, fillColor: '#44ff44', fillOpacity: 1 }).addTo(miniMap);
-            const destMarker = L.circleMarker(routeWaypoints[routeWaypoints.length - 1], { radius: 5, color: '#111', weight: 2, fillColor: '#ff4444', fillOpacity: 1 }).addTo(miniMap);
-
-            miniMapMarkers.push(startMarker, destMarker);
-            setTimeout(() => { miniMap.invalidateSize(); miniMap.fitBounds(L.latLngBounds(routeWaypoints), { padding: [15, 15] }); }, 50);
-        }
-    }, 100); // Kurze Verzögerung vor dem Start
-}
 
 /* =========================================================
    9. EXTERNE LINKS & LOGBUCH
@@ -2811,485 +2616,6 @@ function clearLog() { if (confirm("Gesamtes Logbuch löschen?")) { localStorage.
 /* =========================================================
    10. HANGAR PINNWAND & CREW BOARD MULTIPLAYER
    ========================================================= */
-let currentBoardMode = 'private'; 
-let pendingPinNote = null;
-let groupDataCache = { members: [], notes: [] };
-const tutorialNotes = [
-    { id: 101, text: "👋 WILLKOMMEN!\n\nZiehe diese Zettel umher, bearbeite sie (✏️) oder lösch sie (✖).", x: 4, y: 6, rot: -2 },
-    { id: 102, text: "📻 NAVCOM THEME\n\nZieh mit gedrückter Maus an den runden Drehknöpfen, um TAS und GPH schnell einzustellen!", x: 28, y: 10, rot: 3 },
-    { id: 103, text: "🗺️ KARTENTISCH\n\nKlick auf die rote Route für neue Wegpunkte. Nutze das ⛶ Icon für den echten Vollbildmodus!", x: 52, y: 5, rot: -1 },
-    { id: 104, text: "🔗 MULTIPLAYER\n\nTritt unten in den Settings einer Crew bei, um Zettel und Flüge in Echtzeit zu teilen!", x: 76, y: 12, rot: 4 },
-    { id: 105, text: "🌤️ WETTER & AIP\n\nIm Briefing (oder auf dem GPS) findest du Direkt-Links zu aktuellen METARs und Anflugkarten.", x: 6, y: 45, rot: 1 },
-    { id: 106, text: "🎨 ANALOG DESIGN\n\nKlicke im Retro-Modus auf die silberne SCHRAUBE oben links, um die Panel-Lackierung zu wechseln!", x: 30, y: 50, rot: -3 },
-    { id: 107, text: "🤖 KI DISPATCHER\n\nTrag unten deinen Gemini API-Key ein für kreative Missions-Storys mit Passagieren & Fracht.", x: 55, y: 42, rot: 2 },
-    { id: 108, text: "📌 FLÜGE MERKEN\n\nPinne coole Routen an dieses Brett. Geflogen? Logge sie unten, um deinen Startplatz zu versetzen!", x: 78, y: 46, rot: -2 }
-];
-function getGroupName() { return localStorage.getItem('ga_group_name') || ""; }
-function getGroupNick() { return localStorage.getItem('ga_group_nick') || ""; }
-function getGroupPin() { return localStorage.getItem('ga_group_pin') || null; }
-function hashPin(str) {
-    let h = 0;
-    for(let i=0; i<str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-    return h.toString();
-}
-async function joinGroup() {
-    const gName = document.getElementById('groupNameInput').value.trim().toUpperCase();
-    const gNick = document.getElementById('groupNickInput').value.trim();
-    const gPin = document.getElementById('groupPinInput').value.trim();
-    if(!gName || !gNick) { alert("Bitte Gruppen-Code und Rufname eingeben!"); return; }
-    document.getElementById('groupStatus').innerText = "Prüfe Zugang...";
-
-    try {
-        const res = await fetch(SYNC_URL + "GROUP_" + gName);
-        let data = { members: [], kicked: [] };
-        if (res.ok) data = await res.json();
-        // 1. Kick-Prüfung
-        if (data.kicked && data.kicked.includes(gNick)) {
-            alert("Dieser Rufname wurde aus der Crew gebannt!");
-            document.getElementById('groupStatus').innerText = "Nicht verbunden";
-            return;
-        }
-        // 2. PIN-Prüfung
-        const existingUser = (data.members || []).find(m => m.nick === gNick);
-        const pinHash = gPin ? hashPin(gPin) : null;
-        if (existingUser && existingUser.pin) {
-            if (existingUser.pin !== pinHash) {
-                alert("Falscher PIN für diesen Rufnamen!");
-                document.getElementById('groupStatus').innerText = "Nicht verbunden";
-                return;
-            }
-        }
-        // Zugang gewährt
-        localStorage.setItem('ga_group_name', gName);
-        localStorage.setItem('ga_group_nick', gNick);
-        if (pinHash) localStorage.setItem('ga_group_pin', pinHash); else localStorage.removeItem('ga_group_pin');
-        document.getElementById('groupStatus').innerText = "Verbunden als " + gNick;
-        document.getElementById('groupStatus').style.color = "var(--green)";
-
-        forceGroupSync();
-        triggerCloudSave(true);
-        alert("🤝 Du bist der Crew '" + gName + "' beigetreten!");
-    } catch(e) {
-        alert("Verbindungsfehler.");
-        document.getElementById('groupStatus').innerText = "Offline";
-    }
-}
-async function removeSelfFromGroup(gName, gNick) {
-    try {
-        const res = await fetch(SYNC_URL + "GROUP_" + gName);
-        if (!res.ok) return;
-        let data = await res.json();
-        if (data.members) {
-            const me = data.members.find(m => m.nick === gNick);
-            data.members = data.members.filter(m => m.nick !== gNick);
-
-            // Admin-Rechte weitergeben, falls Admin geht
-            if (me && me.isAdmin && data.members.length > 0) {
-                data.members.sort((a,b) => a.lastSeen - b.lastSeen);
-                data.members[0].isAdmin = true;
-            }
-
-            data.lastModified = Date.now();
-            await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(data), keepalive: true });
-        }
-    } catch(e) {}
-}
-function leaveGroup(isBanned = false) {
-    const oldName = getGroupName();
-    const oldNick = getGroupNick();
-    if (oldName && oldNick && !isBanned) {
-        removeSelfFromGroup(oldName, oldNick);
-    }
-    localStorage.removeItem('ga_group_name');
-    localStorage.removeItem('ga_group_nick');
-    localStorage.removeItem('ga_group_pin');
-    document.getElementById('groupNameInput').value = "";
-    document.getElementById('groupStatus').innerText = "Nicht verbunden";
-    document.getElementById('groupStatus').style.color = "#888";
-    if(currentBoardMode === 'group') switchPinboardMode('private');
-    triggerCloudSave(true);
-    if(!isBanned) alert("🚪 Crew verlassen.");
-}
-async function kickGroupUser(targetNick) {
-    if(!confirm(`Möchtest du ${targetNick} wirklich aus der Crew kicken?`)) return;
-    const gName = getGroupName();
-    try {
-        const res = await fetch(SYNC_URL + "GROUP_" + gName);
-        if (!res.ok) return;
-        let data = await res.json();
-        data.members = (data.members || []).filter(m => m.nick !== targetNick);
-        data.kicked = data.kicked || [];
-        data.kicked.push(targetNick);
-        data.lastModified = Date.now();
-        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(data) });
-        forceGroupSync();
-    } catch(e) {}
-}
-function updateGroupUIFromSync(gName, gNick) {
-    if (gName && gNick) {
-        localStorage.setItem('ga_group_name', gName);
-        localStorage.setItem('ga_group_nick', gNick);
-        const inpN = document.getElementById('groupNameInput');
-        const inpU = document.getElementById('groupNickInput');
-        const stat = document.getElementById('groupStatus');
-        if (inpN) inpN.value = gName;
-        if (inpU) inpU.value = gNick;
-        if (stat) { stat.innerText = "Verbunden als " + gNick; stat.style.color = "var(--green)"; }
-        silentGroupSync();
-    } else {
-        leaveGroup(true); // Lautlos aufräumen
-    }
-}
-function setNavComLed(btnId, state) {
-    const btn = document.getElementById(btnId);
-    if (!btn) return;
-    btn.classList.remove('led-syncing', 'led-success', 'led-error');
-    if (state !== 'off') btn.classList.add(`led-${state}`);
-}
-function updateGroupBadgeUI() {
-    let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
-    let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
-
-    // GHOST BUSTER: Wenn ein Zettel im lokalen Müll liegt, kann er nicht "Neu" sein!
-    let initialLen = newBadges.length;
-    newBadges = newBadges.filter(id => !hidden.includes(id));
-    if (newBadges.length !== initialLen) {
-        localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
-    }
-    const mainBadge = document.getElementById('mainPinboardBadge');
-    const tabBadge = document.getElementById('groupBadge');
-    const hasNew = newBadges.length > 0;
-
-    if (mainBadge) mainBadge.style.display = hasNew ? 'inline-block' : 'none';
-    if (tabBadge && currentBoardMode !== 'group') {
-        tabBadge.style.display = hasNew ? 'inline-block' : 'none';
-    } else if (tabBadge && currentBoardMode === 'group') {
-        tabBadge.style.display = 'none';
-    }
-}
-function switchPinboardMode(mode) {
-    if(mode === 'group' && !getGroupName()) {
-        alert("Bitte zuerst unten in den Einstellungen einer Crew beitreten!"); return;
-    }
-    currentBoardMode = mode;
-    document.getElementById('tabPrivate').classList.toggle('active', mode === 'private');
-    document.getElementById('tabGroup').classList.toggle('active', mode === 'group');
-    updateGroupBadgeUI();
-    renderNotes();
-}
-function toggleTutorialNotes() {
-    if (currentBoardMode === 'group') { alert("Tipps können nur auf dem privaten Brett geladen werden."); return; }
-    let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-    const hasTutorial = notes.some(n => n.id >= 101 && n.id <= 108);
-    if (hasTutorial) notes = notes.filter(n => n.id < 101 || n.id > 108);
-    else tutorialNotes.forEach(tn => { if (!notes.find(n => n.id === tn.id)) notes.push(tn); });
-    localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-    renderNotes();
-}
-function clearPinboard() {
-    if (currentBoardMode === 'group') {
-        alert("Du kannst nicht das gesamte Crew-Brett löschen. Bitte lösche deine Zettel einzeln."); return;
-    }
-    if (confirm("🗑️ Möchtest du wirklich ALLE Zettel von deinem privaten Brett in den Müll werfen?")) {
-        localStorage.setItem('ga_pinboard', JSON.stringify([]));
-        renderNotes(); triggerCloudSave();
-    }
-}
-function togglePinboard() {
-    const board = document.getElementById('pinboardOverlay');
-    const mapBoard = document.getElementById('mapTableOverlay');
-    if (mapBoard.classList.contains('active')) { toggleMapTable(); }
-    board.classList.toggle('active');
-    document.body.classList.toggle('pinboard-open');
-    if (board.classList.contains('active')) {
-        lockBodyScroll();
-        renderNotes();
-        silentSyncLoad();
-        if(getGroupName()) silentGroupSync();
-    } else {
-        unlockBodyScroll();
-        triggerCloudSave();
-        if(getGroupName()) triggerGroupSave();
-    }
-}
-function addNote() {
-    const text = prompt("Was möchtest du ans Brett pinnen?");
-    if (!text || text.trim() === "") return;
-    const newNote = { id: Date.now(), text: text, x: 30 + Math.random() * 15, y: 30 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4 };
-    
-    if (currentBoardMode === 'group') {
-        newNote.author = getGroupNick();
-        let gNotes = groupDataCache.notes || [];
-        gNotes.push(newNote);
-        groupDataCache.notes = gNotes;
-        renderNotes(); triggerGroupSave(true);
-    } else {
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        notes.push(newNote);
-        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-        renderNotes(); triggerCloudSave();
-    }
-}
-function deleteNote(id, isGroup) {
-    clearNewBadge(id);
-    if (isGroup) {
-        let gNotes = groupDataCache.notes || [];
-        const note = gNotes.find(n => n.id === id);
-        if (note && note.author === getGroupNick()) {
-            if(!confirm("Zettel für ALLE Crew-Mitglieder löschen?")) return;
-            groupDataCache.notes = gNotes.filter(n => n.id !== id);
-            renderNotes(); triggerGroupSave(true);
-        } else {
-            let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
-            hidden.push(id);
-            localStorage.setItem('ga_group_hidden', JSON.stringify(hidden));
-            renderNotes();
-        }
-    } else {
-        if (!confirm("Zettel wirklich abreißen?")) return;
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        notes = notes.filter(n => n.id !== id);
-        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-        renderNotes(); triggerCloudSave();
-    }
-}
-function editNote(id, isGroup) {
-    if (isGroup) {
-        let gNotes = groupDataCache.notes || [];
-        const noteIndex = gNotes.findIndex(n => n.id === id);
-        if (noteIndex > -1 && gNotes[noteIndex].author === getGroupNick()) {
-            const newText = prompt("Notiz bearbeiten:", gNotes[noteIndex].text);
-            if (newText !== null && newText.trim() !== "") {
-                gNotes[noteIndex].text = newText;
-                renderNotes(); triggerGroupSave(true);
-            }
-        }
-    } else {
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        const noteIndex = notes.findIndex(n => n.id === id);
-        if (noteIndex > -1) {
-            const newText = prompt("Notiz bearbeiten:", notes[noteIndex].text);
-            if (newText !== null && newText.trim() !== "") {
-                notes[noteIndex].text = newText;
-                localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-                renderNotes(); triggerCloudSave();
-            }
-        }
-    }
-}
-function pinCurrentFlight() {
-    if (document.getElementById("briefingBox").style.display !== "block" || !currentMissionData) return;
-    const state = {
-        mTitle: document.getElementById('mTitle').innerHTML, mStory: document.getElementById('mStory').innerText,
-        mDepICAO: document.getElementById("mDepICAO").innerText, mDepName: document.getElementById("mDepName").innerText,
-        mDepCoords: document.getElementById("mDepCoords").innerText, mDepRwy: document.getElementById("mDepRwy").innerText,
-        destIcon: document.getElementById("destIcon").innerText, mDestICAO: document.getElementById("mDestICAO").innerText,
-        mDestName: document.getElementById("mDestName").innerText, mDestCoords: document.getElementById("mDestCoords").innerText,
-        mDestRwy: document.getElementById("mDestRwy").innerText, mPay: document.getElementById("mPay").innerText,
-        mWeight: document.getElementById("mWeight").innerText, mDistNote: document.getElementById("mDistNote").innerText,
-        mHeadingNote: document.getElementById("mHeadingNote").innerText, mETENote: document.getElementById("mETENote").innerText,
-        wikiDepDescText: document.getElementById("wikiDepDescText") ? document.getElementById("wikiDepDescText").innerText : "",
-        wikiDestDescText: document.getElementById("wikiDestDescText") ? document.getElementById("wikiDestDescText").innerText : "",
-        wikiDepFreqText: document.getElementById("wikiDepFreqText") ? document.getElementById("wikiDepFreqText").innerHTML : "",
-        wikiDestFreqText: document.getElementById("wikiDestFreqText") ? document.getElementById("wikiDestFreqText").innerHTML : "",
-        wikiDepImageUrl: document.getElementById("wikiDepImage") ? document.getElementById("wikiDepImage").style.backgroundImage : "",
-        wikiDestImageUrl: document.getElementById("wikiDestImage") ? document.getElementById("wikiDestImage").style.backgroundImage : "",
-        isPOI: document.getElementById("destRwyContainer").style.display === "none",
-        currentMissionData: currentMissionData, routeWaypoints: routeWaypoints, currentStartICAO: currentStartICAO,
-        currentDestICAO: currentDestICAO, currentSName: currentSName, currentDName: currentDName,
-        currentDepFreq: currentDepFreq, currentDestFreq: currentDestFreq, freqCache: freqCache,
-        vpAltWaypoints: typeof vpAltWaypoints !== 'undefined' ? vpAltWaypoints : [],
-        vpSegmentAlts: typeof vpSegmentAlts !== 'undefined' ? vpSegmentAlts : [],
-        vpElevationData: typeof vpElevationData !== 'undefined' ? vpElevationData : null
-    };
-    const routeText = `${currentStartICAO} ➔ ${currentDestICAO === "POI" ? currentMissionData.poiName : currentDestICAO}`;
-    pendingPinNote = {
-        id: Date.now(), type: "flight", flightData: state,
-        text: `✈️ <b>${routeText}</b><br><span style="font-size:11px; color:#555;">${state.currentMissionData?.mission || ''}</span><br><span style="font-size:11px;">${state.mDistNote}</span>`,
-        x: 35 + Math.random() * 15, y: 20 + Math.random() * 15, rot: Math.floor(Math.random() * 9) - 4
-    };
-    if(getGroupName()) {
-        document.getElementById('pinModalOverlay').style.display = 'flex';
-        document.getElementById('btnPinGroup').innerText = `👥 An die Crew (${getGroupName()})`;
-    } else {
-        executePin('private');
-    }
-}
-function closePinModal() {
-    document.getElementById('pinModalOverlay').style.display = 'none';
-    pendingPinNote = null;
-}
-function executePin(target) {
-    if(!pendingPinNote) return;
-    if(target === 'private') {
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        if (notes.filter(n => n.type === 'flight').length >= 10) {
-            alert("Dein privates Board ist voll! (Max 10 Flüge)."); closePinModal(); return;
-        }
-        notes.push(pendingPinNote);
-        localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-        triggerCloudSave();
-        if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("📌 Flugauftrag privat gespeichert!");
-    } else if (target === 'group') {
-        pendingPinNote.author = getGroupNick();
-        let gNotes = groupDataCache.notes || [];
-        gNotes.push(pendingPinNote);
-        groupDataCache.notes = gNotes;
-        triggerGroupSave(true);
-        if (!document.getElementById('pinboardOverlay').classList.contains('active')) alert("👥 Flugauftrag mit der Crew geteilt!");
-    }
-    if(document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
-    closePinModal();
-}
-function loadPinnedFlight(id, isGroup) {
-    let note;
-    if(isGroup) {
-        note = (groupDataCache.notes || []).find(n => n.id === id);
-    } else {
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        note = notes.find(n => n.id === id);
-    }
-    if (note && note.flightData) {
-        restoreMissionState(note.flightData);
-        togglePinboard();
-        setTimeout(() => { if (map && routeWaypoints.length >= 2) { map.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] }); updateMiniMap(); } }, 300);
-    }
-}
-function renderNotes() {
-    const board = document.getElementById('pinboard');
-    if (!board) return;
-    board.innerHTML = '';
-    
-    if (currentBoardMode === 'private') {
-        let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-        notes.forEach(note => createNoteDOM(note, false));
-    } else {
-        // Render Crew Roster
-        const roster = document.createElement('div');
-        roster.className = 'post-it roster-card';
-        roster.style.left = '8%'; // Weiter nach rechts verschoben, damit er nicht auf dem Rahmen liegt
-        roster.style.top = '4%';
-        roster.style.transform = 'rotate(-2deg)';
-        
-        const amIAdmin = (groupDataCache.members || []).find(m => m.nick === getGroupNick())?.isAdmin;
-        let membersHtml = (groupDataCache.members || []).map(m => {
-            const isMe = m.nick === getGroupNick();
-            const timeoutMs = m.isAdmin ? (365 * 24 * 60 * 60 * 1000) : (28 * 24 * 60 * 60 * 1000); // Admin=12Mon, Normal=28Tage
-            const isStale = (Date.now() - m.lastSeen) > timeoutMs;
-            if(isStale) return '';
-
-            const adminIcon = m.isAdmin ? '<span title="Admin">👑 </span>' : '';
-            const kickBtn = (amIAdmin && !isMe) ? `<span onclick="kickGroupUser('${m.nick}')" style="cursor:pointer; font-size:1cqw; margin-left:6px; transition:transform 0.2s;" title="Mitglied kicken">👢</span>` : '';
-
-            return `<div class="roster-item"><span style="font-weight:${isMe?'bold':'normal'}">${adminIcon}${m.nick}</span><span class="roster-status" style="display:flex; align-items:center;">${isMe?'Online':'Aktiv'}${kickBtn}</span></div>`;
-        }).join('');
-        
-        roster.innerHTML = `<div class="post-it-pin"></div><div style="font-weight:bold; font-size:1.4cqw; border-bottom:2px solid #aaa; padding-bottom:4px; margin-bottom:4px;">👥 CREW: ${getGroupName()}</div><div class="roster-list">${membersHtml}</div>`;
-        board.appendChild(roster);
-        // Render Group Notes
-        let gNotes = groupDataCache.notes || [];
-        let hidden = JSON.parse(localStorage.getItem('ga_group_hidden')) || [];
-        let localPos = JSON.parse(localStorage.getItem('ga_group_positions')) || {};
-        let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
-        
-        gNotes.forEach(note => {
-            if (hidden.includes(note.id)) return;
-            let renderNote = { ...note };
-            if (localPos[note.id]) {
-                renderNote.x = localPos[note.id].x;
-                renderNote.y = localPos[note.id].y;
-            }
-            if (newBadges.includes(note.id)) renderNote.isNew = true;
-            createNoteDOM(renderNote, true);
-        });
-    }
-}
-function createNoteDOM(note, isGroup) {
-    const board = document.getElementById('pinboard');
-    const div = document.createElement('div');
-    div.className = note.type === 'flight' ? 'post-it flight-card' : 'post-it';
-    let posX = note.x > 100 ? (note.x / 1000) * 100 : note.x;
-    let posY = note.y > 100 ? (note.y / 600) * 100 : note.y;
-    div.style.left = posX + '%'; div.style.top = posY + '%'; div.style.transform = `rotate(${note.rot}deg)`;
-    
-    let badgeHtml = note.isNew ? `<div class="post-it-new-badge">NEU</div>` : '';
-    let authorHtml = isGroup && note.author ? `<div style="position:absolute; bottom:0.4cqw; right:0.8cqw; font-size:0.8cqw; color:#888; font-family:sans-serif;">@${note.author}</div>` : '';
-    
-    if (note.type === 'flight') {
-        div.innerHTML = `${badgeHtml}<div class="post-it-pin"></div><div class="post-it-del" onclick="deleteNote(${note.id}, ${isGroup})">✖</div>${note.text}<button class="flight-load-btn" onclick="loadPinnedFlight(${note.id}, ${isGroup})">📂 Flug laden</button>${authorHtml}`;
-    } else {
-        let editBtn = (!isGroup || note.author === getGroupNick()) ? `<div class="post-it-edit" onclick="editNote(${note.id}, ${isGroup})">✏️</div>` : '';
-        div.innerHTML = `${badgeHtml}<div class="post-it-pin"></div>${editBtn}<div class="post-it-del" onclick="deleteNote(${note.id}, ${isGroup})">✖</div>${note.text.replace(/\n/g, '<br>')}${authorHtml}`;
-    }
-    
-    div.addEventListener('mousedown', () => clearNewBadge(note.id));
-    div.addEventListener('touchstart', () => clearNewBadge(note.id), {passive:true});
-    makeDraggable(div, note.id, isGroup);
-    board.appendChild(div);
-}
-function clearNewBadge(id) {
-    let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
-    if(newBadges.includes(id)) {
-        newBadges = newBadges.filter(nid => nid !== id);
-        localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
-        updateGroupBadgeUI();
-        triggerCloudSave(true); // "Gelesen"-Status sofort geräteübergreifend in die Cloud pushen
-
-        const b = document.getElementById('pinboard');
-        const renderedBadges = b.querySelectorAll('.post-it-new-badge');
-        renderedBadges.forEach(el => el.style.display = 'none');
-        if(currentBoardMode === 'group') renderNotes();
-    }
-}
-function makeDraggable(element, noteId, isGroup) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    element.onmousedown = dragMouseDown; element.ontouchstart = dragMouseDown;
-    function dragMouseDown(e) {
-        if (e.target.className === 'post-it-del' || e.target.className === 'post-it-edit' || e.target.className === 'flight-load-btn') return;
-        e.preventDefault();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX, clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        pos3 = clientX; pos4 = clientY;
-        document.onmouseup = closeDragElement; document.ontouchend = closeDragElement;
-        document.onmousemove = elementDrag; document.ontouchmove = elementDrag;
-    }
-    function elementDrag(e) {
-        e.preventDefault();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX, clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        pos1 = pos3 - clientX; pos2 = pos4 - clientY; pos3 = clientX; pos4 = clientY;
-        const board = document.getElementById('pinboard');
-        let newTop = element.offsetTop - pos2, newLeft = element.offsetLeft - pos1;
-        const padding = 10;
-        const minLeft = padding, maxLeft = board.offsetWidth - element.offsetWidth - padding;
-        const minTop = padding, maxTop = board.offsetHeight - element.offsetHeight - padding;
-        if (newLeft < minLeft) newLeft = minLeft; if (newLeft > maxLeft) newLeft = maxLeft;
-        if (newTop < minTop) newTop = minTop; if (newTop > maxTop) newTop = maxTop;
-        element.style.top = (newTop / board.offsetHeight * 100) + "%";
-        element.style.left = (newLeft / board.offsetWidth * 100) + "%";
-    }
-    function closeDragElement() {
-        document.onmouseup = null; document.ontouchend = null; document.onmousemove = null; document.ontouchmove = null;
-        const board = document.getElementById('pinboard');
-        if (isGroup) {
-            let localPos = JSON.parse(localStorage.getItem('ga_group_positions')) || {};
-            localPos[noteId] = {
-                x: (element.offsetLeft / board.offsetWidth) * 100,
-                y: (element.offsetTop / board.offsetHeight) * 100
-            };
-            localStorage.setItem('ga_group_positions', JSON.stringify(localPos));
-        } else {
-            let notes = JSON.parse(localStorage.getItem('ga_pinboard')) || [];
-            const noteIndex = notes.findIndex(n => n.id === noteId);
-            if (noteIndex > -1) {
-                notes[noteIndex].x = (element.offsetLeft / board.offsetWidth) * 100;
-                notes[noteIndex].y = (element.offsetTop / board.offsetHeight) * 100;
-                localStorage.setItem('ga_pinboard', JSON.stringify(notes));
-                triggerCloudSave();
-            }
-        }
-    }
-}
-
-
 /* =========================================================
    KLN 90B GPS MODULE
    ========================================================= */
@@ -3789,2141 +3115,92 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 });
 
-/* =========================================================
-   19. OPENAIP SNAPPING (NAVAIDS & REP-POINTS)
-   ========================================================= */
-let snapMode = true;
-let cachedNavData = [];
 
-function toggleSnapMode() {
-    snapMode = !snapMode;
-    updateSnapButtonUI();
-    if (snapMode && map) fetchOpenAIPData();
-    else cachedNavData = [];
-}
 
-function updateSnapButtonUI() {
-    const btn = document.getElementById('snapBtn');
-    if (!btn) return;
-    if (snapMode) {
-        btn.innerText = '🧲 Snapping (An)';
-        btn.style.background = '#4da6ff';
-        btn.style.color = '#fff';
-    } else {
-        btn.innerText = '🧲 Snapping (Aus)';
-        btn.style.background = '#444';
-        btn.style.color = '#fff';
-    }
-}
 
-async function fetchOpenAIPData() {
-    if (!map || !snapMode) return;
-
-    // 1. Schutz: Nicht laden, wenn man zu weit rausgezoomt ist (verhindert "Box too large" 500er Fehler)
-    if (map.getZoom() < 8) {
-        cachedNavData = [];
-        return;
-    }
-    const b = map.getBounds();
-
-    // 2. Schutz: Koordinaten auf die reale Weltkarte limitieren (-180 bis 180 / -90 bis 90)
-    const w = Math.max(-180, b.getWest());
-    const s = Math.max(-90, b.getSouth());
-    const e = Math.min(180, b.getEast());
-    const n = Math.min(90, b.getNorth());
-
-    const bbox = `${w},${s},${e},${n}`;
-    const proxy = 'https://ga-proxy.einherjer.workers.dev';
-    try {
-        const [navRes, repRes, aptRes] = await Promise.all([
-            fetch(`${proxy}/api/navaids?bbox=${bbox}&limit=250&t=${Date.now()}`),
-            fetch(`${proxy}/api/reporting-points?bbox=${bbox}&limit=250&t=${Date.now()}`),
-            fetch(`${proxy}/api/airports?bbox=${bbox}&limit=250&t=${Date.now()}`)
-        ]);
-        // 3. Schutz: Falls OpenAIP blockt, breche leise ab statt abzustürzen
-        if (!navRes.ok || !repRes.ok || !aptRes.ok) {
-            return;
-        }
-        const navJson = await navRes.json(), repJson = await repRes.json(), aptJson = await aptRes.json();
-        cachedNavData = [];
-        let navArray = navJson.items || [];
-        let repArray = repJson.items || [];
-        let aptArray = aptJson.items || [];
-        navArray.forEach(i => {
-            if (!i.geometry) return;
-            let freqVal = '';
-            if (i.frequency !== undefined && i.frequency !== null) {
-                freqVal = (typeof i.frequency === 'object' && i.frequency.value) ? i.frequency.value : i.frequency;
-            } else if (i.frequencies && i.frequencies.length > 0) {
-                freqVal = i.frequencies[0].value || i.frequencies[0];
-            }
-            let freq = freqVal ? ` (${freqVal})` : '';
-            let idVal = i.identifier || i.designator || '';
-            let ident = idVal ? ` [${idVal}]` : '';
-            cachedNavData.push({ name: `${i.name}${ident}${freq}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
-        });
-        repArray.forEach(i => {
-            if (!i.geometry) return;
-            cachedNavData.push({ name: `RPP ${i.name}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
-        });
-        aptArray.forEach(i => {
-            if (!i.geometry) return;
-            let freq = (i.frequencies && i.frequencies.length > 0 && i.frequencies[0].value) ? ` (${i.frequencies[0].value})` : '';
-            let displayName = i.icaoCode ? i.icaoCode : i.name;
-            cachedNavData.push({ name: `APT ${displayName}${freq}`, lat: i.geometry.coordinates[1], lng: i.geometry.coordinates[0] });
-        });
-    } catch (e) {
-        // Leiser Fallback, wenn das Netzwerk mal hakt
-    }
-}
-
-/* =========================================================
-   VERTICAL PROFILE (Höhenprofil) ENGINE
-   ========================================================= */
-let vpElevationData = null;
-let vpProfileTimeout = null;
-let vpZoomLevel = 100; // 100 = full route, 10 = 10% view
-let vpHighResData = null; // Higher resolution elevation data for zoom
-let vpElevationCache = {}; // Cache to prevent API rate limits (HTTP 429)
-let vpClimbRate = 500; // ft/min climb rate (configurable)
-let vpDescentRate = 500; // ft/min descent rate (configurable)
-
-function triggerVerticalProfileUpdate() {
-    if (vpProfileTimeout) clearTimeout(vpProfileTimeout);
-    vpProfileTimeout = setTimeout(async () => {
-        if (!routeWaypoints || routeWaypoints.length < 2) return;
-
-        const cacheKey = routeWaypoints.map(p => `${(p.lat || 0).toFixed(4)},${((p.lng || p.lon) || 0).toFixed(4)}`).join('|');
-        if (window._lastVpRouteKey !== cacheKey) {
-            vpAltWaypoints = []; vpSegmentAlts = [];
-            vpHighResData = null;
-            vpZoomLevel = 100;
-            const zd = document.getElementById('vpZoomDisplay');
-            if (zd) zd.textContent = '0%';
-            window._lastVpRouteKey = cacheKey;
-        }
-
-        const page5 = document.getElementById('notePage5');
-        if (page5) page5.style.display = '';
-        const status = document.getElementById('verticalProfileStatus');
-        if (status) status.textContent = 'Lade Höhendaten...';
-
-        try {
-            vpElevationData = await fetchRouteElevation(routeWaypoints);
-            renderVerticalProfile('verticalProfileCanvas');
-            if (status) status.textContent = vpElevationData.length + ' Höhenpunkte geladen';
-        } catch (e) {
-            console.error('Vertical Profile Error:', e);
-            if (status) status.textContent = 'Limit API/Fehler';
-
-            // If we have nothing, render a flat baseline so the canvas still draws and airspaces update
-            if (!vpElevationData || vpElevationData.length === 0) {
-                const totalDist = routeWaypoints.reduce((acc, wp, i) => i === 0 ? 0 : acc + calcNav(routeWaypoints[i - 1].lat, routeWaypoints[i - 1].lng || routeWaypoints[i - 1].lon, wp.lat, wp.lng || wp.lon).dist, 0);
-                vpElevationData = [
-                    { distNM: 0, elevFt: 0, lat: routeWaypoints[0].lat, lon: routeWaypoints[0].lng || routeWaypoints[0].lon },
-                    { distNM: Math.max(1, totalDist), elevFt: 0, lat: routeWaypoints[routeWaypoints.length - 1].lat, lon: routeWaypoints[routeWaypoints.length - 1].lng || routeWaypoints[routeWaypoints.length - 1].lon }
-                ];
-            }
-            renderVerticalProfile('verticalProfileCanvas');
-        }
-    }, 1200);
-}
-
-async function fetchRouteElevation(routePts) {
-    if (!routePts || routePts.length < 2) return [];
-
-    // Generate a unique cache key based on route coordinates
-    const cacheKey = routePts.map(p => `${(p.lat || 0).toFixed(4)},${((p.lng || p.lon) || 0).toFixed(4)}`).join('|');
-    if (vpElevationCache[cacheKey]) {
-        return vpElevationCache[cacheKey];
-    }
-
-    try {
-        const stored = localStorage.getItem('ga_elev_cache_' + cacheKey);
-        if (stored) {
-            const data = JSON.parse(stored);
-            vpElevationCache[cacheKey] = data;
-            return data;
-        }
-    } catch (e) { }
-
-    const interpolated = [];
-    let cumulativeDist = 0;
-
-    for (let i = 0; i < routePts.length - 1; i++) {
-        const p1 = routePts[i], p2 = routePts[i + 1];
-        const lat1 = p1.lat, lon1 = p1.lng || p1.lon;
-        const lat2 = p2.lat, lon2 = p2.lng || p2.lon;
-        const segDist = calcNav(lat1, lon1, lat2, lon2).dist;
-        const steps = Math.max(1, Math.round(segDist));
-
-        for (let j = 0; j <= steps; j++) {
-            if (i > 0 && j === 0) continue;
-            const f = j / steps;
-            interpolated.push({
-                lat: lat1 + (lat2 - lat1) * f,
-                lon: lon1 + (lon2 - lon1) * f,
-                distNM: cumulativeDist + segDist * f
+// === FORCE UPDATE (V53) ===
+window.forceAppUpdate = function() {
+    if (confirm("Möchtest du ein Update erzwingen? Der Zwischenspeicher wird geleert und die App neu geladen.")) {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+                caches.keys().then(function(names) {
+                    for (let name of names) caches.delete(name);
+                    window.location.reload(true);
+                });
             });
-        }
-        cumulativeDist += segDist;
-    }
-
-    let samplePts = interpolated;
-    if (interpolated.length > 100) {
-        samplePts = [];
-        for (let i = 0; i < 100; i++) {
-            const idx = Math.round(i * (interpolated.length - 1) / 99);
-            samplePts.push(interpolated[idx]);
-        }
-    }
-
-    const lats = samplePts.map(p => p.lat.toFixed(4)).join(',');
-    const lons = samplePts.map(p => p.lon.toFixed(4)).join(',');
-
-    const res = await fetch('https://api.open-meteo.com/v1/elevation?latitude=' + lats + '&longitude=' + lons);
-    if (!res.ok) throw new Error('Elevation API error: ' + res.status);
-    const data = await res.json();
-
-    if (!data.elevation || data.elevation.length !== samplePts.length) {
-        throw new Error('Invalid elevation response');
-    }
-
-    const finalData = samplePts.map((p, i) => ({
-        distNM: p.distNM,
-        elevFt: Math.round(data.elevation[i] * 3.28084),
-        lat: p.lat,
-        lon: p.lon
-    }));
-
-    vpElevationCache[cacheKey] = finalData;
-    try { localStorage.setItem('ga_elev_cache_' + cacheKey, JSON.stringify(finalData)); } catch (e) { }
-    return finalData;
-}
-
-function computeFlightProfile(elevationData, cruiseAltFt, climbRateFpm, descentRateFpm, tasKts) {
-    if (!elevationData || elevationData.length < 2) return null;
-
-    const depElevFt = elevationData[0].elevFt;
-    let destElevFt = elevationData[elevationData.length - 1].elevFt;
-    // If destination is a POI, stay at cruise altitude (no descent)
-    if (typeof currentMissionData !== 'undefined' && currentMissionData && currentMissionData.poiName) {
-        destElevFt = cruiseAltFt;
-    }
-    const totalDistNM = elevationData[elevationData.length - 1].distNM;
-
-    const climbFt = Math.max(0, cruiseAltFt - depElevFt);
-    const climbTimeMin = climbFt / climbRateFpm;
-    const climbDistNM = (climbTimeMin / 60) * tasKts * 0.85;
-
-    const descentFt = Math.max(0, cruiseAltFt - destElevFt);
-    const descentTimeMin = descentFt / descentRateFpm;
-    const descentDistNM = (descentTimeMin / 60) * tasKts * 0.9;
-
-    const tocDistNM = Math.min(climbDistNM, totalDistNM * 0.4);
-    const todDistNM = Math.max(totalDistNM - descentDistNM, totalDistNM * 0.6);
-
-    const profile = [];
-    for (const pt of elevationData) {
-        let altFt;
-        if (pt.distNM <= tocDistNM) {
-            const f = tocDistNM > 0 ? pt.distNM / tocDistNM : 1;
-            altFt = depElevFt + (cruiseAltFt - depElevFt) * f;
-        } else if (pt.distNM >= todDistNM) {
-            const f = (totalDistNM - todDistNM) > 0 ? (pt.distNM - todDistNM) / (totalDistNM - todDistNM) : 1;
-            altFt = cruiseAltFt - (cruiseAltFt - destElevFt) * f;
         } else {
-            altFt = cruiseAltFt;
-        }
-        profile.push({ distNM: pt.distNM, altFt: Math.round(altFt) });
-    }
-
-    return { profile, tocDistNM, todDistNM };
-}
-
-function renderVerticalProfile(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas || !vpElevationData || vpElevationData.length < 2) return;
-
-    const container = canvas.parentElement;
-    const displayWidth = container.clientWidth || 400;
-    const displayHeight = Math.round(displayWidth * 0.4);
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = displayWidth * dpr;
-    canvas.height = displayHeight * dpr;
-    canvas.style.width = '100%';
-    canvas.style.maxWidth = displayWidth + 'px';
-    canvas.style.height = 'auto';
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    const padLeft = 45, padRight = 15, padTop = 20, padBottom = 30;
-    const plotW = displayWidth - padLeft - padRight;
-    const plotH = displayHeight - padTop - padBottom;
-
-    const cruiseAlt = parseInt(document.getElementById('altSlider')?.value || 4500);
-    const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-    const totalDist = vpElevationData[vpElevationData.length - 1].distNM;
-    const maxTerrain = Math.max(...vpElevationData.map(p => p.elevFt));
-    const maxAlt = Math.max(cruiseAlt + 500, maxTerrain + 1500);
-    const minAlt = 0;
-
-    const fpResult = computeFlightProfile(vpElevationData, cruiseAlt, vpClimbRate, vpDescentRate, tas);
-
-    const xOf = (distNM) => padLeft + (distNM / totalDist) * plotW;
-    const yOf = (altFt) => padTop + plotH - ((altFt - minAlt) / (maxAlt - minAlt)) * plotH;
-
-    // Background
-    ctx.fillStyle = '#eef6ff';
-    ctx.fillRect(0, 0, displayWidth, displayHeight);
-
-    // Sky gradient
-    const skyGrad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
-    skyGrad.addColorStop(0, '#87CEEB');
-    skyGrad.addColorStop(0.5, '#c8e6f8');
-    skyGrad.addColorStop(1, '#e8f4f8');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(padLeft, padTop, plotW, plotH);
-
-    // Airspace blocks
-    if (typeof activeAirspaces !== 'undefined' && activeAirspaces.length > 0) {
-        for (const as of activeAirspaces) {
-            // FIS Sektoren (Typ 33) ignorieren
-            if (as.type === 33) continue;
-            if (!as.lowerLimit || !as.upperLimit) continue;
-            const lowerFt = airspaceLimitToFt(as.lowerLimit);
-            const upperFt = airspaceLimitToFt(as.upperLimit);
-            if (lowerFt === null || upperFt === null || upperFt <= minAlt || lowerFt >= maxAlt) continue;
-
-            const isLowerAgl = as.lowerLimit.referenceDatum === 0;
-            const isUpperAgl = as.upperLimit.referenceDatum === 0;
-
-            let asMinDist = totalDist, asMaxDist = 0, found = false;
-            const polys = [];
-            if (as.geometry) {
-                if (as.geometry.type === 'Polygon') polys.push(as.geometry.coordinates[0]);
-                else if (as.geometry.type === 'MultiPolygon') as.geometry.coordinates.forEach(mc => polys.push(mc[0]));
-
-                for (let pi = 0; pi < vpElevationData.length; pi++) {
-                    const pt = vpElevationData[pi];
-                    for (const poly of polys) {
-                        if (vpPointInPoly(pt, poly)) {
-                            if (pt.distNM < asMinDist) asMinDist = pt.distNM;
-                            if (pt.distNM > asMaxDist) asMaxDist = pt.distNM;
-                            found = true; break;
-                        }
-                    }
-                    // Also check segment to next point (catches small airspaces between samples)
-                    if (!found && pi < vpElevationData.length - 1) {
-                        const pt2 = vpElevationData[pi + 1];
-                        for (const poly of polys) {
-                            for (let ei = 0, ej = poly.length - 1; ei < poly.length; ej = ei++) {
-                                const ax = poly[ej][0], ay = poly[ej][1], bx = poly[ei][0], by = poly[ei][1];
-                                const d1x = pt2.lon-pt.lon, d1y = pt2.lat-pt.lat;
-                                const d2x = bx-ax, d2y = by-ay;
-                                const cross = d1x*d2y - d1y*d2x;
-                                if (Math.abs(cross) < 1e-12) continue;
-                                const t = ((ax-pt.lon)*d2y - (ay-pt.lat)*d2x) / cross;
-                                const u = ((ax-pt.lon)*d1y - (ay-pt.lat)*d1x) / cross;
-                                if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-                                    const crossDist = pt.distNM + t * (pt2.distNM - pt.distNM);
-                                    if (crossDist < asMinDist) asMinDist = crossDist;
-                                    if (crossDist > asMaxDist) asMaxDist = crossDist;
-                                    found = true; break;
-                                }
-                            }
-                            if (found) break;
-                        }
-                    }
-                }
-            }
-            if (!found) continue;
-
-            // Expand range to include adjacent elevation points for smooth polygon edges
-            const eps = (vpElevationData.length > 1) ? (vpElevationData[1].distNM - vpElevationData[0].distNM) * 0.5 : 0.5;
-            const relevantPts = vpElevationData.filter(p => p.distNM >= asMinDist - eps && p.distNM <= asMaxDist + eps);
-            if (relevantPts.length < 1) continue;
-
-            const style = getAirspaceStyle(as);
-            const x1 = xOf(asMinDist), x2 = xOf(asMaxDist);
-
-            ctx.fillStyle = vpHexToRgba(style.color, 0.15);
-            ctx.strokeStyle = vpHexToRgba(style.color, 0.4);
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3, 3]);
-
-            ctx.beginPath();
-            // Top path
-            for (let i = 0; i < relevantPts.length; i++) {
-                const p = relevantPts[i];
-                const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.min(realUpper, maxAlt)));
-            }
-            // Bottom path (backwards)
-            for (let i = relevantPts.length - 1; i >= 0; i--) {
-                const p = relevantPts[i];
-                const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            const displayName = getAirspaceDisplayName(as);
-            ctx.fillStyle = vpHexToRgba(style.color, 0.7);
-            ctx.font = 'bold 8px Arial';
-            ctx.textAlign = 'center';
-            
-            // Estimate label Y
-            let sumUpper = 0;
-            relevantPts.forEach(p => sumUpper += (isUpperAgl ? p.elevFt + upperFt : upperFt));
-            const avgUpper = sumUpper / relevantPts.length;
-            const labelY = yOf(Math.min(avgUpper, maxAlt));
-
-            ctx.fillText(displayName, (x1 + x2) / 2, labelY + 10);
-            ctx.font = '7px Arial';
-            ctx.fillText(lowerFt + '–' + upperFt + (isUpperAgl ? ' ft AGL' : ' ft'), (x1 + x2) / 2, labelY + 19);
+            window.location.reload(true);
         }
     }
-    ctx.textAlign = 'left';
-
-    // Safety line (terrain + 1000ft)
-    ctx.beginPath();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(200, 80, 0, 0.5)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < vpElevationData.length; i++) {
-        const x = xOf(vpElevationData[i].distNM), y = yOf(vpElevationData[i].elevFt + 1000);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Terrain polygon
-    ctx.beginPath();
-    ctx.moveTo(xOf(0), yOf(0));
-    for (let i = 0; i < vpElevationData.length; i++) ctx.lineTo(xOf(vpElevationData[i].distNM), yOf(vpElevationData[i].elevFt));
-    ctx.lineTo(xOf(totalDist), yOf(0));
-    ctx.closePath();
-
-    const terrainGrad = ctx.createLinearGradient(0, yOf(maxTerrain), 0, yOf(0));
-    terrainGrad.addColorStop(0, '#8B7355');
-    terrainGrad.addColorStop(0.3, '#6B8E23');
-    terrainGrad.addColorStop(0.7, '#228B22');
-    terrainGrad.addColorStop(1, '#2E8B57');
-    ctx.fillStyle = terrainGrad;
-    ctx.fill();
-
-    ctx.beginPath();
-    for (let i = 0; i < vpElevationData.length; i++) {
-        const x = xOf(vpElevationData[i].distNM), y = yOf(vpElevationData[i].elevFt);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = '#3a5a20';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Flight profile
-    if (fpResult && fpResult.profile) {
-        ctx.beginPath();
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM), y = yOf(fpResult.profile[i].altFt) + 2;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 4;
-        ctx.stroke();
-
-        ctx.beginPath();
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM), y = yOf(fpResult.profile[i].altFt);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = '#d93829';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // TOC
-        ctx.beginPath();
-        ctx.arc(xOf(fpResult.tocDistNM), yOf(cruiseAlt), 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#d93829';
-        ctx.fill();
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 9px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('TOC', xOf(fpResult.tocDistNM), yOf(cruiseAlt) - 7);
-
-        // TOD
-        ctx.beginPath();
-        ctx.arc(xOf(fpResult.todDistNM), yOf(cruiseAlt), 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#d93829';
-        ctx.fill();
-        ctx.fillStyle = '#333';
-        ctx.fillText('TOD', xOf(fpResult.todDistNM), yOf(cruiseAlt) - 7);
-        ctx.textAlign = 'left';
-    }
-
-    // Waypoint markers
-    let wpCumDist = 0;
-    for (let i = 0; i < routeWaypoints.length; i++) {
-        if (i > 0) {
-            const prev = routeWaypoints[i - 1], curr = routeWaypoints[i];
-            wpCumDist += calcNav(prev.lat, prev.lng || prev.lon, curr.lat, curr.lng || curr.lon).dist;
-        }
-        const x = xOf(wpCumDist);
-
-        ctx.beginPath();
-        ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 1;
-        ctx.moveTo(x, padTop);
-        ctx.lineTo(x, padTop + plotH);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        let wpLabel;
-        if (i === 0) wpLabel = currentStartICAO || 'DEP';
-        else if (i === routeWaypoints.length - 1) wpLabel = (currentMissionData?.poiName ? 'POI' : currentDestICAO) || 'DEST';
-        else wpLabel = routeWaypoints[i].name ? routeWaypoints[i].name.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '').split(' ')[0] : 'WP' + i;
-        if (wpLabel.length > 8) wpLabel = wpLabel.substring(0, 7) + '…';
-
-        ctx.save();
-        ctx.translate(x, padTop + plotH + 4);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 8px Arial';
-        ctx.textAlign = 'left';
-        ctx.fillText(wpLabel, 0, 0);
-        ctx.restore();
-
-        ctx.beginPath();
-        ctx.arc(x, padTop + 3, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = i === 0 ? '#44ff44' : (i === routeWaypoints.length - 1 ? '#ff4444' : '#fdfd86');
-        ctx.fill();
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-    }
-
-    // Y axis
-    ctx.fillStyle = '#555';
-    ctx.font = '9px Arial';
-    ctx.textAlign = 'right';
-    const altStep = maxAlt > 6000 ? 2000 : (maxAlt > 3000 ? 1000 : 500);
-    for (let alt = 0; alt <= maxAlt; alt += altStep) {
-        const y = yOf(alt);
-        if (y < padTop - 5 || y > padTop + plotH + 5) continue;
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-        ctx.lineWidth = 0.5;
-        ctx.moveTo(padLeft, y);
-        ctx.lineTo(padLeft + plotW, y);
-        ctx.stroke();
-        ctx.fillStyle = '#555';
-        ctx.fillText(alt >= 1000 ? (alt / 1000).toFixed(alt % 1000 === 0 ? 0 : 1) + 'k' : alt + '', padLeft - 4, y + 3);
-    }
-
-    ctx.save();
-    ctx.translate(8, padTop + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = '#888';
-    ctx.font = 'bold 8px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('ALT (ft)', 0, 0);
-    ctx.restore();
-
-    // X axis
-    ctx.textAlign = 'center';
-    const distStep = totalDist > 100 ? 20 : (totalDist > 50 ? 10 : 5);
-    for (let d = 0; d <= totalDist; d += distStep) {
-        ctx.fillStyle = '#888';
-        ctx.font = '8px Arial';
-        ctx.fillText(d + '', xOf(d), padTop + plotH + 22);
-    }
-    ctx.fillStyle = '#888';
-    ctx.font = 'bold 8px Arial';
-    ctx.fillText('NM', padLeft + plotW + 8, padTop + plotH + 22);
-
-    // Border
-    ctx.strokeStyle = '#bbb';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(padLeft, padTop, plotW, plotH);
-
-    // Cruise altitude label & line
-    ctx.fillStyle = 'rgba(217, 56, 41, 0.8)';
-    ctx.font = 'bold 9px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('CRZ ' + cruiseAlt + ' ft', padLeft + 4, yOf(cruiseAlt) - 4);
-    ctx.beginPath();
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = 'rgba(217, 56, 41, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.moveTo(padLeft, yOf(cruiseAlt));
-    ctx.lineTo(padLeft + plotW, yOf(cruiseAlt));
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Peak elevation marker
-    const peakPt = vpElevationData.reduce((max, p) => p.elevFt > max.elevFt ? p : max);
-    ctx.fillStyle = '#333';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('▲', xOf(peakPt.distNM), yOf(peakPt.elevFt) - 3);
-    ctx.font = 'bold 8px Arial';
-    ctx.fillText(peakPt.elevFt + ' ft', xOf(peakPt.distNM), yOf(peakPt.elevFt) - 12);
-
-    // Auto-update things that depend on the completed elevation data
-    if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-    if (typeof vpMapProfileVisible !== 'undefined' && vpMapProfileVisible && vpElevationData) {
-        const mainAlt = document.getElementById('altSlider');
-        const mapAlt = document.getElementById('altSliderMap');
-        const mapDisplay = document.getElementById('altMapDisplay');
-        if (mainAlt && mapAlt) { mapAlt.value = mainAlt.value; }
-        if (mainAlt && mapDisplay) { mapDisplay.textContent = mainAlt.value; }
-        renderMapProfile();
-    }
-}
-
-function vpPointInPoly(pt, polygon) {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
-        const intersect = ((yi > pt.lat) !== (yj > pt.lat)) && (pt.lon < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-function airspaceLimitToFt(lim) {
-    if (!lim) return null;
-    if (lim.referenceDatum === 0 && lim.value === 0) return 0;
-    if (lim.unit === 6) return lim.value * 100;
-    if (lim.unit === 1) return lim.value;
-    if (lim.unit === 0) return Math.round(lim.value * 3.28084);
-    return lim.value;
-}
-
-function vpHexToRgba(hex, alpha) {
-    if (!hex || hex.charAt(0) !== '#') return 'rgba(0,0,0,' + alpha + ')';
-    const r = parseInt(hex.slice(1, 3), 16) || 0;
-    const g = parseInt(hex.slice(3, 5), 16) || 0;
-    const b = parseInt(hex.slice(5, 7), 16) || 0;
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-}
-
-/* =========================================================
-   MAP TABLE PROFILE STRIP
-   ========================================================= */
-let vpMapProfileVisible = true;
-
-function toggleMapProfile() {
-    vpMapProfileVisible = !vpMapProfileVisible;
-    const strip = document.getElementById('mapProfileStrip');
-    const btn = document.getElementById('vpToggleBtn');
-    if (strip) strip.style.display = vpMapProfileVisible ? '' : 'none';
-    if (btn) {
-        btn.textContent = vpMapProfileVisible ? '📊 Profil (An)' : '📊 Profil (Aus)';
-        btn.style.background = vpMapProfileVisible ? '#2E8B57' : '#444';
-    }
-    if (vpMapProfileVisible) {
-        renderMapProfile();
-        // Marker wieder anzeigen, falls er existiert
-        if (vpPositionLeafletMarker && map) vpPositionLeafletMarker.addTo(map);
-    } else {
-        // Marker von der Karte entfernen, wenn Profil ausgeblendet
-        if (vpPositionLeafletMarker && map) map.removeLayer(vpPositionLeafletMarker);
-    }
-    // Invalidate map size since space changed
-    if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 100);
-}
-
-function syncAltFromMap(val) {
-    const mainSlider = document.getElementById('altSlider');
-    if (mainSlider) mainSlider.value = val;
-    document.getElementById('altMapDisplay').textContent = val;
-    handleSliderChange('alt', val);
-    renderMapProfile();
-    if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-}
-
-function vpZoom(delta) {
-    vpZoomLevel = Math.max(10, Math.min(100, vpZoomLevel + delta));
-    // Anzeige invertiert: 0 % = rausgezoomt (vpZoomLevel 100), 100 % = maximal rein (vpZoomLevel 10)
-    document.getElementById('vpZoomDisplay').textContent = Math.round((100 - vpZoomLevel) / 90 * 100) + '%';
-
-    // If zoomed in, fetch higher resolution data
-    if (vpZoomLevel < 100 && routeWaypoints && routeWaypoints.length >= 2) {
-        fetchHighResElevation().then(() => renderMapProfile());
-    } else {
-        vpHighResData = null;
-        renderMapProfile();
-    }
-}
-
-async function fetchHighResElevation() {
-    if (!routeWaypoints || routeWaypoints.length < 2) return;
-
-    const interpolated = [];
-    let cumulativeDist = 0;
-
-    for (let i = 0; i < routeWaypoints.length - 1; i++) {
-        const p1 = routeWaypoints[i], p2 = routeWaypoints[i + 1];
-        const lat1 = p1.lat, lon1 = p1.lng || p1.lon;
-        const lat2 = p2.lat, lon2 = p2.lng || p2.lon;
-        const segDist = calcNav(lat1, lon1, lat2, lon2).dist;
-        // Higher resolution: every 0.25 NM instead of 1 NM
-        const steps = Math.max(1, Math.round(segDist * 4));
-
-        for (let j = 0; j <= steps; j++) {
-            if (i > 0 && j === 0) continue;
-            const f = j / steps;
-            interpolated.push({
-                lat: lat1 + (lat2 - lat1) * f,
-                lon: lon1 + (lon2 - lon1) * f,
-                distNM: cumulativeDist + segDist * f
-            });
-        }
-        cumulativeDist += segDist;
-    }
-
-    // Resample to max 100 points
-    let samplePts = interpolated;
-    if (interpolated.length > 100) {
-        samplePts = [];
-        for (let i = 0; i < 100; i++) {
-            const idx = Math.round(i * (interpolated.length - 1) / 99);
-            samplePts.push(interpolated[idx]);
-        }
-    }
-
-    const lats = samplePts.map(p => p.lat.toFixed(5)).join(',');
-    const lons = samplePts.map(p => p.lon.toFixed(5)).join(',');
-
-    try {
-        const res = await fetch('https://api.open-meteo.com/v1/elevation?latitude=' + lats + '&longitude=' + lons);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.elevation || data.elevation.length !== samplePts.length) return;
-
-        vpHighResData = samplePts.map((p, i) => ({
-            distNM: p.distNM,
-            elevFt: Math.round(data.elevation[i] * 3.28084),
-            lat: p.lat,
-            lon: p.lon
-        }));
-    } catch (e) {
-        console.error('High-res elevation fetch error:', e);
-    }
-}
-
-function renderMapProfile() {
-    const canvas = document.getElementById('mapProfileCanvas');
-    const scrollContainer = document.getElementById('mapProfileScroll');
-    if (!canvas || !scrollContainer) return;
-
-    const elevData = (vpZoomLevel < 100 && vpHighResData) ? vpHighResData : vpElevationData;
-    if (!elevData || elevData.length < 2) return;
-
-    const containerHeight = scrollContainer.clientHeight || 100;
-    const baseWidth = scrollContainer.clientWidth || 600;
-
-    // Zoom: canvas is wider than container when zoomed in
-    const zoomFactor = 100 / vpZoomLevel;
-    const canvasWidth = Math.round(baseWidth * zoomFactor);
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasWidth * dpr;
-    canvas.height = containerHeight * dpr;
-    canvas.style.width = canvasWidth + 'px';
-    canvas.style.height = containerHeight + 'px';
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    const padLeft = 33, padRight = 16, padTop = 12, padBottom = 22;
-    const plotW = canvasWidth - padLeft - padRight;
-    const plotH = containerHeight - padTop - padBottom;
-
-    const cruiseAlt = parseInt(document.getElementById('altSliderMap')?.value || document.getElementById('altSlider')?.value || 4500);
-    const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-    const totalDist = elevData[elevData.length - 1].distNM;
-    const maxTerrain = Math.max(...elevData.map(p => p.elevFt));
-    const maxAlt = Math.max(cruiseAlt + 500, maxTerrain + 1500);
-    const minAlt = 0;
-
-    const fpResult = computeFlightProfile(elevData, cruiseAlt, vpClimbRate, vpDescentRate, tas);
-
-    const xOf = (distNM) => padLeft + (distNM / totalDist) * plotW;
-    const yOf = (altFt) => padTop + plotH - ((altFt - minAlt) / (maxAlt - minAlt)) * plotH;
-
-    // Background - dark theme for map strip
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvasWidth, containerHeight);
-
-    // Sky gradient (dark)
-    const skyGrad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
-    skyGrad.addColorStop(0, '#1a2a3a');
-    skyGrad.addColorStop(0.5, '#1a2030');
-    skyGrad.addColorStop(1, '#151a20');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(padLeft, padTop, plotW, plotH);
-
-    // Airspace blocks (dark theme) with pulse highlight support
-    if (typeof activeAirspaces !== 'undefined' && activeAirspaces.length > 0) {
-        for (let asIdx = 0; asIdx < activeAirspaces.length; asIdx++) {
-            const as = activeAirspaces[asIdx];
-            if (as.type === 33) continue;
-            if (!as.lowerLimit || !as.upperLimit) continue;
-            const lowerFt = airspaceLimitToFt(as.lowerLimit);
-            const upperFt = airspaceLimitToFt(as.upperLimit);
-            if (lowerFt === null || upperFt === null) continue;
-
-            const isLowerAgl = as.lowerLimit.referenceDatum === 0;
-            const isUpperAgl = as.upperLimit.referenceDatum === 0;
-
-            let asMinDist = totalDist, asMaxDist = 0, found = false;
-            const polys = [];
-            if (as.geometry) {
-                if (as.geometry.type === 'Polygon') polys.push(as.geometry.coordinates[0]);
-                else if (as.geometry.type === 'MultiPolygon') as.geometry.coordinates.forEach(mc => polys.push(mc[0]));
-
-                for (let pi = 0; pi < elevData.length; pi++) {
-                    const pt = elevData[pi];
-                    for (const poly of polys) {
-                        if (vpPointInPoly(pt, poly)) {
-                            if (pt.distNM < asMinDist) asMinDist = pt.distNM;
-                            if (pt.distNM > asMaxDist) asMaxDist = pt.distNM;
-                            found = true; break;
-                        }
-                    }
-                    // Also check segment to next point (catches small airspaces between samples)
-                    if (!found && pi < elevData.length - 1) {
-                        const pt2 = elevData[pi + 1];
-                        for (const poly of polys) {
-                            for (let ei = 0, ej = poly.length - 1; ei < poly.length; ej = ei++) {
-                                const ax = poly[ej][0], ay = poly[ej][1], bx = poly[ei][0], by = poly[ei][1];
-                                const d1x = pt2.lon-pt.lon, d1y = pt2.lat-pt.lat;
-                                const d2x = bx-ax, d2y = by-ay;
-                                const cross = d1x*d2y - d1y*d2x;
-                                if (Math.abs(cross) < 1e-12) continue;
-                                const t = ((ax-pt.lon)*d2y - (ay-pt.lat)*d2x) / cross;
-                                const u = ((ax-pt.lon)*d1y - (ay-pt.lat)*d1x) / cross;
-                                if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-                                    const crossDist = pt.distNM + t * (pt2.distNM - pt.distNM);
-                                    if (crossDist < asMinDist) asMinDist = crossDist;
-                                    if (crossDist > asMaxDist) asMaxDist = crossDist;
-                                    found = true; break;
-                                }
-                            }
-                            if (found) break;
-                        }
-                    }
-                }
-            }
-            if (!found) continue;
-
-            const eps = (elevData.length > 1) ? (elevData[1].distNM - elevData[0].distNM) * 0.5 : 0.5;
-            const relevantPts = elevData.filter(p => p.distNM >= asMinDist - eps && p.distNM <= asMaxDist + eps);
-            if (relevantPts.length < 1) continue;
-
-            const style = getAirspaceStyle(as);
-            const x1 = xOf(asMinDist), x2 = xOf(asMaxDist);
-
-            // Pulsing highlight for the active airspace
-            const isHighlighted = (vpHighlightPulseIdx >= 0 && asIdx === vpHighlightPulseIdx);
-            const pulseOpacity = isHighlighted ? 0.2 + 0.4 * (0.5 + 0.5 * Math.sin(vpPulsePhase * Math.PI * 2)) : 0.15;
-            const strokeOpacity = isHighlighted ? 0.5 + 0.5 * (0.5 + 0.5 * Math.sin(vpPulsePhase * Math.PI * 2)) : 0.5;
-            const lineW = isHighlighted ? 2 + 2 * (0.5 + 0.5 * Math.sin(vpPulsePhase * Math.PI * 2)) : 2;
-
-            ctx.fillStyle = vpHexToRgba(style.color, pulseOpacity);
-            ctx.strokeStyle = vpHexToRgba(style.color, strokeOpacity);
-            ctx.lineWidth = lineW;
-            ctx.setLineDash(isHighlighted ? [] : [3, 3]);
-
-            ctx.beginPath();
-            // Top path
-            for (let i = 0; i < relevantPts.length; i++) {
-                const p = relevantPts[i];
-                const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.min(realUpper, maxAlt)));
-            }
-            // Bottom path (backwards)
-            for (let i = relevantPts.length - 1; i >= 0; i--) {
-                const p = relevantPts[i];
-                const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Airspace label (only if zoomed enough to show)
-            if (zoomFactor >= 1.5 || (x2 - x1) > 40 || isHighlighted) {
-                const displayName = getAirspaceDisplayName(as);
-                ctx.fillStyle = vpHexToRgba(style.color, isHighlighted ? 0.9 : 0.6);
-                ctx.font = isHighlighted ? 'bold 11px Arial' : 'bold 10px Arial';
-                ctx.textAlign = 'center';
-
-                // Estimate label Y from average upper limit in this segment
-                let sumUpper = 0;
-                relevantPts.forEach(p => sumUpper += (isUpperAgl ? p.elevFt + upperFt : upperFt));
-                const avgUpper = sumUpper / relevantPts.length;
-                const labelY = yOf(Math.min(avgUpper, maxAlt));
-
-                ctx.fillText(displayName, (x1 + x2) / 2, labelY + 12);
-                if (zoomFactor >= 2 || isHighlighted) {
-                    ctx.font = '9px Arial';
-                    ctx.fillText(lowerFt + '–' + upperFt + (isUpperAgl ? ' ft AGL' : ' ft'), (x1 + x2) / 2, labelY + 23);
-                }
-            }
-        }
-    }
-    ctx.textAlign = 'left';
-
-    // Safety line
-    ctx.beginPath();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(200, 120, 40, 0.4)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < elevData.length; i++) {
-        const x = xOf(elevData[i].distNM), y = yOf(elevData[i].elevFt + 1000);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Terrain polygon
-    ctx.beginPath();
-    ctx.moveTo(xOf(0), yOf(0));
-    for (let i = 0; i < elevData.length; i++) ctx.lineTo(xOf(elevData[i].distNM), yOf(elevData[i].elevFt));
-    ctx.lineTo(xOf(totalDist), yOf(0));
-    ctx.closePath();
-
-    const terrainGrad = ctx.createLinearGradient(0, yOf(maxTerrain), 0, yOf(0));
-    terrainGrad.addColorStop(0, '#6B5B3C');
-    terrainGrad.addColorStop(0.3, '#3B5B23');
-    terrainGrad.addColorStop(0.7, '#1B5B22');
-    terrainGrad.addColorStop(1, '#1E5B37');
-    ctx.fillStyle = terrainGrad;
-    ctx.fill();
-
-    ctx.beginPath();
-    for (let i = 0; i < elevData.length; i++) {
-        const x = xOf(elevData[i].distNM), y = yOf(elevData[i].elevFt);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = '#4a7a30';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Flight profile
-    if (fpResult && fpResult.profile) {
-        ctx.beginPath();
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM), y = yOf(fpResult.profile[i].altFt) + 1;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        ctx.beginPath();
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM), y = yOf(fpResult.profile[i].altFt);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = '#ff4444';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    }
-
-    // Cruise altitude line
-    ctx.beginPath();
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = 'rgba(255, 68, 68, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.moveTo(padLeft, yOf(cruiseAlt));
-    ctx.lineTo(padLeft + plotW, yOf(cruiseAlt));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255, 68, 68, 0.7)';
-    ctx.font = 'bold 10px Arial';
-    ctx.fillText('CRZ ' + cruiseAlt + ' ft', padLeft + 4, yOf(cruiseAlt) - 4);
-
-    // Waypoint markers
-    let wpCumDist = 0;
-    for (let i = 0; i < routeWaypoints.length; i++) {
-        if (i > 0) {
-            const prev = routeWaypoints[i - 1], curr = routeWaypoints[i];
-            wpCumDist += calcNav(prev.lat, prev.lng || prev.lon, curr.lat, curr.lng || curr.lon).dist;
-        }
-        const x = xOf(wpCumDist);
-
-        ctx.beginPath();
-        ctx.setLineDash([2, 3]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 1;
-        ctx.moveTo(x, padTop);
-        ctx.lineTo(x, padTop + plotH);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        let wpLabel;
-        if (i === 0) wpLabel = currentStartICAO || 'DEP';
-        else if (i === routeWaypoints.length - 1) wpLabel = (currentMissionData?.poiName ? 'POI' : currentDestICAO) || 'DEST';
-        else wpLabel = routeWaypoints[i].name ? routeWaypoints[i].name.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '').split(' ')[0] : 'WP' + i;
-        if (!zoomFactor || zoomFactor < 2) { if (wpLabel.length > 6) wpLabel = wpLabel.substring(0, 5) + '…'; }
-        else { if (wpLabel.length > 12) wpLabel = wpLabel.substring(0, 11) + '…'; }
-
-        // Colored dot
-        ctx.beginPath();
-        ctx.arc(x, padTop + plotH + 3, 3, 0, Math.PI * 2);
-        ctx.fillStyle = i === 0 ? '#44ff44' : (i === routeWaypoints.length - 1 ? '#ff4444' : '#ffcc00');
-        ctx.fill();
-
-        // Label  
-        ctx.fillStyle = '#bbb';
-        ctx.font = (zoomFactor >= 2) ? 'bold 11px Arial' : 'bold 9px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(wpLabel, x, padTop + plotH + 16);
-    }
-
-    // Y axis
-    ctx.textAlign = 'right';
-    const altStep = maxAlt > 6000 ? 2000 : (maxAlt > 3000 ? 1000 : 500);
-    for (let alt = 0; alt <= maxAlt; alt += altStep) {
-        const y = yOf(alt);
-        if (y < padTop - 3 || y > padTop + plotH + 3) continue;
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        ctx.lineWidth = 0.5;
-        ctx.moveTo(padLeft, y);
-        ctx.lineTo(padLeft + plotW, y);
-        ctx.stroke();
-        ctx.fillStyle = '#777';
-        ctx.font = '9px Arial';
-        ctx.fillText(alt >= 1000 ? (alt / 1000).toFixed(0) + 'k' : alt + '', padLeft - 3, y + 3);
-    }
-
-    // X axis ticks
-    ctx.textAlign = 'center';
-    const distStep = totalDist > 150 ? 25 : (totalDist > 80 ? 10 : 5);
-    for (let d = distStep; d < totalDist; d += distStep) {
-        const x = xOf(d);
-        ctx.fillStyle = '#666';
-        ctx.font = '8px Arial';
-        ctx.fillText(d + '', x, containerHeight - 1);
-    }
-
-    // Peak marker
-    const peakPt = elevData.reduce((max, p) => p.elevFt > max.elevFt ? p : max);
-    ctx.fillStyle = '#aaa';
-    ctx.font = '11px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('▲', xOf(peakPt.distNM), yOf(peakPt.elevFt) - 3);
-    ctx.font = 'bold 9px Arial';
-    ctx.fillText(peakPt.elevFt + ' ft', xOf(peakPt.distNM), yOf(peakPt.elevFt) - 13);
-
-    // Border
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(padLeft, padTop, plotW, plotH);
-
-    // === POSITION MARKER (Magenta triangle + line) ===
-    if (typeof vpPositionFraction === 'number' && vpPositionFraction >= 0) {
-        const posDistNM = vpPositionFraction * totalDist;
-        const posX = xOf(posDistNM);
-
-        // Vertical magenta line
-        ctx.beginPath();
-        ctx.strokeStyle = '#ff00ff';
-        ctx.lineWidth = 1.5;
-        ctx.moveTo(posX, padTop);
-        ctx.lineTo(posX, padTop + plotH);
-        ctx.stroke();
-
-        // Magenta triangle at bottom
-        ctx.beginPath();
-        ctx.moveTo(posX, padTop + plotH + 2);
-        ctx.lineTo(posX - 5, padTop + plotH + 10);
-        ctx.lineTo(posX + 5, padTop + plotH + 10);
-        ctx.closePath();
-        ctx.fillStyle = '#ff00ff';
-        ctx.fill();
-    }
-
-    // === ALTITUDE WAYPOINTS (user markers on flight line) ===
-    if (vpAltWaypoints.length > 0) {
-        for (let i = 0; i < vpAltWaypoints.length; i++) {
-            const wp = vpAltWaypoints[i];
-            const wx = xOf(wp.distNM);
-            const wy = yOf(wp.altFt);
-
-            // Vertical dashed line from waypoint down to terrain
-            ctx.beginPath();
-            ctx.setLineDash([2, 3]);
-            ctx.strokeStyle = 'rgba(255,0,255,0.3)';
-            ctx.lineWidth = 1;
-            ctx.moveTo(wx, wy);
-            ctx.lineTo(wx, padTop + plotH);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Diamond marker
-            ctx.beginPath();
-            ctx.moveTo(wx, wy - 7);
-            ctx.lineTo(wx + 6, wy);
-            ctx.lineTo(wx, wy + 7);
-            ctx.lineTo(wx - 6, wy);
-            ctx.closePath();
-            ctx.fillStyle = '#ff00ff';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Label: show altitude
-            ctx.fillStyle = '#ff00ff';
-            ctx.font = 'bold 9px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(wp.altFt + ' ft', wx, wy - 11);
-        }
-    }
-}
-
-// Removed arbitrary setTimeout hook in favor of synchronous hooks within renderVerticalProfile
-
-/* =========================================================
-   RESIZE HANDLE (Map / Profile split)
-   ========================================================= */
-let vpResizeActive = false;
-
-function initProfileResize() {
-    const handle = document.getElementById('profileResizeHandle');
-    const strip = document.getElementById('mapProfileStrip');
-    const maptable = document.querySelector('.maptable-content');
-    if (!handle || !strip || !maptable) return;
-
-    let startY = 0, startH = 0;
-
-    function onStart(e) {
-        vpResizeActive = true;
-        startY = e.touches ? e.touches[0].clientY : e.clientY;
-        startH = strip.offsetHeight;
-        document.body.style.cursor = 'ns-resize';
-        e.preventDefault();
-    }
-
-    function onMove(e) {
-        if (!vpResizeActive) return;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const delta = startY - clientY; // pulling up = bigger profile
-        let newH = startH + delta;
-        const totalH = maptable.offsetHeight;
-        const maxFraction = document.body.classList.contains('map-is-fullscreen') ? 0.75 : 0.6;
-        newH = Math.max(60, Math.min(totalH * maxFraction, newH));
-        strip.style.height = newH + 'px';
-
+};
+
+
+// === AUTO-RESIZE FÜR CANVAS & KARTE (z.B. bei Rotation in Landscape) ===
+let vpWindowResizeTimeout = null;
+window.addEventListener('resize', () => {
+    if (vpWindowResizeTimeout) clearTimeout(vpWindowResizeTimeout);
+    vpWindowResizeTimeout = setTimeout(() => {
+        // 1. Leaflet Karte an neue Dimensionen anpassen
         if (typeof map !== 'undefined' && map) map.invalidateSize();
-        renderMapProfile();
-    }
-
-    function onEnd() {
-        if (!vpResizeActive) return;
-        vpResizeActive = false;
-        document.body.style.cursor = '';
-    }
-
-    handle.addEventListener('mousedown', onStart);
-    handle.addEventListener('touchstart', onStart, { passive: false });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('mouseup', onEnd);
-    document.addEventListener('touchend', onEnd);
-}
-
-// Init resize when map table opens
-const _origToggleMapTable = typeof toggleMapTable === 'function' ? toggleMapTable : null;
-if (_origToggleMapTable) {
-    const _origFn = toggleMapTable;
-    toggleMapTable = function () {
-        _origFn();
-        setTimeout(() => {
-            initProfileResize();
-            if (vpMapProfileVisible && vpElevationData) renderMapProfile();
-        }, 500);
-    };
-}
-
-/* =========================================================
-   POSITION MARKER (Magenta triangle + Leaflet marker sync)
-   ========================================================= */
-let vpPositionFraction = 0; // 0 = start of profile
-let vpPositionLeafletMarker = null;
-
-function vpUpdatePosition(fraction) {
-    vpPositionFraction = fraction;
-    renderMapProfile();
-
-    // Update Leaflet marker on map
-    if (!vpElevationData || vpElevationData.length < 2) return;
-    const totalDist = vpElevationData[vpElevationData.length - 1].distNM;
-    const targetDist = fraction * totalDist;
-
-    // Find the interpolated lat/lon at this distance
-    let lat, lon;
-    for (let i = 0; i < vpElevationData.length - 1; i++) {
-        if (vpElevationData[i + 1].distNM >= targetDist) {
-            const segLen = vpElevationData[i + 1].distNM - vpElevationData[i].distNM;
-            const f = segLen > 0 ? (targetDist - vpElevationData[i].distNM) / segLen : 0;
-            lat = vpElevationData[i].lat + (vpElevationData[i + 1].lat - vpElevationData[i].lat) * f;
-            lon = vpElevationData[i].lon + (vpElevationData[i + 1].lon - vpElevationData[i].lon) * f;
-            break;
-        }
-    }
-    if (!lat) { lat = vpElevationData[vpElevationData.length - 1].lat; lon = vpElevationData[vpElevationData.length - 1].lon; }
-
-    if (typeof map !== 'undefined' && map && typeof L !== 'undefined') {
-        if (!vpPositionLeafletMarker) {
-            const magentaIcon = L.divIcon({
-                className: 'vp-pos-marker',
-                html: '<div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid #ff00ff;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));"></div>',
-                iconSize: [16, 14],
-                iconAnchor: [8, 14]
-            });
-            vpPositionLeafletMarker = L.marker([lat, lon], { icon: magentaIcon, interactive: false, zIndexOffset: 5000 });
-            // Nur zur Map hinzufügen, wenn Profil sichtbar ist
-            if (vpMapProfileVisible) vpPositionLeafletMarker.addTo(map);
-        } else {
-            vpPositionLeafletMarker.setLatLng([lat, lon]);
-            // Sicherstellen, dass Sichtbarkeit synchron ist
-            if (vpMapProfileVisible) {
-                if (!map.hasLayer(vpPositionLeafletMarker)) vpPositionLeafletMarker.addTo(map);
-            } else {
-                if (map.hasLayer(vpPositionLeafletMarker)) map.removeLayer(vpPositionLeafletMarker);
+        
+        // 2. Profile Canvas an neue Dimensionen anpassen (falls Kartentisch offen)
+        const mapTableOverlay = document.getElementById('mapTableOverlay');
+        if (mapTableOverlay && mapTableOverlay.classList.contains('active')) {
+            if (typeof window.throttledRenderProfiles === 'function') {
+                window.throttledRenderProfiles();
             }
         }
-    }
-}
+    }, 200); // 200ms warten, bis das mobile Gerät die Drehung visuell abgeschlossen hat
+});
 
-/* =========================================================
-   ALTITUDE WAYPOINTS (Click to set, drag to move)
-   ========================================================= */
-let vpAltWaypoints = []; // [{distNM, altFt}] - fixed anchor points
-let vpSegmentAlts = [];  // vpSegmentAlts[i] = cruise altitude between vpAltWaypoints[i] and [i+1]
-let vpDraggingWP = -1;
-let vpDraggingSegment = null; // { segIndex, origAlt }
-let vpCanvasClickHandler = null;
+// Verstecke zielgenau die Zoom- und Y-Achsen-Steuerung inkl. Text-Labels auf mobilen Geräten
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.innerWidth <= 767) {
+        const hideSpecificControls = (displayId, labelKeywords) => {
+            const el = document.getElementById(displayId);
+            if (!el) return;
 
-function getExactAltAtDist(distNM, profObj, fallbackAlt) {
-    if (!profObj || !profObj.profile || profObj.profile.length === 0) return fallbackAlt;
-    const prof = profObj.profile;
-    if (distNM <= prof[0].distNM) return prof[0].altFt;
-    if (distNM >= prof[prof.length - 1].distNM) return prof[prof.length - 1].altFt;
-    for (let j = 0; j < prof.length - 1; j++) {
-        if (distNM >= prof[j].distNM && distNM <= prof[j + 1].distNM) {
-            const f = (distNM - prof[j].distNM) / (prof[j + 1].distNM - prof[j].distNM || 1);
-            return prof[j].altFt + f * (prof[j + 1].altFt - prof[j].altFt);
-        }
-    }
-    return fallbackAlt;
-}
+            el.style.display = 'none';
 
-function initAltWaypoints() {
-    const canvas = document.getElementById('mapProfileCanvas');
-    if (!canvas || vpCanvasClickHandler) return;
-
-    vpCanvasClickHandler = true;
-
-    // === SHARED HELPERS for mouse & touch ===
-    function vpGetCanvasMetrics() {
-        const elevData = (vpZoomLevel < 100 && vpHighResData) ? vpHighResData : vpElevationData;
-        if (!elevData || elevData.length < 2) return null;
-        const rect = canvas.getBoundingClientRect();
-        const scrollContainer = document.getElementById('mapProfileScroll');
-        const containerHeight = scrollContainer?.clientHeight || 100;
-        const baseWidth = scrollContainer?.clientWidth || 600;
-        const zoomFactor = 100 / vpZoomLevel;
-        const canvasWidth = Math.round(baseWidth * zoomFactor);
-        const totalDist = elevData[elevData.length - 1].distNM;
-        const cruiseAlt = parseInt(document.getElementById('altSliderMap')?.value || document.getElementById('altSlider')?.value || 4500);
-        const maxTerrain = Math.max(...elevData.map(p => p.elevFt));
-        const maxAlt = Math.max(cruiseAlt + 500, maxTerrain + 1500);
-        const padLeft = 33, padRight = 16, padTop = 12, padBottom = 22;
-        const plotW = canvasWidth - padLeft - padRight;
-        const plotH = containerHeight - padTop - padBottom;
-        const scaleX = canvasWidth / rect.width;
-        const scaleY = containerHeight / rect.height;
-        return { elevData, rect, containerHeight, baseWidth, zoomFactor, canvasWidth, totalDist, cruiseAlt, maxTerrain, maxAlt, padLeft, padRight, padTop, padBottom, plotW, plotH, scaleX, scaleY };
-    }
-
-    function vpClientToCanvas(clientX, clientY, m) {
-        return { mx: (clientX - m.rect.left) * m.scaleX, my: (clientY - m.rect.top) * m.scaleY };
-    }
-
-    function vpHitTestWaypoint(mx, my, m) {
-        for (let i = 0; i < vpAltWaypoints.length; i++) {
-            const wp = vpAltWaypoints[i];
-            const wpx = m.padLeft + (wp.distNM / m.totalDist) * m.plotW;
-            const wpy = m.padTop + m.plotH - (wp.altFt / m.maxAlt) * m.plotH;
-            if (Math.abs(mx - wpx) < 26 && Math.abs(my - wpy) < 26) return i;
-        }
-        return -1;
-    }
-
-    function vpHitTestFlightLine(mx, my, m) {
-        const mouseDistNM = ((mx - m.padLeft) / m.plotW) * m.totalDist;
-        if (mouseDistNM < 0 || mouseDistNM > m.totalDist) return null;
-        const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-        const profObj = typeof computeFlightProfile === 'function' ? computeFlightProfile(m.elevData, m.cruiseAlt, vpClimbRate, vpDescentRate, tas) : null;
-        const altAtMouse = getExactAltAtDist(mouseDistNM, profObj, m.cruiseAlt);
-        const lineY = m.padTop + m.plotH - (altAtMouse / m.maxAlt) * m.plotH;
-        if (Math.abs(my - lineY) < 32) return mouseDistNM;
-        return null;
-    }
-
-    function vpHitTestMagenta(mx, m) {
-        if (typeof vpPositionFraction !== 'number' || vpPositionFraction < 0) return false;
-        const posX = m.padLeft + (vpPositionFraction * m.totalDist / m.totalDist) * m.plotW;
-        return Math.abs(mx - posX) < 18;
-    }
-
-    function vpFindSegmentIdx(mouseDistNM) {
-        let segIdx = -1;
-        if (vpAltWaypoints.length === 0) {
-            segIdx = -1;
-        } else if (vpAltWaypoints.length === 1) {
-            segIdx = -2;
-        } else {
-            if (mouseDistNM <= vpAltWaypoints[0].distNM) {
-                segIdx = -3;
-            } else if (mouseDistNM >= vpAltWaypoints[vpAltWaypoints.length - 1].distNM) {
-                segIdx = -4;
-            } else {
-                for (let k = 0; k < vpAltWaypoints.length - 1; k++) {
-                    if (mouseDistNM >= vpAltWaypoints[k].distNM && mouseDistNM <= vpAltWaypoints[k + 1].distNM) {
-                        segIdx = k; break;
-                    }
+            // 1. Rückwärts durch echte Elemente gehen (versteckt Buttons und Label-Spans/Divs)
+            let prev = el.previousElementSibling;
+            while (prev) {
+                if (prev.tagName === 'BUTTON' || labelKeywords.some(kw => prev.textContent.toUpperCase().includes(kw))) {
+                    prev.style.display = 'none';
+                    prev = prev.previousElementSibling;
+                } else {
+                    break; // Stop, wenn ein völlig anderes Element (z.B. ein Toggle-Icon) erreicht wird
                 }
             }
-        }
-        return segIdx;
-    }
 
-    function vpRemoveWaypoint(clickDistNM, totalDist) {
-        if (vpAltWaypoints.length === 0) return false;
-        let nearestIdx = -1, nearestDist = Infinity;
-        for (let i = 0; i < vpAltWaypoints.length; i++) {
-            const d = Math.abs(vpAltWaypoints[i].distNM - clickDistNM);
-            if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
-        }
-        if (nearestIdx >= 0 && nearestDist < totalDist * 0.05) {
-            vpAltWaypoints.splice(nearestIdx, 1);
-            if (vpSegmentAlts.length > 0) {
-                if (nearestIdx > 0 && nearestIdx < vpSegmentAlts.length) {
-                    const merged = Math.round((vpSegmentAlts[nearestIdx - 1] + vpSegmentAlts[nearestIdx]) / 2);
-                    vpSegmentAlts.splice(nearestIdx - 1, 2, merged);
-                } else if (nearestIdx < vpSegmentAlts.length) {
-                    vpSegmentAlts.splice(nearestIdx, 1);
-                } else if (vpSegmentAlts.length > 0) {
-                    vpSegmentAlts.splice(vpSegmentAlts.length - 1, 1);
+            // 2. Rückwärts durch alle Nodes gehen (erwischt "nackte" Text-Nodes ohne HTML-Tag)
+            let prevNode = el.previousSibling;
+            while (prevNode) {
+                if (prevNode.nodeType === 3 && labelKeywords.some(kw => prevNode.textContent.toUpperCase().includes(kw))) {
+                    prevNode.textContent = ''; // Rohen Text löschen
                 }
-            }
-            if (vpAltWaypoints.length < 2) vpSegmentAlts = [];
-            renderMapProfile();
-            if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-            return true;
-        }
-        return false;
-    }
-
-    function vpAddWaypoint(clickDistNM, exactAlt, cruiseAlt, totalDist) {
-        if (clickDistNM < 0 || clickDistNM > totalDist) return;
-        for (const wp of vpAltWaypoints) {
-            if (Math.abs(wp.distNM - clickDistNM) < totalDist * 0.03) return;
-        }
-        let insertIdx = vpAltWaypoints.length;
-        for (let k = 0; k < vpAltWaypoints.length; k++) {
-            if (clickDistNM < vpAltWaypoints[k].distNM) { insertIdx = k; break; }
-        }
-        vpAltWaypoints.splice(insertIdx, 0, { distNM: clickDistNM, altFt: exactAlt });
-        if (vpSegmentAlts.length > 0 && insertIdx < vpSegmentAlts.length) {
-            vpSegmentAlts.splice(insertIdx, 1, exactAlt, exactAlt);
-        } else if (vpSegmentAlts.length > 0 && insertIdx >= vpSegmentAlts.length) {
-            vpSegmentAlts.push(exactAlt);
-        } else if (vpAltWaypoints.length >= 2 && vpSegmentAlts.length === 0) {
-            vpSegmentAlts = [];
-            for (let k = 0; k < vpAltWaypoints.length - 1; k++) {
-                vpSegmentAlts.push(exactAlt);
-            }
-        }
-        renderMapProfile();
-        if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-    }
-
-    function vpHandleDoubleHit(mx, my, m) {
-        // 1. Try removing existing waypoint
-        const wpIdx = vpHitTestWaypoint(mx, my, m);
-        if (wpIdx >= 0) {
-            const wp = vpAltWaypoints[wpIdx];
-            vpRemoveWaypoint(wp.distNM, m.totalDist);
-            return true;
-        }
-        // 2. Try adding new waypoint on flight line
-        const clickDistNM = vpHitTestFlightLine(mx, my, m);
-        if (clickDistNM !== null) {
-            const tas = parseInt(document.getElementById('tasSlider')?.value || 115);
-            const profObj = typeof computeFlightProfile === 'function' ? computeFlightProfile(m.elevData, m.cruiseAlt, vpClimbRate, vpDescentRate, tas) : null;
-            let exactAlt = getExactAltAtDist(clickDistNM, profObj, m.cruiseAlt);
-            exactAlt = Math.round(exactAlt / 100) * 100;
-            vpAddWaypoint(clickDistNM, exactAlt, m.cruiseAlt, m.totalDist);
-            return true;
-        }
-        return false;
-    }
-
-    function vpHandleDragMove(clientX, clientY, dragStartX, dragStartY, dragOrigWP) {
-        const m = vpGetCanvasMetrics();
-        if (!m) return;
-        const deltaY = dragStartY - clientY;
-        const altChange = (deltaY / m.plotH) * m.maxAlt;
-
-        if (vpDraggingWP >= 0) {
-            const scaleX = m.canvasWidth / m.rect.width;
-            const deltaX = (clientX - dragStartX) * scaleX;
-            const distChange = (deltaX / m.plotW) * m.totalDist;
-            let newDist = dragOrigWP.distNM + distChange;
-            newDist = Math.max(0, Math.min(m.totalDist, newDist));
-            let newAlt = Math.round((dragOrigWP.altFt + altChange) / 100) * 100;
-            newAlt = Math.max(0, Math.min(m.maxAlt, newAlt));
-            vpAltWaypoints[vpDraggingWP].distNM = newDist;
-            vpAltWaypoints[vpDraggingWP].altFt = newAlt;
-            renderMapProfile();
-        } else if (vpDraggingSegment) {
-            const seg = vpDraggingSegment;
-            const newAlt = Math.max(0, Math.round((seg.origAlt + altChange) / 100) * 100);
-            if (seg.segIdx >= 0 && seg.segIdx < vpSegmentAlts.length) {
-                vpSegmentAlts[seg.segIdx] = newAlt;
-                renderMapProfile();
-                if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-            } else if (seg.segIdx === -1) {
-                const newGlobalAlt = Math.max(500, Math.round((seg.origCruiseAlt + altChange) / 500) * 500);
-                const altMap = document.getElementById('altSliderMap');
-                const altMain = document.getElementById('altSlider');
-                if (altMap && altMap.value != newGlobalAlt) {
-                    altMap.value = newGlobalAlt;
-                    if (typeof handleSliderChange === 'function') handleSliderChange('alt', newGlobalAlt);
-                } else if (altMain && altMain.value != newGlobalAlt) {
-                    altMain.value = newGlobalAlt;
-                    if (typeof handleSliderChange === 'function') handleSliderChange('alt', newGlobalAlt);
+                // Abbrechen, wenn wir ein echtes Element treffen, das weder Button noch gesuchtes Label ist
+                if (prevNode.nodeType === 1 && prevNode.tagName !== 'BUTTON' && !labelKeywords.some(kw => prevNode.textContent.toUpperCase().includes(kw))) {
+                    break; 
                 }
-            } else if (seg.segIdx === -2 || seg.segIdx === -3) {
-                if (vpAltWaypoints.length > 0) {
-                    vpAltWaypoints[0].altFt = newAlt;
-                    renderMapProfile();
-                    if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-                }
-            } else if (seg.segIdx === -4) {
-                if (vpAltWaypoints.length > 0) {
-                    vpAltWaypoints[vpAltWaypoints.length - 1].altFt = newAlt;
-                    renderMapProfile();
-                    if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-                }
+                prevNode = prevNode.previousSibling;
             }
-        } else if (vpDraggingMagenta) {
-            const { mx } = vpClientToCanvas(clientX, clientY, m);
-            let frac = (mx - m.padLeft) / m.plotW;
-            frac = Math.max(0, Math.min(1, frac));
-            vpUpdatePosition(frac);
-            const posSlider = document.getElementById('vpPosSlider');
-            if (posSlider) posSlider.value = Math.round(frac * 1000);
-        }
-    }
 
-    function vpHandleDragEnd() {
-        if (vpDraggingWP >= 0 || vpDraggingSegment || vpDraggingMagenta) {
-            const needsSave = vpDraggingWP >= 0 || !!vpDraggingSegment; // Magenta = nur Position, keine Höhendaten
-            if (vpDraggingWP >= 0) {
-                vpAltWaypoints.sort((a, b) => a.distNM - b.distNM);
-            }
-            vpDraggingWP = -1;
-            vpDraggingSegment = null;
-            vpDraggingMagenta = false;
-            dragOrigWP = null;
-            renderMapProfile();
-            if (typeof renderVerticalProfile === 'function') renderVerticalProfile('verticalProfileCanvas');
-            if (typeof renderAirspaceWarningsList === 'function') renderAirspaceWarningsList();
-            if (needsSave) setTimeout(() => saveMissionState(), 200);
-        }
-    }
-
-    // === STATE ===
-    let vpWasDragging = false;
-    let vpDraggingMagenta = false;
-    let dragStartY = 0, dragStartX = 0, dragOrigWP = null;
-    let lastTapTime = 0;
-    let vpIsPanning = false;
-    let vpPanStartScrollLeft = 0;
-    let vpPanStartX = 0;
-
-    // === DOUBLE CLICK: remove/add waypoint ===
-    canvas.addEventListener('dblclick', (e) => {
-        const m = vpGetCanvasMetrics();
-        if (!m) return;
-        const { mx, my } = vpClientToCanvas(e.clientX, e.clientY, m);
-        if (vpHandleDoubleHit(mx, my, m)) setTimeout(() => saveMissionState(), 200);
-    });
-
-    // === CLICK: no more single-click creation ===
-    canvas.addEventListener('click', (e) => {
-        // Logic removed to prevent accidental creation on iPhone
-    });
-
-    // === HOVER CURSOR ===
-    canvas.addEventListener('mousemove', (e) => {
-        if (vpDraggingWP >= 0 || vpDraggingSegment || vpDraggingMagenta) return;
-        const m = vpGetCanvasMetrics();
-        if (!m) return;
-        const { mx, my } = vpClientToCanvas(e.clientX, e.clientY, m);
-        let cursor = 'default';
-        if (vpHitTestMagenta(mx, m)) cursor = 'ew-resize';
-        else if (vpHitTestWaypoint(mx, my, m) >= 0) cursor = 'move';
-        else if (vpHitTestFlightLine(mx, my, m) !== null) cursor = 'ns-resize';
-        canvas.style.cursor = cursor;
-    });
-
-    // === MOUSEDOWN: start drag ===
-    canvas.addEventListener('mousedown', (e) => {
-        vpWasDragging = false;
-        const m = vpGetCanvasMetrics();
-        if (!m) return;
-        const { mx, my } = vpClientToCanvas(e.clientX, e.clientY, m);
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-
-        // Priority 1: Magenta marker drag
-        if (vpHitTestMagenta(mx, m)) {
-            vpDraggingMagenta = true;
-            e.preventDefault(); e.stopPropagation();
-            return;
-        }
-        // Priority 2: Waypoint drag
-        const wpIdx = vpHitTestWaypoint(mx, my, m);
-        if (wpIdx >= 0) {
-            vpDraggingWP = wpIdx;
-            dragOrigWP = { ...vpAltWaypoints[wpIdx] };
-            e.preventDefault(); e.stopPropagation();
-            return;
-        }
-        // Priority 3: Flight line segment drag
-        const mouseDistNM = vpHitTestFlightLine(mx, my, m);
-        if (mouseDistNM !== null) {
-            const segIdx = vpFindSegmentIdx(mouseDistNM);
-            const origSegAlt = (segIdx >= 0 && segIdx < vpSegmentAlts.length) ? vpSegmentAlts[segIdx] : m.cruiseAlt;
-            vpDraggingSegment = { segIdx, origAlt: origSegAlt, origCruiseAlt: m.cruiseAlt };
-            e.preventDefault(); e.stopPropagation();
-        }
-    });
-
-    // === MOUSEMOVE: drag ===
-    document.addEventListener('mousemove', (e) => {
-        if (vpDraggingWP < 0 && !vpDraggingSegment && !vpDraggingMagenta) return;
-        if (Math.abs(e.clientX - dragStartX) > 2 || Math.abs(e.clientY - dragStartY) > 2) vpWasDragging = true;
-        vpHandleDragMove(e.clientX, e.clientY, dragStartX, dragStartY, dragOrigWP);
-    });
-
-    // === MOUSEUP: end drag ===
-    document.addEventListener('mouseup', () => vpHandleDragEnd());
-
-    // === TOUCH EVENTS ===
-    canvas.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        vpWasDragging = false;
-        vpIsPanning = false;
-        const m = vpGetCanvasMetrics();
-        if (!m) return;
-        const { mx, my } = vpClientToCanvas(touch.clientX, touch.clientY, m);
-        dragStartX = touch.clientX;
-        dragStartY = touch.clientY;
-
-        // Double-tap detection (300ms window)
-        const now = Date.now();
-        if (now - lastTapTime < 300) {
-            e.preventDefault();
-            if (vpHandleDoubleHit(mx, my, m)) setTimeout(() => saveMissionState(), 200);
-            lastTapTime = 0;
-            return;
-        }
-        lastTapTime = now;
-
-        // Priority 1: Magenta marker drag
-        if (vpHitTestMagenta(mx, m)) {
-            e.preventDefault();
-            vpDraggingMagenta = true;
-            return;
-        }
-        // Priority 2: Waypoint drag
-        const wpIdx = vpHitTestWaypoint(mx, my, m);
-        if (wpIdx >= 0) {
-            e.preventDefault();
-            vpDraggingWP = wpIdx;
-            dragOrigWP = { ...vpAltWaypoints[wpIdx] };
-            return;
-        }
-        // Priority 3: Flight line segment drag
-        const mouseDistNM = vpHitTestFlightLine(mx, my, m);
-        if (mouseDistNM !== null) {
-            e.preventDefault();
-            const segIdx = vpFindSegmentIdx(mouseDistNM);
-            const origSegAlt = (segIdx >= 0 && segIdx < vpSegmentAlts.length) ? vpSegmentAlts[segIdx] : m.cruiseAlt;
-            vpDraggingSegment = { segIdx, origAlt: origSegAlt, origCruiseAlt: m.cruiseAlt };
-            return;
-        }
-        // Priority 4: Pan when zoomed in
-        if (vpZoomLevel < 100) {
-            e.preventDefault();
-            vpIsPanning = true;
-            const scrollContainer = document.getElementById('mapProfileScroll');
-            vpPanStartScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
-            vpPanStartX = touch.clientX;
-        }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-        if (vpIsPanning) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const deltaX = vpPanStartX - touch.clientX;
-            const scrollContainer = document.getElementById('mapProfileScroll');
-            if (scrollContainer) scrollContainer.scrollLeft = vpPanStartScrollLeft + deltaX;
-            return;
-        }
-        if (vpDraggingWP < 0 && !vpDraggingSegment && !vpDraggingMagenta) return;
-        e.preventDefault();
-        const touch = e.touches[0];
-        if (Math.abs(touch.clientX - dragStartX) > 3 || Math.abs(touch.clientY - dragStartY) > 3) vpWasDragging = true;
-        vpHandleDragMove(touch.clientX, touch.clientY, dragStartX, dragStartY, dragOrigWP);
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-        if (vpIsPanning) {
-            vpIsPanning = false;
-            return;
-        }
-        // Single tap without drag: Logic removed to prevent accidental creation
-        if (vpDraggingWP >= 0 || vpDraggingSegment || vpDraggingMagenta) {
-            vpHandleDragEnd();
-        }
-    });
-}
-
-// Override computeFlightProfile to use altitude waypoints + segment altitudes
-const _origComputeProfile = computeFlightProfile;
-computeFlightProfile = function (elevationData, cruiseAltFt, climbRateFpm, descentRateFpm, tasKts) {
-    if (!elevationData || elevationData.length < 2) return null;
-    if (vpAltWaypoints.length === 0) return _origComputeProfile(elevationData, cruiseAltFt, climbRateFpm, descentRateFpm, tasKts);
-
-    tasKts = tasKts || parseInt(document.getElementById('tasSlider')?.value || 115);
-    climbRateFpm = climbRateFpm || 500;
-    descentRateFpm = descentRateFpm || 500;
-
-    const totalDistNM = elevationData[elevationData.length - 1].distNM;
-    const depElevFt = elevationData[0].elevFt;
-    let destElevFt = elevationData[elevationData.length - 1].elevFt;
-    // If destination is a POI (not an airport), keep cruise altitude — no descent to ground
-    if (typeof currentMissionData !== 'undefined' && currentMissionData && currentMissionData.poiName) {
-        destElevFt = cruiseAltFt;
-    }
-    const wps = vpAltWaypoints;
-
-    // Ensure vpSegmentAlts has the right length
-    while (vpSegmentAlts.length < wps.length - 1) {
-        vpSegmentAlts.push(cruiseAltFt);
-    }
-    while (vpSegmentAlts.length > Math.max(0, wps.length - 1)) {
-        vpSegmentAlts.pop();
-    }
-
-    const profile = [];
-
-    // Climb: from departure to first WP altitude
-    const firstWpAlt = wps[0].altFt;
-    const climbFt = Math.max(0, firstWpAlt - depElevFt);
-    const climbDistNM = Math.max(0.5, (climbFt / climbRateFpm / 60) * tasKts * 0.85);
-    const tocDistNM = Math.min(climbDistNM, wps[0].distNM);
-
-    // Descent: from last WP altitude to destination
-    const lastWpAlt = wps[wps.length - 1].altFt;
-    const descentFt = Math.max(0, lastWpAlt - destElevFt);
-    const descentDistNM = Math.max(0.5, (descentFt / descentRateFpm / 60) * tasKts * 0.9);
-    const todDistNM = Math.max(totalDistNM - descentDistNM, wps[wps.length - 1].distNM);
-
-    for (const pt of elevationData) {
-        const d = pt.distNM;
-        let altFt = cruiseAltFt;
-
-        if (d <= wps[0].distNM) {
-            // CLIMB ZONE: departure → first WP
-            if (d < tocDistNM) {
-                const f = tocDistNM > 0 ? d / tocDistNM : 1;
-                altFt = depElevFt + f * (firstWpAlt - depElevFt);
-            } else {
-                altFt = firstWpAlt;
-            }
-        } else if (d >= wps[wps.length - 1].distNM) {
-            // DESCENT ZONE: last WP → destination
-            if (d > todDistNM) {
-                const rem = totalDistNM - todDistNM;
-                const f = rem > 0 ? (d - todDistNM) / rem : 1;
-                altFt = lastWpAlt - f * (lastWpAlt - destElevFt);
-            } else {
-                altFt = lastWpAlt;
-            }
-        } else if (wps.length === 1) {
-            // Only 1 WP — hold at that altitude
-            altFt = wps[0].altFt;
-        } else {
-            // MIDDLE: between two consecutive waypoints
-            for (let i = 0; i < wps.length - 1; i++) {
-                if (d >= wps[i].distNM && d <= wps[i + 1].distNM) {
-                    const segAlt = vpSegmentAlts[i] !== undefined ? vpSegmentAlts[i] : Math.max(wps[i].altFt, wps[i + 1].altFt);
-                    const segDist = wps[i + 1].distNM - wps[i].distNM;
-                    const transitionDist = Math.min(segDist * 0.15, 3); // 15% of segment or max 3nm
-
-                    const distFromLeft = d - wps[i].distNM;
-                    const distFromRight = wps[i + 1].distNM - d;
-
-                    if (distFromLeft < transitionDist && wps[i].altFt !== segAlt) {
-                        // Transition from WP[i].alt to segAlt
-                        const f = transitionDist > 0 ? distFromLeft / transitionDist : 1;
-                        altFt = wps[i].altFt + f * (segAlt - wps[i].altFt);
-                    } else if (distFromRight < transitionDist && wps[i + 1].altFt !== segAlt) {
-                        // Transition from segAlt to WP[i+1].alt
-                        const f = transitionDist > 0 ? distFromRight / transitionDist : 1;
-                        altFt = wps[i + 1].altFt + f * (segAlt - wps[i + 1].altFt);
-                    } else {
-                        altFt = segAlt;
-                    }
+            // 3. Vorwärts gehen (versteckt nachfolgende Plus-Buttons)
+            let next = el.nextElementSibling;
+            while (next) {
+                if (next.tagName === 'BUTTON') {
+                    next.style.display = 'none';
+                    next = next.nextElementSibling;
+                } else {
                     break;
                 }
             }
-        }
+        };
 
-        profile.push({ distNM: pt.distNM, altFt: Math.round(altFt) });
+        // Suche nach den Elementen und lösche auch die zugehörigen Texte/Labels davor
+        hideSpecificControls('vpZoomDisplay', ['ZOOM']);
+        hideSpecificControls('yAxisDisplay', ['MAX', 'FT', 'ALT']);
     }
-
-    return { profile, tocDistNM, todDistNM };
-};
-
-// Init altitude waypoints when map table canvas is ready
-
-/* =========================================================
-   CLOUD SYNC LOGIC (Adaptive, Diffing, Debounce & Toggle)
-   ========================================================= */
-const SYNC_URL = 'https://ga-proxy.einherjer.workers.dev/api/sync/';
-let localSyncTime = localStorage.getItem('ga_sync_time') ? parseInt(localStorage.getItem('ga_sync_time')) : 0;
-let lastSyncedPayloadStr = "";
-function saveSyncToggle() {
-    const t = document.getElementById('syncToggle');
-    if (t) localStorage.setItem('ga_sync_enabled', t.checked);
-    if (t && t.checked) silentSyncLoad();
-}
-function getSyncId() {
-    return document.getElementById('syncIdInput')?.value.trim() || localStorage.getItem('ga_sync_id') || "";
-}
-function saveSyncId() {
-    const id = document.getElementById('syncIdInput').value.trim();
-    const oldId = localStorage.getItem('ga_sync_id');
-    if (id !== oldId) {
-        localSyncTime = 0;
-        localStorage.setItem('ga_sync_time', 0);
-    }
-    localStorage.setItem('ga_sync_id', id);
-    if (id) silentSyncLoad();
-}
-function generateSyncId() {
-    const words = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "Xray", "Yankee", "Zulu"];
-    const w1 = words[Math.floor(Math.random() * words.length)];
-    const w2 = words[Math.floor(Math.random() * words.length)];
-    const num = Math.floor(Math.random() * 900) + 100;
-    const newId = `${w1}-${w2}-${num}`;
-    document.getElementById('syncIdInput').value = newId;
-    localSyncTime = 0;
-    localStorage.setItem('ga_sync_time', 0);
-    localStorage.setItem('ga_sync_id', newId);
-    const t = document.getElementById('syncToggle');
-    if (t) { t.checked = true; localStorage.setItem('ga_sync_enabled', 'true'); }
-    updateSyncStatus("Neue ID generiert. Speichere...");
-    triggerCloudSave(true);
-}
-function updateSyncStatus(msg, isError = false) {
-    const el = document.getElementById('syncStatus');
-    if (el) {
-        el.innerText = msg;
-        el.style.color = isError ? "var(--red)" : "var(--green)";
-        setTimeout(() => { if(el.innerText === msg) el.style.color = "#888"; }, 4000);
-    }
-}
-function flashSyncIndicator(direction) {
-    const ind = document.getElementById('syncTrafficIndicator');
-    if (!ind) return;
-    ind.innerText = direction === 'up' ? '⬆️' : '⬇️';
-    ind.style.opacity = '1';
-    setTimeout(() => { ind.style.opacity = '0'; }, 800);
-}
-function setLastSyncedPayload() {
-    const payloadToCompare = {
-        pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
-        logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
-        activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
-        groupName: getGroupName(),
-        groupNick: getGroupNick(),
-        knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
-        newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
-    };
-    lastSyncedPayloadStr = JSON.stringify(payloadToCompare);
-}
-async function triggerCloudSave(immediate = false) {
-    const id = getSyncId();
-    const t = document.getElementById('syncToggle');
-    if (!id) return;
-    // SOFT-SYNC FIX: Normale Spielaktionen (wie Zettel bewegen) rufen dies ohne Parameter auf.
-    // Diese blockieren wir jetzt hart. Ein Upload findet NUR noch beim Schließen (true)
-    // oder durch manuelle Buttons ('manual') statt!
-    if (!immediate) return;
-    if (immediate !== 'manual' && t && !t.checked) return;
-    if (immediate === 'manual') {
-        if (!confirm("⬆️ CLOUD UPLOAD\nMöchtest du deinen aktuellen, lokalen Stand hochladen und das bisherige Cloud-Backup überschreiben?")) return;
-        setNavComLed('navcomSaveBtn', 'syncing');
-    }
-    localSyncTime = Date.now();
-    const payloadToCompare = {
-        pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
-        logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
-        activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
-        groupName: getGroupName(),
-        groupNick: getGroupNick(),
-        knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
-        newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
-    };
-
-    const currentPayloadStr = JSON.stringify(payloadToCompare);
-    if (currentPayloadStr === lastSyncedPayloadStr && immediate !== 'manual') {
-        updateSyncStatus("Cloud: Aktuell ✅");
-        return;
-    }
-    updateSyncStatus("Speichere in Cloud...");
-    localStorage.setItem('ga_sync_time', localSyncTime);
-    const payload = { ...payloadToCompare, lastModified: localSyncTime };
-    try {
-        const res = await fetch(SYNC_URL + id, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
-        if (res.ok) {
-            lastSyncedPayloadStr = currentPayloadStr;
-            updateSyncStatus("Cloud: Gespeichert ✅");
-            flashSyncIndicator('up');
-            if (immediate === 'manual') {
-                setNavComLed('navcomSaveBtn', 'success');
-                setTimeout(() => setNavComLed('navcomSaveBtn', 'off'), 3000);
-            }
-        } else {
-            throw new Error("Server Error");
-        }
-    } catch (e) {
-        updateSyncStatus("Cloud: Speicher-Fehler", true);
-        if (immediate === 'manual') {
-            setNavComLed('navcomSaveBtn', 'error');
-            setTimeout(() => setNavComLed('navcomSaveBtn', 'off'), 3000);
-        }
-    }
-}
-async function forceSyncLoad() {
-    if (!confirm("⬇️ CLOUD DOWNLOAD\nMöchtest du deinen Spielstand aus der Cloud laden? Alle lokalen Änderungen (die nicht hochgeladen wurden) gehen dabei verloren!")) return;
-    const id = getSyncId();
-    if (!id) { alert("Bitte zuerst eine Pilot-ID eingeben oder generieren (🎲)."); return; }
-
-    setNavComLed('navcomLoadBtn', 'syncing');
-    updateSyncStatus("Lade Daten...");
-
-    try {
-        const res = await fetch(SYNC_URL + id);
-        if (res.status === 404) {
-            alert("Zu dieser ID wurden keine Daten gefunden.");
-            updateSyncStatus("Nicht gefunden", true);
-            setNavComLed('navcomLoadBtn', 'error');
-            setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
-            return;
-        }
-        if (!res.ok) throw new Error("Netzwerkfehler");
-        const data = await res.json();
-
-        if (data.lastModified) {
-            localSyncTime = data.lastModified;
-            localStorage.setItem('ga_sync_time', localSyncTime);
-        }
-        if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
-        if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
-        if (data.activeMission) {
-            localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
-            restoreMissionState(data.activeMission);
-        } else {
-            localStorage.removeItem('ga_active_mission');
-            document.getElementById("briefingBox").style.display = "none";
-        }
-        if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
-        if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
-
-        if (data.groupName !== undefined) {
-            updateGroupUIFromSync(data.groupName, data.groupNick);
-        }
-        setLastSyncedPayload();
-        updateGroupBadgeUI();
-        updateSyncStatus("Cloud: Geladen ✅");
-        flashSyncIndicator('down');
-
-        setNavComLed('navcomLoadBtn', 'success');
-        setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
-        if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
-        renderLog();
-    } catch (e) {
-        updateSyncStatus("Cloud: Lade-Fehler", true);
-        alert("Fehler beim Laden aus der Cloud.");
-        setNavComLed('navcomLoadBtn', 'error');
-        setTimeout(() => setNavComLed('navcomLoadBtn', 'off'), 3000);
-    }
-}
-async function silentSyncLoad() {
-    const id = getSyncId();
-    const t = document.getElementById('syncToggle');
-    if (!id || (t && !t.checked)) return;
-    try {
-        const res = await fetch(SYNC_URL + id);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.lastModified && data.lastModified > localSyncTime) {
-            localSyncTime = data.lastModified;
-            localStorage.setItem('ga_sync_time', localSyncTime);
-            if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
-            if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
-            if (data.activeMission) {
-                localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
-                restoreMissionState(data.activeMission);
-            } else {
-                localStorage.removeItem('ga_active_mission');
-                document.getElementById("briefingBox").style.display = "none";
-            }
-            if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
-            if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
-
-            if (data.groupName !== undefined) {
-                updateGroupUIFromSync(data.groupName, data.groupNick);
-            }
-
-            setLastSyncedPayload();
-            updateGroupBadgeUI();
-            if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
-            renderLog();
-            updateSyncStatus("Auto-Sync: Aktualisiert 🔄");
-            flashSyncIndicator('down');
-        }
-    } catch (e) {}
-}
-// === GROUP SYNC LOGIC ===
-let groupSyncTime = 0;
-let isGroupSyncing = false;
-async function silentGroupSync() {
-    const gName = getGroupName();
-    const gNick = getGroupNick();
-    if(!gName || isGroupSyncing) return;
-
-    try {
-        const res = await fetch(SYNC_URL + "GROUP_" + gName);
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.lastModified && data.lastModified > groupSyncTime) {
-            groupSyncTime = data.lastModified;
-            let knownNotes = JSON.parse(localStorage.getItem('ga_known_group_notes')) || [];
-            let newBadges = JSON.parse(localStorage.getItem('ga_group_new')) || [];
-            let changed = false;
-            if (data.kicked && data.kicked.includes(gNick)) {
-                alert("❌ Du wurdest vom Admin aus der Crew entfernt.");
-                leaveGroup(true);
-                return;
-            }
-            const downloadedNotes = data.notes || [];
-            const activeNoteIds = downloadedNotes.map(n => n.id);
-
-            // Ghost-Badge Fix: Entferne alte Badges von Zetteln, die gelöscht wurden
-            const originalBadgeCount = newBadges.length;
-            newBadges = newBadges.filter(id => activeNoteIds.includes(id));
-            if (originalBadgeCount !== newBadges.length) changed = true;
-            downloadedNotes.forEach(dn => {
-                if(!knownNotes.includes(dn.id)) {
-                    knownNotes.push(dn.id);
-                    if (dn.author !== gNick) {
-                        newBadges.push(dn.id);
-                    }
-                    changed = true;
-                }
-            });
-            if (changed) {
-                localStorage.setItem('ga_known_group_notes', JSON.stringify(knownNotes));
-                localStorage.setItem('ga_group_new', JSON.stringify(newBadges));
-                triggerCloudSave(true); // Ins Profil sichern
-            }
-            groupDataCache = data;
-            updateGroupBadgeUI();
-            if (document.getElementById('pinboardOverlay').classList.contains('active') && currentBoardMode === 'group') {
-                renderNotes();
-            }
-        }
-    } catch(e) {}
-}
-async function triggerGroupSave(immediate = false) {
-    const gName = getGroupName();
-    const gNick = getGroupNick();
-    if(!gName) return;
-
-    isGroupSyncing = true;
-    try {
-        const res = await fetch(SYNC_URL + "GROUP_" + gName);
-        let latestData = { members: [], notes: [] };
-        if (res.ok) latestData = await res.json();
-
-        let members = latestData.members || [];
-        // Veraltete Mitglieder (außer Admin) herausfiltern
-        members = members.filter(m => {
-            const timeoutMs = m.isAdmin ? (365 * 24 * 60 * 60 * 1000) : (28 * 24 * 60 * 60 * 1000);
-            return (Date.now() - m.lastSeen) < timeoutMs && m.nick !== gNick;
-        });
-
-        let amIAdmin = false;
-        const existingMe = (latestData.members || []).find(m => m.nick === gNick);
-        if (existingMe && existingMe.isAdmin) amIAdmin = true;
-        if (members.length === 0) amIAdmin = true; // Wer die Gruppe belebt, wird Admin
-        members.push({ nick: gNick, lastSeen: Date.now(), pin: getGroupPin(), isAdmin: amIAdmin });
-
-        // Max 10 Mitglieder (älteste Nicht-Admins fliegen zuerst)
-        if(members.length > 10) {
-            members.sort((a,b) => b.lastSeen - a.lastSeen); // Neueste zuerst
-            members = members.slice(0, 10);
-        }
-
-        // Kicked-Liste behalten
-        const kickedList = latestData.kicked || [];
-
-        let cloudNotes = latestData.notes || [];
-        let localNotes = groupDataCache.notes || [];
-
-        const myLocalNotes = localNotes.filter(n => n.author === gNick);
-        const theirCloudNotes = cloudNotes.filter(n => n.author !== gNick);
-        let mergedNotes = [...myLocalNotes, ...theirCloudNotes];
-
-        const payload = { members: members, notes: mergedNotes, kicked: kickedList, lastModified: Date.now() };
-
-        groupDataCache = payload;
-        groupSyncTime = payload.lastModified;
-        await fetch(SYNC_URL + "GROUP_" + gName, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
-    } catch(e) {}
-    isGroupSyncing = false;
-}
-async function forceGroupSync() {
-    await triggerGroupSave(true);
-    await silentGroupSync();
-}
-// === Auto-Sync Trigger (Adaptive Polling & Idle-Conflict-Check) ===
-let syncLastActivityTime = Date.now();
-let syncLastFetchTime = Date.now();
-let syncIsSleeping = false;
-let idleCheckInProgress = false;
-async function checkCloudAfterIdle() {
-    const id = getSyncId();
-    if (!id) return;
-    idleCheckInProgress = true;
-    updateSyncStatus("Prüfe Cloud...");
-    try {
-        const res = await fetch(SYNC_URL + id);
-        if (!res.ok) throw new Error("Netzwerkfehler");
-        const data = await res.json();
-        if (data.lastModified && data.lastModified > localSyncTime) {
-            // Lokalen Status abgleichen (Habe ich hier ungespeicherte Änderungen?)
-            const payloadToCompare = {
-                pinboard: JSON.parse(localStorage.getItem('ga_pinboard') || '[]'),
-                logbook: JSON.parse(localStorage.getItem('ga_logbook') || '[]'),
-                activeMission: JSON.parse(localStorage.getItem('ga_active_mission') || 'null'),
-                groupName: getGroupName(),
-                groupNick: getGroupNick(),
-                knownNotes: JSON.parse(localStorage.getItem('ga_known_group_notes') || '[]'),
-                newBadges: JSON.parse(localStorage.getItem('ga_group_new') || '[]')
-            };
-            const currentPayloadStr = JSON.stringify(payloadToCompare);
-            const hasLocalUnsavedChanges = (currentPayloadStr !== lastSyncedPayloadStr);
-            let msg = "☁️ NEUE CLOUD DATEN VERFÜGBAR\n\nEin anderes Gerät hat in der Zwischenzeit neue Daten gespeichert.\nMöchtest du deinen aktuellen Bildschirm aktualisieren?";
-            if (hasLocalUnsavedChanges) {
-                msg = "⚠️ CLOUD KONFLIKT\n\nEin anderes Gerät hat in der Zwischenzeit neue Daten gespeichert. Du hast hier aber UNGESPEICHERTE lokale Änderungen!\n\nMöchtest du die Cloud-Daten laden? (Deine lokalen Änderungen hier gehen dann verloren!)";
-            }
-            if (confirm(msg)) {
-                // User will laden -> Daten anwenden
-                localSyncTime = data.lastModified;
-                localStorage.setItem('ga_sync_time', localSyncTime);
-                if (data.pinboard) localStorage.setItem('ga_pinboard', JSON.stringify(data.pinboard));
-                if (data.logbook) localStorage.setItem('ga_logbook', JSON.stringify(data.logbook));
-                if (data.activeMission) {
-                    localStorage.setItem('ga_active_mission', JSON.stringify(data.activeMission));
-                    restoreMissionState(data.activeMission);
-                } else {
-                    localStorage.removeItem('ga_active_mission');
-                    document.getElementById("briefingBox").style.display = "none";
-                }
-                if (data.knownNotes) localStorage.setItem('ga_known_group_notes', JSON.stringify(data.knownNotes));
-                if (data.newBadges) localStorage.setItem('ga_group_new', JSON.stringify(data.newBadges));
-                if (data.groupName !== undefined) {
-                    updateGroupUIFromSync(data.groupName, data.groupNick);
-                }
-                setLastSyncedPayload();
-                updateGroupBadgeUI();
-                if (document.getElementById('pinboardOverlay').classList.contains('active')) renderNotes();
-                renderLog();
-                updateSyncStatus("Cloud-Update geladen ✅");
-                flashSyncIndicator('down');
-            } else {
-                // User lehnt ab -> Behalte lokale Daten.
-                // Wir setzen die Sync-Zeit künstlich hoch, damit der lokale Stand als der "neueste" gilt und beim Schließen gepusht wird.
-                localSyncTime = Date.now();
-                localStorage.setItem('ga_sync_time', localSyncTime);
-                updateSyncStatus("Lokaler Stand behalten");
-            }
-        } else {
-            updateSyncStatus("Auto-Sync: Aktuell ✅");
-        }
-    } catch(e) {
-        updateSyncStatus("Cloud-Prüfung fehlgeschlagen", true);
-    }
-    // 10 Sekunden Cooldown, damit man bei vielen Klicks nicht bombardiert wird
-    setTimeout(() => { idleCheckInProgress = false; }, 10000);
-}
-function resetSyncTimer() {
-    const now = Date.now();
-    const idleTime = now - syncLastActivityTime;
-    // IDLE CHECK: Wenn länger als 30 Sekunden keine Aktion stattfand
-    if (idleTime > 30000 && !idleCheckInProgress) {
-        const t = document.getElementById('syncToggle');
-        if (getSyncId() && t && t.checked) {
-            checkCloudAfterIdle();
-        }
-    }
-    syncLastActivityTime = now;
-    if (syncIsSleeping) {
-        syncIsSleeping = false;
-        syncLastFetchTime = now;
-    }
-}
-['click', 'touchstart', 'scroll', 'keydown'].forEach(evt => {
-    document.addEventListener(evt, resetSyncTimer, { passive: true, capture: true });
 });
-setTimeout(() => initAltWaypoints(), 2000);
