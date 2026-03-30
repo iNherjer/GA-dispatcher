@@ -404,6 +404,8 @@ function cyclePanelColor() {
 let map, polyline, markers = [], currentStartICAO, currentDestICAO, currentMissionData = null, selectedAC = "PA-24";
 let currentDepFreq = "";
 let currentDestFreq = "";
+let currentDepElev = null;
+let currentDestElev = null;
 let globalAirports = null, runwayCache = {}, freqCache = {};
 window.drumCache = {};
 
@@ -704,6 +706,8 @@ function saveMissionState() {
         currentDName: currentDName,
         currentDepFreq: currentDepFreq,
         currentDestFreq: currentDestFreq,
+        currentDepElev: currentDepElev,
+        currentDestElev: currentDestElev,
         freqCache: freqCache,
         vpAltWaypoints: typeof vpAltWaypoints !== 'undefined' ? vpAltWaypoints : [],
         vpSegmentAlts: typeof vpSegmentAlts !== 'undefined' ? vpSegmentAlts : [],
@@ -756,6 +760,7 @@ async function restoreMissionState(state) {
     currentStartICAO = state.currentStartICAO; currentDestICAO = state.currentDestICAO;
     currentSName = state.currentSName; currentDName = state.currentDName;
     currentDepFreq = state.currentDepFreq || ""; currentDestFreq = state.currentDestFreq || "";
+    currentDepElev = state.currentDepElev ?? null; currentDestElev = state.currentDestElev ?? null;
     freqCache = state.freqCache || {};
     vpAltWaypoints = state.vpAltWaypoints || [];
     vpSegmentAlts  = state.vpSegmentAlts  || [];
@@ -1191,7 +1196,7 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
 
         const isMini = containerId.startsWith('wxPopup');
         
-        // PERFORMANCE FIX: Wait-Schleife für Pisten-Daten nur ausführen, wenn es kein Mini-Popup ist!
+        // Für Vollansicht: auf Pisten-Daten warten; für Mini-Popup direkt aus Cache lesen
         let retries = 0;
         if (!isMini) {
             while (!runwayCache[foundIcao] && !runwayCache[icao] && retries < 15) {
@@ -1201,9 +1206,7 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
         }
 
         let rwyHdg = 0; let rwy1 = ""; let rwy2 = "";
-        
-        // Pisten-Infos nur laden, wenn wir NICHT im Mini-Popup sind (spart Platz & Zeit)
-        if (!isMini) {
+        {
             const rData = runwayCache[foundIcao] || runwayCache[icao];
             if (rData && !rData.includes('Keine Daten')) {
                 const match = rData.match(/(?:^|\s|\n|<br\s*\/?>)(0[1-9]|[12]\d|3[0-6])([LRC]?)\s*\/\s*((?:0[1-9]|[12]\d|3[0-6])[LRC]?)/);
@@ -1305,12 +1308,15 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
             }
 
             let rwyHtmlModern = '';
-            if (!isMini && rwy1 && rwy2) {
+            if (rwy1 && rwy2) {
+                const rwyW = isMini ? '15px' : '26px';
+                const rwyH = isMini ? '60px' : '105px';
+                const rwyFSize = isMini ? '8px' : '10px';
                 rwyHtmlModern = `
-                <div style="position:absolute; top:50%; left:50%; width:26px; height:105px; background:#444; border:1px solid #111; border-radius: 3px; transform: translate(-50%, -50%) rotate(${rwyHdg}deg); transform-origin: center center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding: 4px 0; box-sizing: border-box; z-index:5; box-shadow: 0 2px 4px rgba(0,0,0,0.4);">
-                    <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; transform: rotate(180deg); font-family: sans-serif;">${rwy1}</div>
-                    <div style="width:2px; flex-grow:1; margin: 4px 0; background: repeating-linear-gradient(to bottom, #d4d4d4 0, #d4d4d4 8px, transparent 8px, transparent 16px);"></div>
-                    <div style="width:100%; text-align:center; font-size:10px; line-height:1; color:#fff; font-weight:bold; font-family: sans-serif;">${rwy2}</div>
+                <div style="position:absolute; top:50%; left:50%; width:${rwyW}; height:${rwyH}; background:#444; border:1px solid #111; border-radius: 3px; transform: translate(-50%, -50%) rotate(${rwyHdg}deg); transform-origin: center center; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding: 3px 0; box-sizing: border-box; z-index:5; box-shadow: 0 2px 4px rgba(0,0,0,0.4);">
+                    <div style="width:100%; text-align:center; font-size:${rwyFSize}; line-height:1; color:#fff; font-weight:bold; transform: rotate(180deg); font-family: sans-serif;">${rwy1}</div>
+                    <div style="width:2px; flex-grow:1; margin: 3px 0; background: repeating-linear-gradient(to bottom, #d4d4d4 0, #d4d4d4 6px, transparent 6px, transparent 12px);"></div>
+                    <div style="width:100%; text-align:center; font-size:${rwyFSize}; line-height:1; color:#fff; font-weight:bold; font-family: sans-serif;">${rwy2}</div>
                 </div>`;
             }
 
@@ -1321,8 +1327,8 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
             let pPad = isMini ? '10px' : '15px 15px 20px 15px';
 
             container.innerHTML = `
-                <div style="background:#f0eada; border-radius:12px; padding:${pPad}; border: 3px solid #c2bba8; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.5); font-family: 'Arial', sans-serif; color: #333; position:relative; overflow:hidden;">
-                    
+                <div style="${isMini ? 'background:none; border:none; box-shadow:none; padding:4px 0;' : `background:#f0eada; border-radius:12px; padding:${pPad}; border: 3px solid #c2bba8; box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.5);`} font-family: 'Arial', sans-serif; color: #333; position:relative; overflow:hidden;">
+
                     ${!isMini ? `
                     <div style="position:absolute; top:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
                     <div style="position:absolute; bottom:6px; right:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
@@ -1330,16 +1336,15 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
                     <div style="position:absolute; bottom:6px; left:6px; width:6px; height:6px; background:#ddd; border-radius:50%; box-shadow: inset 0 0 2px #555;"></div>
                     ` : ''}
 
-                    <div style="color: #8a1a12; font-size: 14px; font-weight: bold; margin-bottom: ${isMini?8:12}px; border-bottom: 2px dashed #c2bba8; padding-bottom: 8px; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px;">
+                    <div style="color: #8a1a12; font-size: 14px; font-weight: bold; margin-bottom: ${isMini?6:12}px; ${isMini ? '' : 'border-bottom: 2px dashed #c2bba8;'} padding-bottom: ${isMini?0:8}px; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px;">
                         <span>${modernHeaderText}</span>
                         <span style="color:${catColor}; font-size:14px; padding: 2px 8px; border: 2px solid ${catColor}; border-radius: 4px; background: rgba(255,255,255,0.7); box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${catText}</span>
                     </div>
-                    <div style="background:#e6e0ce; color:#333; font-family: 'Courier New', Courier, monospace; padding:10px; border-radius:4px; font-size:11.5px; margin-bottom:${isMini?10:18}px; border: 1px inset #c2bba8; line-height: 1.4; letter-spacing: 0.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                        ${raw}
-                    </div>
+                    ${!isMini ? `<div style="background:#e6e0ce; color:#333; font-family: 'Courier New', Courier, monospace; padding:10px; border-radius:4px; font-size:11.5px; margin-bottom:18px; border: 1px inset #c2bba8; line-height: 1.4; letter-spacing: 0.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">${raw}</div>` : ''}
                     <div style="display:flex; justify-content: space-between; align-items: center; gap: 8px;">
                         <div style="display:flex; flex-direction:column; gap:${gap}px; font-family: 'Courier New', Courier, monospace; flex-shrink: 1; min-width: 0;">
                             <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">WIND</div><div style="color:#1a73e8; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${windText}</div></div>
+                            ${!isMini ? `
                             <div style="display:flex; gap:12px;">
                                 <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">VIS</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${visib}</div></div>
                                 <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">WX</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${wx}</div></div>
@@ -1347,13 +1352,13 @@ async function loadMetarWidget(icao, containerId, lat, lon, forceModern = false)
                             <div style="display:flex; gap:12px;">
                                 <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">TEMP</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${temp}</div></div>
                                 <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">DEWP</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${dewp}</div></div>
-                            </div>
+                            </div>` : ''}
                             <div style="display:flex; gap:12px;">
                                 <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">QNH</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${qnhStr}</div></div>
-                                <div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">COVER</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${cover}</div></div>
+                                ${!isMini ? `<div><div style="color:#666; font-size:${fLbl}px; font-weight:bold; letter-spacing:1px;">COVER</div><div style="color:#111; font-size:${fVal}px; font-weight:bold; white-space: nowrap;">${cover}</div></div>` : ''}
                             </div>
                         </div>
-                        <div style="position:relative; width:${cSize}px; height:${cSize}px; flex-shrink: 0; border:4px solid #a8a291; border-radius:50%; background:#fcfaf5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.2);">
+                        <div style="position:relative; width:${cSize}px; height:${cSize}px; flex-shrink: 0; ${isMini ? 'margin-left: auto;' : ''} border:4px solid #a8a291; border-radius:50%; background:#fcfaf5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.2);">
                             <svg viewBox="0 0 160 160" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none;">
                                 ${svgTicks}
                             </svg>
@@ -1874,6 +1879,15 @@ async function fetchAirportFreq(icao, elementId, type) {
         const data = await res.json();
         if (data && data.items && data.items.length > 0) {
             const apt = data.items[0];
+
+            // Elevation aus OpenAIP (unit 0 = Meter, 1 = Fuß)
+            if (apt.elevation != null) {
+                const ev = apt.elevation.value;
+                const elevFt = apt.elevation.unit === 1 ? ev : Math.round(ev * 3.28084);
+                if (type === 'dep')  { currentDepElev  = elevFt; }
+                if (type === 'dest') { currentDestElev = elevFt; }
+            }
+
             if (apt.frequencies && apt.frequencies.length > 0) {
 
                 // Bestimme die relevanteste Frequenz (Tower > Info > Radio)
@@ -2511,6 +2525,9 @@ async function generateMission() {
     if (destLocRadioEl) destLocRadioEl.value = '';
 
     updateMap(start.lat, start.lon, dest.lat, dest.lon, currentStartICAO, dest.n);
+
+    currentDepElev  = (globalAirports && globalAirports[currentStartICAO])  ? (globalAirports[currentStartICAO].elevation  ?? null) : null;
+    currentDestElev = (globalAirports && globalAirports[currentDestICAO])   ? (globalAirports[currentDestICAO].elevation   ?? null) : null;
 
     const destLinks = document.getElementById("wikiDestLinks");
     if (destLinks) destLinks.style.display = isPOI ? "none" : "block";
