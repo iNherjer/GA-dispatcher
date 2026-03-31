@@ -1143,6 +1143,7 @@ window.freeflightDirectTo = function(icao, lat, lon) {
     if (polyline) polyline.setStyle({ opacity: 1 });
     renderMainRoute();
     updateRoutePerformance();
+    if (typeof triggerVerticalProfileUpdate === 'function') triggerVerticalProfileUpdate();
 
     // Elevation, Frequenz & Pisten für beide Airports via OpenAIP laden
     const startIcao = startWp.icao || null;

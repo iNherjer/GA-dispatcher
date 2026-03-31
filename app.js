@@ -832,6 +832,8 @@ function resetApp() {
     localStorage.removeItem('ga_active_mission'); document.getElementById("briefingBox").style.display = "none";
     currentMissionData = null; routeWaypoints = [];
     vpAltWaypoints = []; vpSegmentAlts = [];
+    vpElevationData = null; window.vpElevationData = null;
+    window._lastVpRouteKey = null; window.vpBgNeedsUpdate = true;
     if (map) { routeMarkers.forEach(m => map.removeLayer(m)); if (polyline) { map.removeLayer(polyline); polyline = null; } if (window.hitBoxPolyline) { map.removeLayer(window.hitBoxPolyline); window.hitBoxPolyline = null; } clearAirspaceMapLayers(); if (typeof wxMapMarkers !== 'undefined') { wxMapMarkers.forEach(m => map.removeLayer(m)); wxMapMarkers = []; } }
     if (miniMap) { if (miniRoutePolyline) miniMap.removeLayer(miniRoutePolyline); miniMapMarkers.forEach(m => miniMap.removeLayer(m)); miniMapMarkers = []; }
 
@@ -865,6 +867,9 @@ function resetApp() {
         map.removeLayer(vpPositionLeafletMarker);
         vpPositionLeafletMarker = null;
     }
+
+    // Höhenband: Bereitschaftsstand (leeres Profil)
+    if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
 }
 /* =========================================================
    4. HELPER-FUNKTIONEN (UI & Mathe)
