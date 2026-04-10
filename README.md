@@ -1,14 +1,14 @@
-# GA-Dispatcher-stable
+# VFR Multitool 
 
 https://inherjer.github.io/VFR-Multitool/
 
-# GA-Dispatcher-Beta
+# Beta
 
 https://inherjer.github.io/GA-Dispatcher-beta/
 
-# 🛩️ GA Dispatcher
+# 🛩️ VFR multitool 
 
-Der **GA Dispatcher** ist ein interaktiver, webbasierter Flugdienstleiter für General Aviation (GA) Piloten in Flugsimulatoren (MSFS, X-Plane, etc.). Wenn du mal wieder nicht weißt, wohin du fliegen sollst, generiert dir dieses Tool realistische, abwechslungsreiche und immersive Flugaufträge.
+Der **VFR multitool** ist ein interaktiver, webbasierter Flugdienstleiter für General Aviation (GA) Piloten in Flugsimulatoren (MSFS, X-Plane, etc.). Wenn du mal wieder nicht weißt, wohin du fliegen sollst, generiert dir dieses Tool realistische, abwechslungsreiche und immersive Flugaufträge.
 
 ## ✨ Kernfunktionen
 
