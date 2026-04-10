@@ -1143,6 +1143,20 @@ window.freeflightDirectTo = function(icao, lat, lon) {
     if (polyline) polyline.setStyle({ opacity: 1 });
     renderMainRoute();
     updateRoutePerformance();
+
+    // Lufträume, Landmarks, Hindernisse/Flüsse explizit laden —
+    // updateRoutePerformance() gibt früh zurück wenn kein currentMissionData gesetzt ist
+    // (Direct-To aus leerer Karte), daher hier direkt triggern.
+    const _ffCacheKey = routeWaypoints.map(p =>
+        `${(p.lat || 0).toFixed(4)},${((p.lng || p.lon) || 0).toFixed(4)}`).join('|');
+    // Cache-Keys zurücksetzen damit ein voller Neu-Fetch stattfindet
+    if (window._lastLmRouteKey  !== _ffCacheKey) window._lastLmRouteKey  = null;
+    if (window._lastObsRouteKey !== _ffCacheKey) window._lastObsRouteKey = null;
+    // Airspaces
+    if (window.airspaceFetchTimeout) clearTimeout(window.airspaceFetchTimeout);
+    window.airspaceFetchTimeout = setTimeout(() => {
+        if (typeof fetchRouteAirspaces === 'function') fetchRouteAirspaces(routeWaypoints);
+    }, 800);
     if (typeof triggerVerticalProfileUpdate === 'function') triggerVerticalProfileUpdate();
 
     // Elevation, Frequenz & Pisten für beide Airports via OpenAIP laden

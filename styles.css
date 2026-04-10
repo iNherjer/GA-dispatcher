@@ -2418,6 +2418,8 @@ body.theme-retro .wp-data {
 
 /* ── iPhone (≤767px): Karte Vollbild, Pinnwand horizontal panbar ── */
 @media (max-width: 767px) {
+    #navStationLabel { display: none; }
+
     #mapTableOverlay .pinboard-scroll-area {
         padding: 0 !important;
     }
@@ -4089,6 +4091,28 @@ body.theme-navcom .btn-menu:active {
 }
 
 /* ==========================================================================
+   ELEVATION / TPA TOOLTIP
+   ========================================================================== */
+.leaflet-tooltip.elev-tooltip {
+    background: rgba(10, 10, 10, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.45;
+    padding: 4px 8px;
+    white-space: nowrap;
+    text-align: center;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+}
+.leaflet-tooltip.elev-tooltip::before {
+    display: none;
+}
+
+/* ==========================================================================
    DIRECT TO MODE
    ========================================================================== */
 #freeflightBtn.active {
@@ -4129,4 +4153,44 @@ body.theme-navcom .btn-menu:active {
     0% { opacity: 1; }
     70% { opacity: 1; }
     100% { opacity: 0; }
+}
+
+/* Prediction Vector Tooltips */
+.prediction-tooltip {
+    background: rgba(0, 0, 0, 0.7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    color: #fff !important;
+    font-size: 10px !important;
+    font-weight: bold !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5) !important;
+}
+.prediction-tooltip::before {
+    border-top-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ─── TRAFFIC MARKER ─────────────────────────────────────────────────────── */
+.traffic-marker {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ── AWM Frequenz-Banner ─────────────────────────────────────────────────── */
+.awm-freq-entry { display:flex; align-items:center; gap:10px;
+    background:rgba(8,8,8,0.94); border-top-width:2px; border-top-style:solid;
+    padding:8px 10px 8px 13px; backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px); cursor:pointer; user-select:none; }
+.awm-freq-name  { font-weight:bold; font-size:13px; font-family:monospace;
+    letter-spacing:.4px; white-space:nowrap; }
+.awm-freq-vals  { font-size:15px; font-family:monospace; }
+.awm-freq-val   { white-space:nowrap; display:inline-block; }
+.awm-freq-dismiss { background:none; border:none; color:#555; font-size:17px;
+    cursor:pointer; padding:0 2px 0 6px; line-height:1; flex-shrink:0;
+    touch-action:manipulation; }
+@media (max-width: 480px) {
+    .awm-freq-name { font-size:11px; }
+    .awm-freq-vals { font-size:12px; display:flex; flex-direction:column; gap:1px; }
+    .awm-freq-entry { padding:6px 8px 6px 10px; gap:7px; }
 }

@@ -821,7 +821,7 @@ function drawNotebookBackground(doc, pageNum, totalPages) {
     doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120, 115, 100);
     doc.text(`Seite ${pageNum} / ${totalPages}`, W - 15, H - 12, { align: 'right' });
     doc.setFontSize(7); doc.setTextColor(170, 165, 150);
-    doc.text('GA Dispatcher \u2013 Briefing Pack', W / 2, H - 6, { align: 'center' });
+    doc.text('VFR Multitool \u2013 Briefing Pack', W / 2, H - 6, { align: 'center' });
 }
 
 function pdfWrappedText(doc, text, x, y, maxWidth, lineHeight) {

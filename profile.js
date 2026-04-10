@@ -8,22 +8,25 @@ if (!document.getElementById('vp-err-dot-style')) {
 
 window.vpFailedOverpassChunks = [];
 window.updateOverpassErrorUI = function() {
+    const hasError = window.vpFailedOverpassChunks && window.vpFailedOverpassChunks.length > 0;
+
+    // Error-Dot auf Einzel-Buttons (im Untermenü)
     const btnOb = document.getElementById('btnToggleObstacles');
     const btnLin = document.getElementById('btnToggleLinear');
     [btnOb, btnLin].forEach(btn => {
         if (!btn) return;
         btn.classList.add('vp-btn-relative');
         let dot = btn.querySelector('.vp-error-dot');
-        if (window.vpFailedOverpassChunks && window.vpFailedOverpassChunks.length > 0) {
-            if (!dot) {
-                dot = document.createElement('div');
-                dot.className = 'vp-error-dot';
-                btn.appendChild(dot);
-            }
+        if (hasError) {
+            if (!dot) { dot = document.createElement('div'); dot.className = 'vp-error-dot'; btn.appendChild(dot); }
         } else {
             if (dot) dot.remove();
         }
     });
+
+    // Error-Dot auch am Zahnrad-Button sichtbar machen
+    const gearDot = document.getElementById('vpSettingsErrorDot');
+    if (gearDot) gearDot.style.display = hasError ? 'block' : 'none';
 };
 window.vpBgNeedsUpdate = true;
 window.vpAnimFrameId = null;
@@ -58,6 +61,9 @@ let vpDescentRate = 500; // ft/min descent rate (configurable)
 let vpLandmarks = [];
 let vpObstacles = [];
 let vpLinearFeatures = [];
+
+// Traffic im Profil
+window.vpTrafficProfileVisible = true;
 
 async function fetchProfileLandmarks(elevData) {
     if (!elevData || elevData.length < 2) return [];
@@ -101,6 +107,33 @@ async function fetchProfileLandmarks(elevData) {
     return landmarks.sort((a,b) => b.pop - a.pop);
 }
 
+// GPS-zentrierte Städte/Airports laden (ohne Flugplan, aus RAM)
+async function updateGpsCities(lat, lon) {
+    await loadGlobalCities();
+    await loadGlobalAirports();
+    let landmarks = [];
+
+    if (globalCities && globalCities.length > 0) {
+        globalCities.forEach(c => {
+            if (Math.abs(c.lat - lat) > 0.22 || Math.abs(c.lon - lon) > 0.33) return;
+            const nav = calcNav(lat, lon, c.lat, c.lon);
+            if (nav.dist > 15) return;
+            landmarks.push({ name: c.name, type: c.pop >= 15000 ? 'city' : 'town', pop: c.pop || 5000, distNM: nav.dist });
+        });
+    }
+    if (typeof globalAirports !== 'undefined' && globalAirports) {
+        for (let k in globalAirports) {
+            const a = globalAirports[k];
+            const nav = calcNav(lat, lon, a.lat, a.lon);
+            if (nav.dist <= 10) landmarks.push({ name: a.icao, type: 'apt', pop: 100000000, distNM: nav.dist });
+        }
+    }
+
+    vpLandmarks = landmarks.sort((a, b) => b.pop - a.pop);
+    window.vpBgNeedsUpdate = true;
+    if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+}
+window.updateGpsCities = updateGpsCities;
 
 
 // Helfer zum Entdoppeln von Hindernissen (nimmt das höchste in einem 0.5 NM Fenster)
@@ -232,7 +265,7 @@ async function fetchProfileObstacles(elevData, signal) {
                                 let d = calcNav(e.lat, e.lon, ep.lat, ep.lon).dist;
                                 if (d < bestD) { bestD = d; bestDistNM = ep.distNM; baseElevFt = ep.elevFt; }
                             });
-                            localObs.push({ type: isWind ? 'wind' : 'mast', hFt: hFt, distNM: bestDistNM, elevFt: baseElevFt });
+                            localObs.push({ type: isWind ? 'wind' : 'mast', hFt: hFt, distNM: bestDistNM, elevFt: baseElevFt, lat: e.lat, lon: e.lon });
                         } else if (e.type === 'way' && e.geometry && e.tags) {
                             let featType = e.tags.highway ? 'highway' : 'river';
                             let name = e.tags.name || e.tags.ref || '';
@@ -255,7 +288,7 @@ async function fetchProfileObstacles(elevData, signal) {
                                                 let ix = { lat: wp0.lat + (t * s1_y), lon: wp0.lon + (t * s1_x) };
                                                 let distBefore = 0;
                                                 for(let k=0; k<i; k++) distBefore += calcNav(routeWaypoints[k].lat, routeWaypoints[k].lng||routeWaypoints[k].lon, routeWaypoints[k+1].lat, routeWaypoints[k+1].lng||routeWaypoints[k+1].lon).dist;
-                                                localLin.push({ type: featType, name: name, distNM: distBefore + calcNav(rp0.lat, rp0.lon, ix.lat, ix.lon).dist });
+                                                localLin.push({ type: featType, name: name, distNM: distBefore + calcNav(rp0.lat, rp0.lon, ix.lat, ix.lon).dist, lat: ix.lat, lon: ix.lon });
                                                 break;
                                             }
                                         }
@@ -322,6 +355,77 @@ async function fetchProfileObstacles(elevData, signal) {
     console.log(`[Overpass] Alle Segmente verarbeitet.`);
     return { obs: vpObstacles, lin: vpLinearFeatures };
 }
+
+// GPS-zentrierte Hindernisse laden (ohne Flugplan, 30×30 km Box, max. alle 2 Minuten)
+async function fetchGpsObstacles(lat, lon) {
+    const cacheKey = `ga_gps_obs_${lat.toFixed(1)}_${lon.toFixed(1)}`;
+    try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        if (cached && (Date.now() - cached.ts) < 30 * 60 * 1000) {
+            vpObstacles = cached.obs;
+            window.vpBgNeedsUpdate = true;
+            if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+            return;
+        }
+    } catch(e) {}
+
+    const minLat = (lat - 0.135).toFixed(4), maxLat = (lat + 0.135).toFixed(4);
+    const minLon = (lon - 0.20).toFixed(4),  maxLon = (lon + 0.20).toFixed(4);
+    const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+    const query = `[out:json][timeout:30][bbox:${bbox}];(node["generator:source"="wind"];node["man_made"~"mast|tower"]["height"];);out body qt;`;
+
+    const overpassServers = [
+        'https://overpass-api.de/api/interpreter',
+        'https://lz4.overpass-api.de/api/interpreter',
+        'https://z.overpass-api.de/api/interpreter'
+    ];
+    window.vpServerOffset = (window.vpServerOffset || 0) + 1;
+    const serverUrl = overpassServers[window.vpServerOffset % overpassServers.length];
+
+    try {
+        const res = await fetch(serverUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `data=${encodeURIComponent(query)}`
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.elements) return;
+
+        let rawObs = [];
+        json.elements.forEach(e => {
+            if (e.type !== 'node' || !e.lat || !e.lon) return;
+            const hFt = parseFloat(e.tags?.height || 0) * 3.28084;
+            if (hFt < 50) return;
+            const nav = calcNav(lat, lon, e.lat, e.lon);
+            const isWind = e.tags?.['generator:source'] === 'wind';
+            rawObs.push({ type: isWind ? 'windrad' : 'mast', hFt, distNM: nav.dist, elevFt: 0, groundElevFt: 0, lat: e.lat, lon: e.lon });
+        });
+
+        let buckets = {};
+        rawObs.forEach(obs => {
+            let bIdx = Math.floor(obs.distNM / 0.5);
+            if (!buckets[bIdx]) buckets[bIdx] = [];
+            buckets[bIdx].push(obs);
+        });
+        let finalObs = [];
+        for (let k in buckets) {
+            let group = buckets[k].sort((a,b) => b.hFt - a.hFt);
+            let rep = group[0]; rep.count = group.length;
+            finalObs.push(rep);
+        }
+
+        vpObstacles = finalObs;
+        window.vpBgNeedsUpdate = true;
+        if (typeof window.throttledRenderProfiles === 'function') window.throttledRenderProfiles();
+
+        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), obs: finalObs })); } catch(e) {}
+        console.log(`[GPS-Obs] ${finalObs.length} Hindernisse im 30km-Umkreis geladen.`);
+    } catch(e) {
+        console.warn('[GPS-Obs] Overpass-Fehler:', e);
+    }
+}
+window.fetchGpsObstacles = fetchGpsObstacles;
 
 function triggerVerticalProfileUpdate() {
     if (vpProfileFastTimeout) clearTimeout(vpProfileFastTimeout);
@@ -710,8 +814,12 @@ function vpDrawTerrainCover(ctx, xOf, yOf, elevData, viewMinX, viewMaxX, zoomFac
     }
     ctx.fill();
     
-    // 2. ECHTE FLÜSSE UND AUTOBAHNEN (Linear Features aus Overpass)
-    if (typeof vpShowLinear !== 'undefined' && vpShowLinear && typeof vpLinearFeatures !== 'undefined' && vpLinearFeatures.length > 0) {
+    // 2. ECHTE FLÜSSE UND AUTOBAHNEN (Linear Features aus Overpass / HDG-Korridor)
+    // Im HDG-Modus: vpHdgLinearFeatures (entlang Heading gefiltert), sonst Route-Daten
+    const _linSrc = (vpMode === 'HDG' && typeof vpHdgLinearFeatures !== 'undefined' && vpHdgLinearFeatures.length > 0)
+        ? vpHdgLinearFeatures
+        : (typeof vpLinearFeatures !== 'undefined' ? vpLinearFeatures : []);
+    if (typeof vpShowLinear !== 'undefined' && vpShowLinear && _linSrc.length > 0) {
         const getElevY = (dNM) => {
             for(let i=0; i<elevData.length-1; i++) {
                 if (dNM >= elevData[i].distNM && dNM <= elevData[i+1].distNM) {
@@ -721,15 +829,18 @@ function vpDrawTerrainCover(ctx, xOf, yOf, elevData, viewMinX, viewMaxX, zoomFac
             }
             return yOf(elevData[elevData.length-1].elevFt);
         };
-        
+
         // PERFORMANCE FIX: Layout nur 1x pro Zoom-Stufe, maxAlt UND aktueller Route berechnen!
         const routeKey = window._lastVpRouteKey || 'none';
-        const layoutKey = routeKey + '_' + zoomFactor.toFixed(2) + '_' + (maxAlt || 0).toFixed(0);
-        
+        // Im HDG-Modus: Cache-Key enthält Heading → wird bei Kursänderung invalidiert
+        const layoutKey = (vpMode === 'HDG')
+            ? ('hdg_lin_' + (window.lastLiveGpsPos?.hdg || 0).toFixed(0) + '_' + zoomFactor.toFixed(2))
+            : (routeKey + '_' + zoomFactor.toFixed(2) + '_' + (maxAlt || 0).toFixed(0));
+
         // Neu berechnen, wenn sich der Cache-Key ändert ODER die Features noch keine Render-Daten haben
-        if (!window._vpLinearLayouts || window._vpLinearLayouts.key !== layoutKey || (vpLinearFeatures.length > 0 && !vpLinearFeatures[0]._render)) {
+        if (!window._vpLinearLayouts || window._vpLinearLayouts.key !== layoutKey || (_linSrc.length > 0 && !_linSrc[0]._render)) {
             let occupiedSigns = [];
-            for (const feat of vpLinearFeatures) {
+            for (const feat of _linSrc) {
                 const px = xOf(feat.distNM);
                 const py = getElevY(feat.distNM);
                 feat._render = { px, py, drawName: false, labelY: 0, tw: 0 };
@@ -760,7 +871,7 @@ function vpDrawTerrainCover(ctx, xOf, yOf, elevData, viewMinX, viewMaxX, zoomFac
         }
 
         // NUR NOCH ZEICHNEN (mit weichem Culling)
-        for (const feat of vpLinearFeatures) {
+        for (const feat of _linSrc) {
             if (!feat._render) continue;
             
             // FIX: X und Y live berechnen, damit Schilder mit der Bodenlinie wandern
@@ -788,8 +899,9 @@ function vpDrawTerrainCover(ctx, xOf, yOf, elevData, viewMinX, viewMaxX, zoomFac
     }
     ctx.restore();
 }
-function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFactor, maxAlt) {
-    if (!vpLandmarks || vpLandmarks.length === 0) return;
+function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFactor, maxAlt, lmOverride = null) {
+    const _landmarks = lmOverride !== null ? lmOverride : vpLandmarks;
+    if (!_landmarks || _landmarks.length === 0) return;
     const getElevY = (dNM) => {
         if (!elevData || elevData.length < 2) return yOf(0);
         for(let i=0; i<elevData.length-1; i++) {
@@ -805,14 +917,18 @@ function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFa
     const routeKey = window._lastVpRouteKey || 'none';
     const layoutKey = routeKey + '_' + zoomFactor.toFixed(2) + '_' + (maxAlt || 0).toFixed(0) + '_' + (window.vpShowLinear ? '1' : '0');
     
-    // Neu berechnen, wenn sich der Cache-Key ändert ODER die Städte noch keine Render-Daten haben
-    if (!window._vpLandmarkLayouts || window._vpLandmarkLayouts.key !== layoutKey || (vpLandmarks.length > 0 && !vpLandmarks[0]._render)) {
+    // Im HDG-Modus: kein Layout-Cache, immer neu berechnen (distNM ändert sich mit Kurs)
+    const isHdgLm = lmOverride !== null;
+    const hdgLmKey = isHdgLm ? ('hdg_' + (window.lastLiveGpsPos?.hdg || 0).toFixed(0) + '_' + zoomFactor.toFixed(2)) : null;
+    const effectiveLayoutKey = isHdgLm ? hdgLmKey : layoutKey;
+
+    if (!window._vpLandmarkLayouts || window._vpLandmarkLayouts.key !== effectiveLayoutKey || (_landmarks.length > 0 && !_landmarks[0]._render)) {
         let globalOccupiedX = [];
         const nmPerPx = totalDist / (xOf(totalDist) - xOf(0));
         const edgePad = Math.min(2.5, totalDist * 0.05);
         ctx.font = `bold ${(zoomFactor >= 1.5 ? 10 : 8)}px Arial`; // Setup für measureText
-        
-        for (const lm of vpLandmarks) {
+
+        for (const lm of _landmarks) {
             lm._render = null;
             if (lm.distNM < edgePad || lm.distNM > totalDist - edgePad) continue;
             
@@ -867,7 +983,7 @@ function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFa
                 lm._render = { distNM: currentDistNM, icon, iconFontSize, iconOffsetY, fontSize };
             }
         }
-        window._vpLandmarkLayouts = { key: layoutKey, occ: globalOccupiedX };
+        window._vpLandmarkLayouts = { key: effectiveLayoutKey, occ: globalOccupiedX };
         window.vpLandmarkOccupiedX = globalOccupiedX;
     }
     
@@ -882,9 +998,9 @@ function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFa
         if (sc) { viewMinX = sc.scrollLeft - 100; viewMaxX = sc.scrollLeft + sc.clientWidth + 100; }
     }
 
-    for (const lm of vpLandmarks) {
+    for (const lm of _landmarks) {
         if (!lm._render) continue;
-        
+
         // FIX: X und Y Pixel in Echtzeit anhand der aktuellen Skalierung berechnen
         const px = xOf(lm._render.distNM);
         const py = getElevY(lm._render.distNM);
@@ -903,7 +1019,8 @@ function vpDrawLandmarks(ctx, xOf, yOf, elevData, totalDist, isDarkTheme, zoomFa
     }
     ctx.restore();
 }
-function vpDrawObstacles(ctx, xOf, yOf, totalDist, zoomFactor, elevData, timeMs = 0) {
+function vpDrawObstacles(ctx, xOf, yOf, totalDist, zoomFactor, elevData, timeMs = 0, obsOverride = null) {
+    if (obsOverride !== null) { const _orig = vpObstacles; vpObstacles = obsOverride; const r = vpDrawObstacles(ctx, xOf, yOf, totalDist, zoomFactor, elevData, timeMs, null); vpObstacles = _orig; return r; }
     if (!vpObstacles || vpObstacles.length === 0) return;
     const edgePad = Math.min(1.0, totalDist * 0.02);
     
@@ -1338,7 +1455,12 @@ function computeFlightProfile(elevationData, cruiseAltFt, climbRateFpm, descentR
     return { profile, tocDistNM, todDistNM };
 }
 function getCachedAirspaceIntersections(elevData, totalDist) {
-    const asCacheKey = (window._lastVpRouteKey || 'none') + '_' + activeAirspaces.length;
+    // Im HDG-Modus ändert sich elevData[0] mit jeder Position → Cache-Key muss mitlaufen
+    const isHdg = (typeof vpMode !== 'undefined' && vpMode === 'HDG');
+    const hdgPosKey = isHdg && elevData[0]
+        ? `_${(elevData[0].lat || 0).toFixed(2)}_${(elevData[0].lon || 0).toFixed(2)}`
+        : '';
+    const asCacheKey = (window._lastVpRouteKey || 'none') + '_v' + (window._activeAirspacesVersion || 0) + hdgPosKey;
     if (window._vpAsCache && window._vpAsCache.key === asCacheKey && window._vpAsCache.elevLength === elevData.length) {
         return window._vpAsCache.items;
     }
@@ -1484,16 +1606,30 @@ function renderVerticalProfile(canvasId) {
             ctx.lineWidth = 1;
             ctx.setLineDash([3, 3]);
 
+            // Airspace-Form zeichnen: MSL → exaktes Rechteck (kein Sampling-Artefakt),
+            // AGL → Gelände-folgendes Polygon
             ctx.beginPath();
-            for (let i = 0; i < relevantPts.length; i++) {
-                const p = relevantPts[i];
-                const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.min(realUpper, maxAlt)));
-            }
-            for (let i = relevantPts.length - 1; i >= 0; i--) {
-                const p = relevantPts[i];
-                const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
-                ctx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
+            if (!isLowerAgl && !isUpperAgl) {
+                // Reines MSL-Rechteck — exakt von asMinDist bis asMaxDist
+                const ry1 = yOf(Math.min(upperFt, maxAlt));
+                const ry2 = yOf(Math.max(lowerFt, minAlt));
+                ctx.moveTo(xOf(asMinDist), ry1);
+                ctx.lineTo(xOf(asMaxDist), ry1);
+                ctx.lineTo(xOf(asMaxDist), ry2);
+                ctx.lineTo(xOf(asMinDist), ry2);
+            } else {
+                // AGL-Polygon entlang Geländeprofil
+                for (let i = 0; i < relevantPts.length; i++) {
+                    const p = relevantPts[i];
+                    const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
+                    const y = yOf(Math.min(realUpper, maxAlt));
+                    if (i === 0) ctx.moveTo(xOf(p.distNM), y); else ctx.lineTo(xOf(p.distNM), y);
+                }
+                for (let i = relevantPts.length - 1; i >= 0; i--) {
+                    const p = relevantPts[i];
+                    const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
+                    ctx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
+                }
             }
             ctx.closePath();
             ctx.fill();
@@ -1502,7 +1638,7 @@ function renderVerticalProfile(canvasId) {
 
             let sumUpper = 0;
             relevantPts.forEach(p => sumUpper += (isUpperAgl ? p.elevFt + upperFt : upperFt));
-            const avgUpper = sumUpper / relevantPts.length;
+            const avgUpper = relevantPts.length ? sumUpper / relevantPts.length : upperFt;
 
             let labelY = yOf(Math.min(avgUpper, maxAlt));
             labelY = Math.max(padTop + 15, labelY);
@@ -1881,6 +2017,113 @@ function renderMapProfile() {
     }
 }
 
+// ─── TRAFFIC PROJEKTION AUF ROUTE ────────────────────────────────────────────
+function vpProjectTrafficOnRoute(elevData) {
+    if (!window.vpTrafficData?.length || !elevData?.length) return [];
+    const MAX_LAT_NM = 5;
+    const result = [];
+    for (const ac of window.vpTrafficData) {
+        let bestDist = Infinity, bestDistNM = 0;
+        for (const ep of elevData) {
+            if (ep.lat == null) continue;
+            const d = calcNav(ac.lat, ac.lon, ep.lat, ep.lon).dist;
+            if (d < bestDist) { bestDist = d; bestDistNM = ep.distNM; }
+        }
+        if (bestDist <= MAX_LAT_NM) {
+            result.push({ id: ac.id, callsign: ac.callsign, projDistNM: bestDistNM, altFt: ac.alt, lateralNM: bestDist });
+        }
+    }
+    return result;
+}
+
+// ─── TRAFFIC PROJEKTION AUF HEADING (HDG-MODUS) ──────────────────────────────
+function vpProjectTrafficOnHeading() {
+    if (!window.vpTrafficData?.length || !window.lastLiveGpsPos) return [];
+    const { lat: oLat, lon: oLon, hdg: oHdg } = window.lastLiveGpsPos;
+    const gs = (typeof smoothedGS !== 'undefined' && smoothedGS > 20) ? smoothedGS : 80;
+    const hdgRad = oHdg * Math.PI / 180;
+    const hdgSin = Math.sin(hdgRad), hdgCos = Math.cos(hdgRad);
+    const MAX_LAT_NM = 5;
+    const minAlongNM = -(VP_HDG_LOOKBACK_MIN * gs / 60);
+    const maxAlongNM =  VP_HDG_LOOKAHEAD_MIN * gs / 60;
+    const result = [];
+
+    for (const ac of window.vpTrafficData) {
+        const dLatNM = (ac.lat - oLat) * 60;
+        const dLonNM = (ac.lon - oLon) * 60 * Math.cos(oLat * Math.PI / 180);
+        const along = dLonNM * hdgSin + dLatNM * hdgCos;   // NM entlang Heading
+        const cross = Math.abs(-dLonNM * hdgCos + dLatNM * hdgSin); // NM quer
+        if (cross > MAX_LAT_NM || along < minAlongNM || along > maxAlongNM) continue;
+        // Im HDG-Modus: distNM speichert Minuten (gleich wie vpHdgElevData)
+        const timeMin = VP_HDG_LOOKBACK_MIN + (along / (gs / 60));
+        result.push({ id: ac.id, callsign: ac.callsign, projDistNM: timeMin, altFt: ac.alt, lateralNM: cross });
+    }
+    return result;
+}
+
+// ─── TRAFFIC IM VERTIKALPROFIL ZEICHNEN ──────────────────────────────────────
+function vpDrawTrafficInProfile(fgCtx, xOf, yOf, elevData, isHdgMode, viewMinX, viewMaxX) {
+    if (!window.vpTrafficProfileVisible) return;
+    const traffic = isHdgMode ? vpProjectTrafficOnHeading() : vpProjectTrafficOnRoute(elevData);
+    if (!traffic.length) return;
+
+    const ownAlt = (window.lastLiveGpsPos?.alt) ?? vpLiveAltFt ?? 0;
+
+    for (const ac of traffic) {
+        const tx = xOf(ac.projDistNM);
+        const ty = yOf(ac.altFt);
+        if (tx < viewMinX - 30 || tx > viewMaxX + 30) continue;
+
+        const relAlt = Math.round((ac.altFt - ownAlt) / 100) * 100;
+        const relAltStr = (relAlt >= 0 ? '+' : '') + relAlt;
+        const relAltColor = Math.abs(relAlt) < 300 ? '#ff8800' : relAlt > 0 ? '#44ff44' : '#888888';
+
+        fgCtx.save();
+        fgCtx.translate(tx, ty);
+
+        // Flugzeug-Silhouette (Seitenansicht, schaut nach rechts)
+        fgCtx.fillStyle = '#00ccff';
+        fgCtx.strokeStyle = 'rgba(0,0,0,0.6)';
+        fgCtx.lineWidth = 0.5;
+
+        // Rumpf
+        fgCtx.beginPath();
+        fgCtx.ellipse(0, 0, 7, 2, 0, 0, Math.PI * 2);
+        fgCtx.fill(); fgCtx.stroke();
+
+        // Tragfläche (oben)
+        fgCtx.beginPath();
+        fgCtx.moveTo(-7, -1); fgCtx.lineTo(5, -1); fgCtx.lineTo(4, 1.5); fgCtx.lineTo(-6, 1.5);
+        fgCtx.closePath(); fgCtx.fill(); fgCtx.stroke();
+
+        // Leitwerk (hinten oben)
+        fgCtx.beginPath();
+        fgCtx.moveTo(-7, -1); fgCtx.lineTo(-4, -4); fgCtx.lineTo(-2, -1);
+        fgCtx.closePath(); fgCtx.fill(); fgCtx.stroke();
+
+        // Relative Höhe
+        fgCtx.fillStyle = relAltColor;
+        fgCtx.font = 'bold 8px monospace';
+        fgCtx.textAlign = 'center';
+        fgCtx.fillText(relAltStr, 0, -11);
+
+        // Callsign (wenn vorhanden)
+        if (ac.callsign) {
+            fgCtx.fillStyle = 'rgba(0, 200, 255, 0.75)';
+            fgCtx.font = '7px monospace';
+            fgCtx.fillText(ac.callsign, 0, 14);
+        }
+
+        fgCtx.restore();
+    }
+}
+
+window.vpToggleTrafficProfile = function() {
+    window.vpTrafficProfileVisible = !window.vpTrafficProfileVisible;
+    const btn = document.getElementById('btnToggleTrafficProfile');
+    if (btn) btn.classList.toggle('active', window.vpTrafficProfileVisible);
+};
+
 function renderMapProfileFrames(timeMs) {
     const mapTable = document.getElementById('mapTableOverlay');
     if (!mapTable || !mapTable.classList.contains('active') || (typeof vpMapProfileVisible !== 'undefined' && !vpMapProfileVisible)) {
@@ -1897,7 +2140,10 @@ function renderMapProfileFrames(timeMs) {
         return;
     }
 
-    const elevData = (vpZoomLevel < 100 && vpHighResData) ? vpHighResData : vpElevationData;
+    const isHdgMode = (typeof vpMode !== 'undefined' && vpMode === 'HDG');
+    const elevData = isHdgMode
+        ? vpHdgElevData
+        : (vpZoomLevel < 100 && vpHighResData) ? vpHighResData : vpElevationData;
     if (!elevData || elevData.length < 2) {
         window.vpAnimFrameId = requestAnimationFrame(renderMapProfileFrames);
         return;
@@ -1987,16 +2233,27 @@ function renderMapProfileFrames(timeMs) {
                 targetCtx.lineWidth = lineW; 
                 targetCtx.setLineDash(isHighlighted ? [] : [3, 3]);
 
+                // Airspace-Form zeichnen: MSL → exaktes Rechteck, AGL → Gelände-Polygon
                 targetCtx.beginPath();
-                for (let i = 0; i < relevantPts.length; i++) {
-                    const p = relevantPts[i];
-                    const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
-                    targetCtx.lineTo(xOf(p.distNM), yOf(Math.min(realUpper, maxAlt)));
-                }
-                for (let i = relevantPts.length - 1; i >= 0; i--) {
-                    const p = relevantPts[i];
-                    const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
-                    targetCtx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
+                if (!isLowerAgl && !isUpperAgl) {
+                    const ry1 = yOf(Math.min(upperFt, maxAlt));
+                    const ry2 = yOf(Math.max(lowerFt, minAlt));
+                    targetCtx.moveTo(xOf(asMinDist), ry1);
+                    targetCtx.lineTo(xOf(asMaxDist), ry1);
+                    targetCtx.lineTo(xOf(asMaxDist), ry2);
+                    targetCtx.lineTo(xOf(asMinDist), ry2);
+                } else {
+                    for (let i = 0; i < relevantPts.length; i++) {
+                        const p = relevantPts[i];
+                        const realUpper = isUpperAgl ? p.elevFt + upperFt : upperFt;
+                        const y = yOf(Math.min(realUpper, maxAlt));
+                        if (i === 0) targetCtx.moveTo(xOf(p.distNM), y); else targetCtx.lineTo(xOf(p.distNM), y);
+                    }
+                    for (let i = relevantPts.length - 1; i >= 0; i--) {
+                        const p = relevantPts[i];
+                        const realLower = isLowerAgl ? p.elevFt + lowerFt : lowerFt;
+                        targetCtx.lineTo(xOf(p.distNM), yOf(Math.max(realLower, minAlt)));
+                    }
                 }
                 targetCtx.closePath(); targetCtx.fill(); targetCtx.stroke(); targetCtx.setLineDash([]);
 
@@ -2085,8 +2342,11 @@ function renderMapProfileFrames(timeMs) {
         // WÄLDER UND FLÜSSE GENERIEREN
         vpDrawTerrainCover(bgCtx, xOf, yOf, elevData, viewMinX, viewMaxX, zoomFactor, maxAlt);
 
-        if (vpShowLandmarks) vpDrawLandmarks(bgCtx, xOf, yOf, elevData, totalDist, true, zoomFactor, maxAlt);
-        if (vpShowClouds) vpDrawClouds(bgCtx, xOf, yOf, padTop, plotH, totalDist, true, elevData);
+        if (vpShowLandmarks) {
+            const lmOverride = isHdgMode ? vpHdgLandmarks : null;
+            vpDrawLandmarks(bgCtx, xOf, yOf, elevData, totalDist, true, zoomFactor, maxAlt, lmOverride);
+        }
+        if (vpShowClouds && !isHdgMode) vpDrawClouds(bgCtx, xOf, yOf, padTop, plotH, totalDist, true, elevData);
 
         bgCtx.textAlign = 'right';
         const altStep = maxAlt > 6000 ? 2000 : (maxAlt > 3000 ? 1000 : 500);
@@ -2100,9 +2360,33 @@ function renderMapProfileFrames(timeMs) {
         }
 
         bgCtx.textAlign = 'center';
-        const distStep = totalDist > 150 ? 25 : (totalDist > 80 ? 10 : 5);
-        for (let d = distStep; d < totalDist; d += distStep) {
-            bgCtx.fillStyle = '#666'; bgCtx.font = '8px Arial'; bgCtx.fillText(d + '', xOf(d), containerHeight - 1);
+        if (isHdgMode) {
+            // X-Achse in Minuten (HDG-Modus)
+            const hdgHdgVal = window.lastLiveGpsPos ? Math.round(window.lastLiveGpsPos.hdg) : 0;
+            const acX = xOf(VP_HDG_LOOKBACK_MIN);
+            // Flugzeug-Trennlinie (senkrecht, gestrichelt)
+            bgCtx.beginPath(); bgCtx.setLineDash([3, 4]);
+            bgCtx.strokeStyle = 'rgba(100,200,255,0.3)'; bgCtx.lineWidth = 1;
+            bgCtx.moveTo(acX, padTop); bgCtx.lineTo(acX, padTop + plotH); bgCtx.stroke(); bgCtx.setLineDash([]);
+            // Minuten-Ticks
+            const tickStep = totalDist > 12 ? 5 : 2;
+            for (let m = 0; m <= Math.ceil(totalDist); m += tickStep) {
+                const x = xOf(m);
+                const label = m < VP_HDG_LOOKBACK_MIN ? `-${Math.round(VP_HDG_LOOKBACK_MIN - m)}m`
+                    : m === VP_HDG_LOOKBACK_MIN ? 'NOW'
+                    : `+${Math.round(m - VP_HDG_LOOKBACK_MIN)}m`;
+                bgCtx.fillStyle = m === VP_HDG_LOOKBACK_MIN ? '#64c8ff' : '#666';
+                bgCtx.font = m === VP_HDG_LOOKBACK_MIN ? 'bold 8px Arial' : '8px Arial';
+                bgCtx.fillText(label, x, containerHeight - 1);
+            }
+            // Mode-Label oben links
+            bgCtx.fillStyle = '#64c8ff'; bgCtx.font = 'bold 9px Arial'; bgCtx.textAlign = 'left';
+            bgCtx.fillText(`HDG ${hdgHdgVal}°`, viewX + padLeft + 4, padTop + 10);
+        } else {
+            const distStep = totalDist > 150 ? 25 : (totalDist > 80 ? 10 : 5);
+            for (let d = distStep; d < totalDist; d += distStep) {
+                bgCtx.fillStyle = '#666'; bgCtx.font = '8px Arial'; bgCtx.fillText(d + '', xOf(d), containerHeight - 1);
+            }
         }
 
         const peakPt = elevData.reduce((max, p) => p.elevFt > max.elevFt ? p : max);
@@ -2137,57 +2421,122 @@ function renderMapProfileFrames(timeMs) {
         drawAirspaces(fgCtx, true);
     }
 
-    if (vpShowObstacles) vpDrawObstacles(fgCtx, xOf, yOf, totalDist, zoomFactor, elevData, timeMs);
-    if (vpShowClouds) vpDrawAnimatedWeather(fgCtx, xOf, yOf, totalDist, elevData, timeMs, viewMinX, viewMaxX);
+    if (vpShowObstacles) {
+        const obsSrc = isHdgMode ? vpHdgObstacles : vpObstacles;
+        if (obsSrc && obsSrc.length > 0) vpDrawObstacles(fgCtx, xOf, yOf, totalDist, zoomFactor, elevData, timeMs, obsSrc);
+    }
+    if (vpShowClouds && !isHdgMode) vpDrawAnimatedWeather(fgCtx, xOf, yOf, totalDist, elevData, timeMs, viewMinX, viewMaxX);
 
-    if (fpResult && fpResult.profile) {
-        fgCtx.beginPath();
-        let shStarted = false;
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM);
-            if (x < viewMinX - 100 && i < fpResult.profile.length - 1 && xOf(fpResult.profile[i+1].distNM) < viewMinX) continue;
-            if (x > viewMaxX + 100 && i > 0 && xOf(fpResult.profile[i-1].distNM) > viewMaxX) continue;
-            const y = yOf(fpResult.profile[i].altFt) + 1;
-            if (!shStarted) { fgCtx.moveTo(x, y); shStarted = true; } else { fgCtx.lineTo(x, y); }
-        }
-        fgCtx.strokeStyle = 'rgba(0,0,0,0.3)'; fgCtx.lineWidth = 3; fgCtx.stroke();
+    // Im HDG-Modus: Fluglinie einblenden wenn Flugzeug ≤2 NM von der geplanten Route entfernt
+    // X-Achse: NM-Offset vom aktuellen Standort → Minuten umrechnen (offsetNM / gs * 60)
+    if (isHdgMode
+        && typeof vpLiveGpsFraction === 'number' && vpLiveGpsFraction >= 0
+        && (window.vpLiveRouteDistNM ?? 999) <= 2.0
+        && typeof vpElevationData !== 'undefined' && vpElevationData && vpElevationData.length >= 2
+        && typeof computeFlightProfile === 'function') {
 
-        fgCtx.beginPath();
-        let rdStarted = false;
-        for (let i = 0; i < fpResult.profile.length; i++) {
-            const x = xOf(fpResult.profile[i].distNM);
-            if (x < viewMinX - 100 && i < fpResult.profile.length - 1 && xOf(fpResult.profile[i+1].distNM) < viewMinX) continue;
-            if (x > viewMaxX + 100 && i > 0 && xOf(fpResult.profile[i-1].distNM) > viewMaxX) continue;
-            const y = yOf(fpResult.profile[i].altFt);
-            if (!rdStarted) { fgCtx.moveTo(x, y); rdStarted = true; } else { fgCtx.lineTo(x, y); }
+        const routeElevData = vpElevationData;
+        const routeTotalDist = routeElevData[routeElevData.length - 1].distNM;
+        const tasHdg = parseInt(document.getElementById('tasSlider')?.value || 115);
+        const fpRoute = computeFlightProfile(routeElevData, cruiseAlt, vpClimbRate, vpDescentRate, tasHdg);
+        if (fpRoute && fpRoute.profile) {
+            const liveDistNM = vpLiveGpsFraction * routeTotalDist;
+            const gs = (window.lastLiveGpsPos?.gs > 20 ? window.lastLiveGpsPos.gs : null) || tasHdg;
+            const hdgTotalMin = VP_HDG_LOOKBACK_MIN + VP_HDG_LOOKAHEAD_MIN;
+
+            const _drawHdgFpLine = (offsetY, style, width) => {
+                fgCtx.beginPath();
+                let started = false;
+                for (const pt of fpRoute.profile) {
+                    const offsetNM = pt.distNM - liveDistNM;
+                    const minAxis = VP_HDG_LOOKBACK_MIN + (offsetNM / gs * 60);
+                    if (minAxis < -0.5 || minAxis > hdgTotalMin + 0.5) { started = false; continue; }
+                    const x = xOf(minAxis);
+                    if (x < viewMinX - 60 || x > viewMaxX + 60) { started = false; continue; }
+                    const y = yOf(pt.altFt) + offsetY;
+                    if (!started) { fgCtx.moveTo(x, y); started = true; } else { fgCtx.lineTo(x, y); }
+                }
+                fgCtx.strokeStyle = style; fgCtx.lineWidth = width; fgCtx.stroke();
+            };
+            _drawHdgFpLine(1, 'rgba(0,0,0,0.3)', 3);
+            _drawHdgFpLine(0, '#ff4444', 2);
         }
-        fgCtx.strokeStyle = '#ff4444'; fgCtx.lineWidth = 2; fgCtx.stroke();
     }
 
+    // Fluglinie (Climb/Cruise/Descend) und Route-Waypoint-Marker nur im RTE-Modus
+    // Im HDG-Modus wären distNM-Werte (NM) falsch durch xOf() das Minuten erwartet
+    if (!isHdgMode) {
+        if (fpResult && fpResult.profile) {
+            fgCtx.beginPath();
+            let shStarted = false;
+            for (let i = 0; i < fpResult.profile.length; i++) {
+                const x = xOf(fpResult.profile[i].distNM);
+                if (x < viewMinX - 100 && i < fpResult.profile.length - 1 && xOf(fpResult.profile[i+1].distNM) < viewMinX) continue;
+                if (x > viewMaxX + 100 && i > 0 && xOf(fpResult.profile[i-1].distNM) > viewMaxX) continue;
+                const y = yOf(fpResult.profile[i].altFt) + 1;
+                if (!shStarted) { fgCtx.moveTo(x, y); shStarted = true; } else { fgCtx.lineTo(x, y); }
+            }
+            fgCtx.strokeStyle = 'rgba(0,0,0,0.3)'; fgCtx.lineWidth = 3; fgCtx.stroke();
+
+            fgCtx.beginPath();
+            let rdStarted = false;
+            for (let i = 0; i < fpResult.profile.length; i++) {
+                const x = xOf(fpResult.profile[i].distNM);
+                if (x < viewMinX - 100 && i < fpResult.profile.length - 1 && xOf(fpResult.profile[i+1].distNM) < viewMinX) continue;
+                if (x > viewMaxX + 100 && i > 0 && xOf(fpResult.profile[i-1].distNM) > viewMaxX) continue;
+                const y = yOf(fpResult.profile[i].altFt);
+                if (!rdStarted) { fgCtx.moveTo(x, y); rdStarted = true; } else { fgCtx.lineTo(x, y); }
+            }
+            fgCtx.strokeStyle = '#ff4444'; fgCtx.lineWidth = 2; fgCtx.stroke();
+        }
+    }
+
+    // CRZ-Höhenlinie (gestrichelt, horizontal) – in beiden Modi
     fgCtx.beginPath(); fgCtx.setLineDash([6, 4]); fgCtx.strokeStyle = 'rgba(255, 68, 68, 0.3)'; fgCtx.lineWidth = 1;
-    fgCtx.moveTo(Math.max(padLeft, viewMinX), yOf(cruiseAlt)); 
-    fgCtx.lineTo(Math.min(padLeft + plotW, viewMaxX), yOf(cruiseAlt)); 
+    fgCtx.moveTo(Math.max(padLeft, viewMinX), yOf(cruiseAlt));
+    fgCtx.lineTo(Math.min(padLeft + plotW, viewMaxX), yOf(cruiseAlt));
     fgCtx.stroke(); fgCtx.setLineDash([]);
-    
     fgCtx.fillStyle = 'rgba(255, 68, 68, 0.7)'; fgCtx.font = 'bold 10px Arial'; fgCtx.textAlign = 'left';
     fgCtx.fillText('CRZ ' + cruiseAlt + ' ft', Math.max(padLeft + 4, viewMinX + 4), yOf(cruiseAlt) - 4);
 
-    let wpCumDist = 0;
-    for (let i = 0; i < routeWaypoints.length; i++) {
-        if (i > 0) wpCumDist += calcNav(routeWaypoints[i - 1].lat, routeWaypoints[i - 1].lng || routeWaypoints[i - 1].lon, routeWaypoints[i].lat, routeWaypoints[i].lng || routeWaypoints[i].lon).dist;
-        const x = xOf(wpCumDist);
-        if (x < viewMinX - 40 || x > viewMaxX + 40) continue;
+    // Im HDG-Modus: "JETZT"-Linie bei VP_HDG_LOOKBACK_MIN (Flugzeugposition)
+    if (isHdgMode) {
+        const nowX = xOf(VP_HDG_LOOKBACK_MIN);
+        if (nowX >= viewMinX && nowX <= viewMaxX) {
+            fgCtx.beginPath();
+            fgCtx.setLineDash([3, 4]);
+            fgCtx.strokeStyle = 'rgba(255,255,255,0.18)';
+            fgCtx.lineWidth = 1;
+            fgCtx.moveTo(nowX, padTop);
+            fgCtx.lineTo(nowX, padTop + plotH);
+            fgCtx.stroke();
+            fgCtx.setLineDash([]);
+            fgCtx.fillStyle = 'rgba(255,255,255,0.35)';
+            fgCtx.font = '8px Arial'; fgCtx.textAlign = 'center';
+            fgCtx.fillText('NOW', nowX, padTop + plotH + 12);
+        }
+    }
 
-        fgCtx.beginPath(); fgCtx.setLineDash([2, 3]); fgCtx.strokeStyle = 'rgba(255,255,255,0.2)'; fgCtx.lineWidth = 1;
-        fgCtx.moveTo(x, padTop); fgCtx.lineTo(x, padTop + plotH); fgCtx.stroke(); fgCtx.setLineDash([]);
-        let wpLabel = (i === 0) ? (currentStartICAO || 'DEP') : ((i === routeWaypoints.length - 1) ? (currentDestICAO || 'DEST') : (routeWaypoints[i].name ? routeWaypoints[i].name.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '').split(' ')[0] : 'WP' + i));
-        if (!zoomFactor || zoomFactor < 2) { if (wpLabel.length > 6) wpLabel = wpLabel.substring(0, 5) + '…'; } else { if (wpLabel.length > 12) wpLabel = wpLabel.substring(0, 11) + '…'; }
-        fgCtx.beginPath(); fgCtx.arc(x, padTop + plotH + 3, 3, 0, Math.PI * 2); fgCtx.fillStyle = i === 0 ? '#44ff44' : (i === routeWaypoints.length - 1 ? '#ff4444' : '#ffcc00'); fgCtx.fill();
-        fgCtx.fillStyle = '#bbb'; fgCtx.font = (zoomFactor >= 2) ? 'bold 11px Arial' : 'bold 9px Arial'; fgCtx.textAlign = 'center'; fgCtx.fillText(wpLabel, x, padTop + plotH + 16);
+    // Route-Waypoint-Marker nur im RTE-Modus (Positionen in NM, im HDG unbrauchbar)
+    if (!isHdgMode) {
+        let wpCumDist = 0;
+        for (let i = 0; i < routeWaypoints.length; i++) {
+            if (i > 0) wpCumDist += calcNav(routeWaypoints[i - 1].lat, routeWaypoints[i - 1].lng || routeWaypoints[i - 1].lon, routeWaypoints[i].lat, routeWaypoints[i].lng || routeWaypoints[i].lon).dist;
+            const x = xOf(wpCumDist);
+            if (x < viewMinX - 40 || x > viewMaxX + 40) continue;
+
+            fgCtx.beginPath(); fgCtx.setLineDash([2, 3]); fgCtx.strokeStyle = 'rgba(255,255,255,0.2)'; fgCtx.lineWidth = 1;
+            fgCtx.moveTo(x, padTop); fgCtx.lineTo(x, padTop + plotH); fgCtx.stroke(); fgCtx.setLineDash([]);
+            let wpLabel = (i === 0) ? (currentStartICAO || 'DEP') : ((i === routeWaypoints.length - 1) ? (currentDestICAO || 'DEST') : (routeWaypoints[i].name ? routeWaypoints[i].name.replace(/^RPP\s+/i, '').replace(/^APT\s+/i, '').split(' ')[0] : 'WP' + i));
+            if (!zoomFactor || zoomFactor < 2) { if (wpLabel.length > 6) wpLabel = wpLabel.substring(0, 5) + '…'; } else { if (wpLabel.length > 12) wpLabel = wpLabel.substring(0, 11) + '…'; }
+            fgCtx.beginPath(); fgCtx.arc(x, padTop + plotH + 3, 3, 0, Math.PI * 2); fgCtx.fillStyle = i === 0 ? '#44ff44' : (i === routeWaypoints.length - 1 ? '#ff4444' : '#ffcc00'); fgCtx.fill();
+            fgCtx.fillStyle = '#bbb'; fgCtx.font = (zoomFactor >= 2) ? 'bold 11px Arial' : 'bold 9px Arial'; fgCtx.textAlign = 'center'; fgCtx.fillText(wpLabel, x, padTop + plotH + 16);
+        }
     }
 
     // A: SCRUB-MARKER (Magenta Linie bei Hover)
-    if (typeof vpPositionFraction === 'number' && vpPositionFraction >= 0) {
+    // Scrub-Marker nur im RTE-Modus (in HDG-Modus ist Position live-GPS-gesteuert)
+    if (!isHdgMode && typeof vpPositionFraction === 'number' && vpPositionFraction >= 0) {
         const posX = xOf(vpPositionFraction * totalDist);
         if (posX >= viewMinX - 20 && posX <= viewMaxX + 20) {
             fgCtx.beginPath(); fgCtx.strokeStyle = '#ff00ff'; fgCtx.lineWidth = 1.5; fgCtx.moveTo(posX, padTop); fgCtx.lineTo(posX, padTop + plotH); fgCtx.stroke();
@@ -2195,11 +2544,17 @@ function renderMapProfileFrames(timeMs) {
         }
     }
 
-            // B: LIVE-GPS-MARKER (Das Flugzeug, unabhängig vom Scrubbing)
-    if (typeof vpLiveGpsFraction === 'number' && vpLiveGpsFraction >= 0) {
-        const liveX = xOf(vpLiveGpsFraction * totalDist);
+            // B: LIVE-GPS-MARKER (Das Flugzeug)
+    const _showLiveMarker = isHdgMode
+        ? (window.lastLiveGpsPos != null)
+        : (typeof vpLiveGpsFraction === 'number' && vpLiveGpsFraction >= 0);
+    if (_showLiveMarker) {
+        const liveX = isHdgMode
+            ? xOf(VP_HDG_LOOKBACK_MIN)   // Im HDG-Modus: leicht eingerückt vom linken Rand
+            : xOf(vpLiveGpsFraction * totalDist);
+        const _liveAlt = isHdgMode ? (window.lastLiveGpsPos?.alt ?? 0) : vpLiveAltFt;
         if (liveX >= viewMinX - 50 && liveX <= viewMaxX + 50) {
-            const liveY = yOf(vpLiveAltFt);
+            const liveY = yOf(_liveAlt);
             
             // CSS Variablen auslesen
             const rootStyle = getComputedStyle(document.documentElement);
@@ -2208,31 +2563,107 @@ function renderMapProfileFrames(timeMs) {
 
             fgCtx.save();
             fgCtx.translate(liveX, liveY);
-            
+
+            // Pitch-Rotation: Steig-/Sinkwinkel aus VS/GS berechnen
+            // smoothedVS in ft/min → ft/s (/60), smoothedGS in kts → ft/s (*1.6878)
+            const _vsPitch = (typeof smoothedVS !== 'undefined') ? smoothedVS : 0;
+            const _gsPitch = (typeof smoothedGS !== 'undefined' && smoothedGS > 20) ? smoothedGS : 80;
+            const _pitchRad = Math.atan2(_vsPitch / 60, _gsPitch * 1.6878);
+            fgCtx.rotate(_pitchRad);
+
             // Berechnung der Skalierung (Basisbreite Path: 504.91)
             const baseScale = planeSizePx / 504.91;
-            
-            // USER: "scaleX(-1)" als Standard -> nach rechts schauen
-            let sx = -1;
-            // Wenn West (180-360) -> Spiegeln (nach links schauen)
-            if (vpLiveHdg > 180 && vpLiveHdg < 360) sx = 1;
 
-            fgCtx.scale(sx * baseScale, baseScale);
-            
+            // Im Profil schaut das Flugzeug immer nach rechts (Richtung Zukunft).
+            // sx=1: Nase bei x=504 → rechts, Heck bei x=0 → links (korrekte Ausrichtung).
+            // Kein Flip basierend auf Heading — das Profil hat immer Vergangenheit links.
+            fgCtx.scale(baseScale, baseScale);
+
             fgCtx.fillStyle = planeColor;
             
             // Side-View Path (ViewBox 504.91 x 184.69, Zentrum: 252.45, 92.35)
             const sideViewPath = new Path2D("M504.83,54.71l-.57-2.37a1.12,1.12,0,0,0-.84-.84,1.14,1.14,0,0,0-1.13.35,108.13,108.13,0,0,0-7.76,9.95,42.45,42.45,0,0,0-6.15,11.54,20.33,20.33,0,0,0-2.53-.45c-1.13-2.15-6.44-3.5-15.36-3.92-12.18-.81-42.61-3.25-51.64-4a13.91,13.91,0,0,1-3.4-.72l-.53-.2a15,15,0,0,1-1.62-.77c-5.49-3.07-19.3-10.65-29.11-14.65-7.6-3.09-12.88-5.24-18.9-6.51l-.8-.16a71.07,71.07,0,0,0-12.43-1.21,161,161,0,0,0-20.61,1.63v-.86a1.45,1.45,0,0,0-1.62-1.43c-2.38.28-6.23,1.11-7.08,3.5L320,44c-2.6-2-6.49-2.07-8.85-1.92a2,2,0,0,0-1.88,2.22l.15,1.42c-13.69,1.51-38.55,6-65.14,11.22l-.07-1.22A4.24,4.24,0,0,0,243,52.92l-17-16.46a.46.46,0,0,0-.65,0,.47.47,0,0,0,0,.65l17,16.46a3.36,3.36,0,0,1,1,2.22l.07,1.35c-19.92,3.91-40.74,8.21-58.51,11.94l-.22-4a4.17,4.17,0,0,0-1.29-2.83l-17-16.46a.46.46,0,0,0-.64.66l17,16.46a3.3,3.3,0,0,1,1,2.22l.23,4.2c-15.46,3.25-28.52,6.07-36.53,7.8a18.29,18.29,0,0,1-17.05-5.25L73.68,12.1a9.11,9.11,0,0,0-5-2.7V5.7A.68.68,0,0,0,68,5H67V1.89A1.89,1.89,0,0,0,65.08,0a1.89,1.89,0,0,0-1.89,1.89V5H62.13a.68.68,0,0,0-.67.68v4.55L38.14,15.42a4.46,4.46,0,0,0-1.16.41,4.74,4.74,0,0,0-1,.69,1.66,1.66,0,0,0-.45.69h0L24,18.84a.46.46,0,0,0,.06.92h.07l11.35-1.61a1.58,1.58,0,0,0,.82,1l.07,0a4.28,4.28,0,0,1,2.17,2.37l26.85,72a24.81,24.81,0,0,0-2.32,5.77L0,110.9l1.15.32c.18,0,18.4,5,48.57,5.2h0l17.32-4.16a1.51,1.51,0,0,1,1.34.31c1.35,1.13,5.76,3.21,20.08,4.44l.41,0-1.62,2.45a2.43,2.43,0,0,0,3.49,3.29l6.64-5c7.72.7,16.8,1.57,26.24,2.47,15.52,1.48,31.57,3,42.88,4,18.77,1.55,54.16,4.95,61,5.6l-19.28,7.63,39.35.54,3.63,6.59a1.32,1.32,0,0,0,1.52.63l1.57-.47a1.31,1.31,0,0,0,.8-1.84l-2.4-4.84,13.36.19.8,2.92,9.31-2.57,36.25,2v4.57l5.11,3.2c-3.29.8-18.46,4.51-24.31,6.06-6.22,1.65-9.95,2.88-9.29,6.17.41,2.05,2.4,3.68,4.29,5,3.29,2.3,6.84,3.11,10.19,3.73s6.52,1.17,9.34,1.65l5.46.93a13.62,13.62,0,0,0,27,1.79c.42-.06.87-.13,1.33-.22a41.71,41.71,0,0,0,10.61-3.56l.16-.07c2.56-1.25,6.42-3.13,5.92-6.53-.69-4.67-5.09-7.72-8.63-10.16-5.13-3.55-14.6-4.94-18.2-5.36v-7.41c3.37-.32,39.35-3.77,51.17-5.41,12.27-1.71,32.66-6.86,37-9.86.82.14,5.58.81,9.48-1.56v3.31l1.82,1.81a.78.78,0,0,0,1.34-.55v-5.27l7.93-1.18v.82l-7.77,7.73,7.05,3.51a11.14,11.14,0,0,1-3.52,1.38c-1.71.33-18.72-.25-26-.51a2.13,2.13,0,0,0-1.82,3.35l5.63,8.07a5.22,5.22,0,0,0,3.56,2.17,53.38,53.38,0,0,1,9.85,2.13L430,151.4a36.46,36.46,0,0,0,9.37,2.64,13.18,13.18,0,0,0,24.92-.47c.83-.36,1.67-.76,2.51-1.19l.49-.25c2.2-1.11,5.52-2.79,4.68-5.72a11.89,11.89,0,0,0-3.26-4.68l-.33-.34a45.54,45.54,0,0,0-7.27-6.28,29.74,29.74,0,0,0-7.87-3.61,56.48,56.48,0,0,0-5.57-1.47l-1.82-9.58,1.25-.19c4.59-.7,9.32-1.42,13.94-2.31,1.52-.3,3.07-.54,4.58-.78s3-.48,4.51-.77l.18,0c2.9-.56,5.89-1.13,8.24-3.11a21.78,21.78,0,0,0,7.26-11.85,64.85,64.85,0,0,0,1.29-8.49,37.13,37.13,0,0,0,15.63-8.15,2.93,2.93,0,0,0,1-2.35,3,3,0,0,0-1.22-2.31,43,43,0,0,0-6.18-3.8l8.32-19.79A2.86,2.86,0,0,0,504.83,54.71ZM321.27,80.13a3.12,3.12,0,0,1-2.14,1.07l-24,1.61a3.13,3.13,0,0,1-3-1.78l-6.32-13.25a3.11,3.11,0,0,1,2.16-4.4l29.13-6.25A3.13,3.13,0,0,1,320.84,60L322,77.86A3.09,3.09,0,0,1,321.27,80.13Zm67.42-6.44-21.6-30c5.14,1.29,10.06,3.29,16.65,6h0c9.75,4,23.52,11.53,29,14.59.34.19.68.36,1,.52-3.91,5.23-13.17,9.1-18.45,11a5.69,5.69,0,0,1-1.91.33A5.83,5.83,0,0,1,388.69,73.69Zm4.68,3h0Zm-.35,0-.33,0Zm-.4,0-.27,0Zm-.35,0-.31-.07Zm-.38-.09-.27-.07Zm-.34-.09-.31-.1Zm-.38-.13-.25-.1Zm-.33-.13-.29-.14Zm-.35-.17-.24-.13Zm-.31-.17-.28-.18Zm-.33-.21a1.88,1.88,0,0,1-.23-.16A1.88,1.88,0,0,0,389.85,75.56Zm-.3-.21-.26-.21Zm-14-.4a5.12,5.12,0,0,1-4.27,2.83l-36.16,2.38a5.21,5.21,0,0,1-3.89-1.38A5.16,5.16,0,0,1,329.57,75l-.26-15.32a5.33,5.33,0,0,1,4.77-5.4l23.15-2.51a9.58,9.58,0,0,1,9.11,4.31l9,13.75A5.11,5.11,0,0,1,375.58,75Zm12.87-.67a3.17,3.17,0,0,1-.21-.27A3.17,3.17,0,0,0,388.45,74.28Zm.27.32-.21-.25Zm0,0,.24.24Zm.53.51-.23-.21Zm4.19,1.53h0Zm1.81-.28.25-.08Zm-1.55.27h0Zm.26,0h0Zm.26,0,.14,0Zm.26,0,.15,0Zm.26,0,.15,0Zm.25-.07.17,0Zm44.66,54.37-3.46-1.25,5.23-4.35,1.93,2.46Z");
             
-            // Zentrierung (ViewBox: 504.91 x 184.69)
-            fgCtx.translate(-252.45 * sx, -92.35); 
+            // Zentrierung: immer -252.45 (unabhaengig von Spiegelung)
+            // Beweis: path-Center (252.45, 92.35) → translate(-252.45,-92.35) → (0,0) → scale → (0,0) → an liveX,liveY ✓
+            fgCtx.translate(-252.45, -92.35);
             fgCtx.fill(sideViewPath);
             
             fgCtx.restore();
         }
     }
 
-    if (vpAltWaypoints.length > 0) {
+    // C: PREDICTION VECTORS im Vertikalprofil
+    const _predAvail = window.vpPredictionData && window.vpPredictionData.length > 0 &&
+        (isHdgMode || (typeof vpLiveGpsFraction === 'number' && vpLiveGpsFraction >= 0));
+    if (_predAvail) {
+        const baseDist = isHdgMode ? VP_HDG_LOOKBACK_MIN : vpLiveGpsFraction * totalDist;
+        const baseX = xOf(baseDist);
+        // Im HDG-Modus: Live-GPS-Hoehe verwenden (vpLiveAltFt kommt vom Route-Marker)
+        const _predBaseAlt = isHdgMode ? (window.lastLiveGpsPos?.alt ?? vpLiveAltFt) : vpLiveAltFt;
+        const baseY = yOf(_predBaseAlt);
+
+        // Punkte filtern die noch innerhalb der Route liegen
+        // Im HDG-Modus: distNMAhead in Minuten umrechnen
+        const _gs4pred = (typeof smoothedGS !== 'undefined' && smoothedGS > 20) ? smoothedGS : 80;
+        const ptOffset = (pt) => isHdgMode ? pt.min : pt.distNMAhead;
+        const visiblePts = window.vpPredictionData.filter(pt => baseDist + ptOffset(pt) <= totalDist + 1);
+
+        if (visiblePts.length > 0) {
+            // Gestrichelte Linie vom Flugzeug durch alle Prediction-Punkte
+            fgCtx.save();
+            fgCtx.setLineDash([5, 4]);
+            fgCtx.lineWidth = 1.5;
+            fgCtx.beginPath();
+            fgCtx.moveTo(baseX, baseY);
+
+            for (const pt of visiblePts) {
+                const px = xOf(baseDist + ptOffset(pt));
+                const py = yOf(pt.altFt);
+                fgCtx.lineTo(px, py);
+            }
+            fgCtx.strokeStyle = 'rgba(255,255,255,0.55)';
+            fgCtx.stroke();
+            fgCtx.setLineDash([]);
+
+            // Zeitmarker + Labels
+            for (const pt of visiblePts) {
+                const px = xOf(baseDist + ptOffset(pt));
+                const py = yOf(pt.altFt);
+
+                // Culling: nur sichtbaren Bereich rendern
+                if (px < viewMinX - 30 || px > viewMaxX + 30) continue;
+
+                const tc = pt.threat === 'red' ? '#ff2222' : pt.threat === 'amber' ? '#ffaa00' : (pt.asColor || '#ffffff');
+
+                // Kreis
+                fgCtx.beginPath();
+                fgCtx.arc(px, py, 3.5, 0, Math.PI * 2);
+                fgCtx.fillStyle = tc;
+                fgCtx.fill();
+                fgCtx.strokeStyle = 'rgba(0,0,0,0.6)';
+                fgCtx.lineWidth = 1;
+                fgCtx.stroke();
+
+                // Zeitlabel oben
+                fgCtx.fillStyle = tc;
+                fgCtx.font = 'bold 9px Arial';
+                fgCtx.textAlign = 'center';
+                fgCtx.fillText(pt.min + 'm', px, py - 8);
+
+                // Höhe unten (nur wenn genug Platz)
+                if (zoomFactor >= 1.5 || window.vpPredictionData.length <= 3) {
+                    fgCtx.fillStyle = 'rgba(255,255,255,0.6)';
+                    fgCtx.font = '8px Arial';
+                    fgCtx.fillText(Math.round(pt.altFt) + 'ft', px, py + 14);
+                }
+            }
+            fgCtx.restore();
+        }
+    }
+
+    // Altitude-Waypoint-Diamanten nur im RTE-Modus (distNM = Route-NM, im HDG unbrauchbar)
+    if (!isHdgMode && vpAltWaypoints.length > 0) {
         for (let i = 0; i < vpAltWaypoints.length; i++) {
             const wp = vpAltWaypoints[i], wx = xOf(wp.distNM), wy = yOf(wp.altFt);
             if (wx < viewMinX - 20 || wx > viewMaxX + 20) continue;
@@ -2244,6 +2675,46 @@ function renderMapProfileFrames(timeMs) {
             fgCtx.fillStyle = '#ff00ff'; fgCtx.font = 'bold 9px Arial'; fgCtx.textAlign = 'center'; fgCtx.fillText(wp.altFt + ' ft', wx, wy - 11);
         }
     }
+
+    // D: TRAFFIC IM PROFIL
+    vpDrawTrafficInProfile(fgCtx, xOf, yOf, elevData, isHdgMode, viewMinX, viewMaxX);
+
+    // E: AWM PULS — nur das Luftraum-Polygon aufblinken (nicht ganzer Bildschirm)
+    if (window._awmPulse) {
+        const _p = window._awmPulse;
+        const _elapsed = Date.now() - _p.startMs;
+        const _TOTAL = 2700;  // 3 Pulse × 900ms
+        if (_elapsed > _TOTAL) {
+            window._awmPulse = null;
+        } else {
+            const _phase = Math.floor(_elapsed / 450);  // 0-5
+            if (_phase % 2 === 0) {
+                // Horizontale Ausdehnung aus dem Airspace-Cache holen
+                let _px1 = padLeft, _pw = plotW; // Fallback: volle Breite
+                if (_p.as && window._vpAsCache && window._vpAsCache.items) {
+                    const _match = window._vpAsCache.items.find(item => item.as === _p.as);
+                    if (_match) {
+                        _px1 = xOf(_match.asMinDist);
+                        _pw  = Math.max(4, xOf(_match.asMaxDist) - _px1);
+                    }
+                }
+                const _alpha = 0.75 * (1 - (_elapsed % 450) / 450 * 0.35);
+                const _y1 = Math.min(yOf(Math.max(_p.lowerFt, 0)), yOf(Math.max(_p.upperFt, 0)));
+                const _y2 = Math.max(yOf(Math.max(_p.lowerFt, 0)), yOf(Math.max(_p.upperFt, 0)));
+                const _h  = Math.max(4, _y2 - _y1);
+                fgCtx.save();
+                fgCtx.globalAlpha = _alpha;
+                fgCtx.strokeStyle = _p.color;
+                fgCtx.lineWidth = 3;
+                fgCtx.strokeRect(_px1, _y1, _pw, _h);
+                fgCtx.globalAlpha = _alpha * 0.28;
+                fgCtx.fillStyle = _p.color;
+                fgCtx.fillRect(_px1, _y1, _pw, _h);
+                fgCtx.restore();
+            }
+        }
+    }
+
     fgCtx.restore();
 
     window.vpAnimFrameId = requestAnimationFrame(renderMapProfileFrames);
@@ -2645,6 +3116,7 @@ function initAltWaypoints() {
 
     // === DOUBLE CLICK: remove/add waypoint ===
     canvas.addEventListener('dblclick', (e) => {
+        if (typeof vpMode !== 'undefined' && vpMode === 'HDG') return; // Nur im RTE-Modus
         const m = vpGetCanvasMetrics();
         if (!m) return;
         const { mx, my } = vpClientToCanvas(e.clientX, e.clientY, m);
@@ -2665,7 +3137,7 @@ function initAltWaypoints() {
         let cursor = 'default';
         if (vpHitTestMagenta(mx, m)) cursor = 'ew-resize';
         else if (vpHitTestWaypoint(mx, my, m) >= 0) cursor = 'move';
-        else if (vpHitTestFlightLine(mx, my, m) !== null) cursor = 'ns-resize';
+        else if ((typeof vpMode === 'undefined' || vpMode !== 'HDG') && vpHitTestFlightLine(mx, my, m) !== null) cursor = 'ns-resize';
         canvas.style.cursor = cursor;
     });
 
@@ -2678,8 +3150,9 @@ function initAltWaypoints() {
         dragStartX = e.clientX;
         dragStartY = e.clientY;
 
-        // Priority 1: Magenta marker drag
-        if (vpHitTestMagenta(mx, m)) {
+        // Priority 1: Magenta marker drag (nur im RTE-Modus)
+        const _isHdgNow = (typeof vpMode !== 'undefined' && vpMode === 'HDG');
+        if (!_isHdgNow && vpHitTestMagenta(mx, m)) {
             window.vpDraggingPosMarker = true;
             e.preventDefault(); e.stopPropagation();
             return;
@@ -2692,7 +3165,8 @@ function initAltWaypoints() {
             e.preventDefault(); e.stopPropagation();
             return;
         }
-        // Priority 3: Flight line segment drag
+        // Priority 3: Flight line segment drag (nur im ROUTE-Modus)
+        if (typeof vpMode !== 'undefined' && vpMode === 'HDG') return; // Keine Höhenlinien-Interaktion im HDG-Modus
         const mouseDistNM = vpHitTestFlightLine(mx, my, m);
         if (mouseDistNM !== null) {
             e.preventDefault(); e.stopPropagation();
@@ -2743,13 +3217,16 @@ function initAltWaypoints() {
         const now = Date.now();
         if (now - lastTapTime < 300) {
             e.preventDefault();
-            if (vpHandleDoubleHit(mx, my, m)) window.debouncedSaveMissionState();
+            if (typeof vpMode === 'undefined' || vpMode !== 'HDG') { // Nur im RTE-Modus
+                if (vpHandleDoubleHit(mx, my, m)) window.debouncedSaveMissionState();
+            }
             lastTapTime = 0;
             return;
         }
         lastTapTime = now;
 
-        if (vpHitTestMagenta(mx, m)) {
+        const _isHdgNow2 = (typeof vpMode !== 'undefined' && vpMode === 'HDG');
+        if (!_isHdgNow2 && vpHitTestMagenta(mx, m)) {
             e.preventDefault();
             window.vpDraggingPosMarker = true;
             return;
@@ -2761,6 +3238,7 @@ function initAltWaypoints() {
             dragOrigWP = { ...vpAltWaypoints[wpIdx] };
             return;
         }
+        if (typeof vpMode !== 'undefined' && vpMode === 'HDG') return; // Keine Höhenlinien-Interaktion im HDG-Modus
         const mouseDistNM = vpHitTestFlightLine(mx, my, m);
         if (mouseDistNM !== null) {
             e.preventDefault();
@@ -3395,10 +3873,246 @@ window.exportFor2DSim = function() {
     try {
         localStorage.setItem('autoSimFlightPlan', jsonString);
         // Öffnet den Simulator in einem neuen Tab (Pfad ggf. anpassen, falls game.html woanders liegt)
-        window.open('game.html', '_blank'); 
+        window.open('game.html', '_blank');
     } catch (e) {
         alert("Fehler beim Transfer! Bitte Cookies/Local Storage im Browser erlauben.");
         console.error(e);
     }
 };
+
+/* =========================================================
+   HDG-MODUS: Heading-basiertes Vertikalprofil (v1)
+   Zeigt Terrain, Lufträume, Städte entlang der aktuellen
+   Flugrichtung — ohne neue API-Calls.
+   X-Achse = Minuten voraus/zurück (totalDist = Minuten).
+   Flugzeug steht bei distNM = VP_HDG_LOOKBACK_MIN (leicht eingerückt).
+   ========================================================= */
+
+const VP_HDG_LOOKBACK_MIN = 2;    // Minuten hinter dem Flugzeug (Gelände dahinter)
+const VP_HDG_LOOKAHEAD_MIN = 15;  // Minuten voraus (Standard)
+const VP_HDG_SAMPLES = 80;        // Anzahl Terrain-Sample-Punkte (gesamt)
+
+let vpMode = 'ROUTE';            // 'ROUTE' | 'HDG'
+let vpHdgElevData = null;        // [{distNM (=Minuten), elevFt, lat, lon}]
+let vpHdgLandmarks = [];
+let vpHdgObstacles = [];
+let vpHdgLinearFeatures = [];
+let vpHdgUpdateTimer = null;
+let vpHdgLastUpdate = { lat: 0, lon: 0, hdg: -999 };
+
+// ── Toggle ──────────────────────────────────────────────
+function vpToggleMode() {
+    const btn = document.getElementById('btnToggleVpMode');
+    const hasGps = window.lastLiveGpsPos && typeof smoothedGS !== 'undefined' && smoothedGS > 20;
+
+    if (vpMode === 'ROUTE') {
+        if (!hasGps) {
+            // Kein GPS → Button kurz blinken lassen
+            if (btn) { btn.style.background = '#833'; setTimeout(() => btn.style.background = '', 600); }
+            return;
+        }
+        vpMode = 'HDG';
+        if (btn) { btn.textContent = 'HDG'; btn.classList.add('active'); }
+        startHdgCycle();
+    } else {
+        stopHdgCycle();
+        if (btn) { btn.textContent = 'RTE'; btn.classList.remove('active'); }
+        // _hdgAutoActivated bleibt true → kein sofortiger Re-Trigger durch GPS-Tick
+        // Reset passiert erst beim GPS-Disconnect (in sync.js onclose)
+    }
+}
+
+function startHdgCycle() {
+    updateHdgProfile();
+    vpHdgUpdateTimer = setInterval(updateHdgProfile, 1000);
+}
+
+function stopHdgCycle() {
+    clearInterval(vpHdgUpdateTimer);
+    vpHdgUpdateTimer = null;
+    vpHdgElevData = null;
+    vpHdgLandmarks = [];
+    vpHdgObstacles = [];
+    vpHdgLinearFeatures = [];
+    vpMode = 'ROUTE';
+    window.vpBgNeedsUpdate = true;
+}
+
+async function updateHdgProfile() {
+    if (vpMode !== 'HDG') return;
+    if (!window.lastLiveGpsPos) return;
+
+    const { lat, lon, hdg, alt } = window.lastLiveGpsPos;
+    const gs = (typeof smoothedGS !== 'undefined' && smoothedGS > 20) ? smoothedGS : 80;
+
+    // Change-Detection: nur updaten wenn Kurs/Position sich nennenswert geändert hat
+    const dHdg = Math.abs(((hdg - vpHdgLastUpdate.hdg) + 540) % 360 - 180);
+    const dPos = Math.abs(lat - vpHdgLastUpdate.lat) + Math.abs(lon - vpHdgLastUpdate.lon);
+    if (vpHdgElevData && dHdg < 2 && dPos < 0.003) return;
+
+    vpHdgLastUpdate = { lat, lon, hdg };
+    await generateHdgProfile(lat, lon, hdg, alt, gs);
+    computeHdgLandmarks(lat, lon, hdg, gs);
+    computeHdgObstacles(lat, lon, hdg, gs);
+    computeHdgLinearFeatures(lat, lon, hdg, gs);
+    window.vpBgNeedsUpdate = true;
+}
+
+// ── Terrain-Sampling entlang der Flugrichtung ────────────
+async function generateHdgProfile(lat, lon, hdg, alt, gs) {
+    if (typeof sampleTerrainElevation !== 'function') return;
+
+    const totalMin = VP_HDG_LOOKBACK_MIN + VP_HDG_LOOKAHEAD_MIN;
+    const totalNM  = gs * (totalMin / 60);
+    const stepNM   = totalNM / VP_HDG_SAMPLES;
+    const backNM   = gs * (VP_HDG_LOOKBACK_MIN / 60);
+
+    const points = [];
+    for (let i = 0; i <= VP_HDG_SAMPLES; i++) {
+        const ahead = i * stepNM - backNM;  // negativ = hinter dem Flugzeug
+        const bearing = ahead >= 0 ? hdg : (hdg + 180) % 360;
+        const dist    = Math.abs(ahead);
+        const pt = (typeof getDestinationPoint === 'function')
+            ? getDestinationPoint(lat, lon, dist, bearing)
+            : { lat, lon };
+        // distNM speichern wir in Minuten (i * totalMin / samples)
+        const timeMin = i * totalMin / VP_HDG_SAMPLES;
+        points.push({ lat: pt.lat, lon: pt.lon, distNM: timeMin });
+    }
+
+    // Tiles parallel vorladen (normalerweise 1-3 Tiles)
+    const tileSet = new Set();
+    const tilePromises = [];
+    for (const p of points) {
+        const z = 10;
+        const n = Math.pow(2, z);
+        const tx = Math.floor((p.lon + 180) / 360 * n);
+        const latRad = p.lat * Math.PI / 180;
+        const ty = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+        const key = `${z}/${tx}/${ty}`;
+        if (!tileSet.has(key) && typeof _tawsLoadTile === 'function') {
+            tileSet.add(key);
+            tilePromises.push(_tawsLoadTile(tx, ty, z).catch(() => null));
+        }
+    }
+    if (tilePromises.length) await Promise.all(tilePromises);
+
+    // Höhen sampeln (synchron aus Cache)
+    const result = [];
+    for (const p of points) {
+        try {
+            const elevFt = await sampleTerrainElevation(p.lat, p.lon);
+            result.push({ distNM: p.distNM, elevFt: Math.max(0, elevFt), lat: p.lat, lon: p.lon });
+        } catch (e) {
+            result.push({ distNM: p.distNM, elevFt: 0, lat: p.lat, lon: p.lon });
+        }
+    }
+    vpHdgElevData = result;
+}
+
+// ── Landmarks (Städte & Airports) entlang Heading ────────
+function computeHdgLandmarks(lat, lon, hdg, gs) {
+    vpHdgLandmarks = [];
+    if (!window.GLOBAL_CITIES_DATA && typeof globalCities === 'undefined') return;
+
+    const cities = window.GLOBAL_CITIES_DATA || (typeof globalCities !== 'undefined' ? globalCities : []);
+    const airports = (typeof globalAirports !== 'undefined' && globalAirports) ? Object.values(globalAirports) : [];
+    const totalMin = VP_HDG_LOOKBACK_MIN + VP_HDG_LOOKAHEAD_MIN;
+    const totalNM  = gs * (totalMin / 60);
+    const backNM   = gs * (VP_HDG_LOOKBACK_MIN / 60);
+
+    const found = [];
+
+    // Städte
+    for (const c of cities) {
+        if (!c.lat || !c.lon) continue;
+        if (typeof calcNav !== 'function') break;
+        const nav = calcNav(lat, lon, c.lat, c.lon);
+        if (nav.dist > totalNM + 5) continue; // Grob-Filter
+        // Winkel zur Heading-Linie prüfen
+        const angleOff = Math.abs(((nav.brng - hdg) + 540) % 360 - 180);
+        if (angleOff > 20 || nav.dist > totalNM + 3) continue;
+        // Seitliche Abweichung prüfen (max 4 NM)
+        const sideDevNM = nav.dist * Math.sin(angleOff * Math.PI / 180);
+        if (Math.abs(sideDevNM) > 4) continue;
+        // Distanz entlang Heading → Minuten
+        const alongNM = nav.dist * Math.cos(angleOff * Math.PI / 180);
+        const alongMin = (alongNM / gs) * 60;
+        const timeMin = VP_HDG_LOOKBACK_MIN + (nav.brng === hdg ? alongMin : -alongMin);
+        if (timeMin < 0 || timeMin > totalMin) continue;
+        found.push({ name: c.name || c.n, type: 'city', pop: c.pop || 0, distNM: timeMin });
+    }
+
+    // Airports
+    for (const a of airports) {
+        if (!a.lat || !a.lon) continue;
+        if (typeof calcNav !== 'function') break;
+        const nav = calcNav(lat, lon, a.lat, a.lon);
+        if (nav.dist > totalNM + 5) continue;
+        const angleOff = Math.abs(((nav.brng - hdg) + 540) % 360 - 180);
+        if (angleOff > 20 || nav.dist > totalNM + 3) continue;
+        const sideDevNM = nav.dist * Math.sin(angleOff * Math.PI / 180);
+        if (Math.abs(sideDevNM) > 4) continue;
+        const alongNM = nav.dist * Math.cos(angleOff * Math.PI / 180);
+        const alongMin = (alongNM / gs) * 60;
+        const timeMin = VP_HDG_LOOKBACK_MIN + (nav.brng === hdg ? alongMin : -alongMin);
+        if (timeMin < 0 || timeMin > totalMin) continue;
+        found.push({ name: a.icao || a.name, type: 'apt', pop: 999999, distNM: timeMin });
+    }
+
+    // Sortieren nach Entfernung, max. 12 Landmarks
+    found.sort((a, b) => b.pop - a.pop);
+    vpHdgLandmarks = found.slice(0, 12);
+}
+
+// ── Hindernisse aus Cache filtern ────────────────────────
+function computeHdgObstacles(lat, lon, hdg, gs) {
+    vpHdgObstacles = [];
+    if (!vpObstacles || vpObstacles.length === 0) return;
+
+    const totalMin = VP_HDG_LOOKBACK_MIN + VP_HDG_LOOKAHEAD_MIN;
+    const totalNM  = gs * (totalMin / 60);
+    const backNM   = gs * (VP_HDG_LOOKBACK_MIN / 60);
+
+    for (const obs of vpObstacles) {
+        if (!obs.lat || !obs.lon) continue;
+        if (typeof calcNav !== 'function') break;
+        const nav = calcNav(lat, lon, obs.lat, obs.lon);
+        if (nav.dist > totalNM + 3) continue;
+        const angleOff = Math.abs(((nav.brng - hdg) + 540) % 360 - 180);
+        if (angleOff > 20) continue;
+        const sideDevNM = nav.dist * Math.sin(angleOff * Math.PI / 180);
+        if (Math.abs(sideDevNM) > 3) continue;
+        const alongNM = nav.dist * Math.cos(angleOff * Math.PI / 180);
+        const alongMin = (alongNM / gs) * 60;
+        // angleOff ≤ 20° → Hindernis liegt voraus (Heading-Korridor)
+        const timeMin = VP_HDG_LOOKBACK_MIN + alongMin;
+        if (timeMin < 0 || timeMin > totalMin) continue;
+        vpHdgObstacles.push({ ...obs, distNM: timeMin, groundElevFt: obs.elevFt });
+    }
+}
+
+// ── Lineare Features (Straßen & Flüsse) entlang Heading ──
+function computeHdgLinearFeatures(lat, lon, hdg, gs) {
+    vpHdgLinearFeatures = [];
+    if (!vpLinearFeatures || vpLinearFeatures.length === 0) return;
+
+    const totalMin = VP_HDG_LOOKBACK_MIN + VP_HDG_LOOKAHEAD_MIN;
+    const totalNM  = gs * (totalMin / 60);
+
+    for (const lin of vpLinearFeatures) {
+        if (!lin.lat || !lin.lon) continue;
+        if (typeof calcNav !== 'function') break;
+        const nav = calcNav(lat, lon, lin.lat, lin.lon);
+        if (nav.dist > totalNM + 3) continue;
+        const angleOff = Math.abs(((nav.brng - hdg) + 540) % 360 - 180);
+        if (angleOff > 25) continue; // etwas breiterer Korridor für Straßen/Flüsse
+        const sideDevNM = nav.dist * Math.sin(angleOff * Math.PI / 180);
+        if (Math.abs(sideDevNM) > 5) continue;
+        const alongNM = nav.dist * Math.cos(angleOff * Math.PI / 180);
+        const timeMin = VP_HDG_LOOKBACK_MIN + (alongNM / gs) * 60;
+        if (timeMin < 0 || timeMin > totalMin) continue;
+        vpHdgLinearFeatures.push({ ...lin, distNM: timeMin });
+    }
+}
 

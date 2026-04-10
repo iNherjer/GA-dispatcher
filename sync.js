@@ -27,8 +27,20 @@ function getSyncPin() {
 let liveSnailTrail = null;
 let lastTrailPoint = null;
 let isAutoFollow = true;
-let lastGpsTickDetails = null; 
+let lastGpsTickDetails = null;
 let lastTelemetryUpdateAt = 0;
+
+// --- PREDICTION VECTORS ---
+let predictionLine = null;
+let predictionMarkers = [];
+let lastPredictionUpdate = 0;
+let smoothedGS = 0;
+let smoothedVS = 0;
+
+// --- LIVE TRAFFIC ---
+let liveTrafficMarkers = {}; // key → { marker }
+window.vpTrafficData = [];
+window.vpTrafficMapVisible = true;
 
 function toggleAutoFollow() {
     isAutoFollow = !isAutoFollow;
@@ -588,10 +600,11 @@ function resetSyncTimer() {
 
 // Globale Variablen für das Live-Tracking
 let liveGpsSocket = null;
-let liveGpsMarker = null; 
+let liveGpsMarker = null;
 let gpsWatchdog;
+let gpsReconnectDelay = 2000; // Start: 2s, wächst bei wiederholtem Fehlschlag
 // Diese Funktion aufrufen, sobald eine Route per Sync ID geladen wurde (z.B. connectToLiveGPS("4815"))
-window.connectToLiveGPS = function(syncId) {
+window.connectToLiveGPS = async function(syncId) {
     if (!syncId) return;
 
     const wsUrl = 'wss://websocketrelais.onrender.com/';
@@ -600,16 +613,25 @@ window.connectToLiveGPS = function(syncId) {
     if (liveGpsSocket) liveGpsSocket.close();
 
     console.log(`[GPS] 📡 Verbinde mit Live-Tracking für Pilot-ID ${syncId}...`);
+
+    // Wake-up Ping: Render.com Free Tier aus dem Schlaf holen bevor WebSocket versucht wird
+    const ind0 = document.getElementById('liveGpsIndicator');
+    if (ind0) { ind0.innerHTML = '🛰️ WAKE'; ind0.style.color = '#f2c12e'; ind0.style.textShadow = 'none'; }
+    try {
+        await fetch('https://websocketrelais.onrender.com/', { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(8000) });
+    } catch(e) { /* Server schläft evtl. noch – WebSocket versucht es trotzdem */ }
+
     liveGpsSocket = new WebSocket(wsUrl);
 
     liveGpsSocket.onopen = () => {
         console.log(`[GPS] ✅ Verbunden! Warte auf Flugzeug-Daten...`);
+        gpsReconnectDelay = 2000; // Erfolg → Backoff zurücksetzen
         // Dem Server mitteilen, in welchen Raum wir wollen (mit PIN!)
         liveGpsSocket.send(JSON.stringify({ type: 'join', syncId: syncId, pin: getSyncPin() }));
 
         const ind = document.getElementById('liveGpsIndicator');
-        if (ind) { 
-            ind.innerHTML = '🛰️ WAIT'; 
+        if (ind) {
+            ind.innerHTML = '🛰️ WAIT';
             ind.style.color = '#f2c12e'; // Orange
             ind.style.textShadow = 'none';
         }
@@ -625,6 +647,25 @@ window.connectToLiveGPS = function(syncId) {
             }
             if (data.type === 'gps') {
                 updateLivePlanePosition(data.lat, data.lon, data.alt, data.hdg);
+
+                // Traffic-Daten die im GPS-Paket eingebettet sind (Relay-kompatibler Weg)
+                if (data.traffic && Array.isArray(data.traffic)) {
+                    // Eigenes Flugzeug + irrelevanten Traffic herausfiltern
+                    const filteredTraffic = data.traffic.filter(ac => {
+                        const dLat = Math.abs((ac.lat ?? 0) - data.lat);
+                        const dLon = Math.abs((ac.lon ?? 0) - data.lon);
+                        if (dLat < 0.0015 && dLon < 0.0015) return false; // eigene Position ~0.1 NM
+                        // Nur Flieger innerhalb ±5000 ft anzeigen – außer sie sind sehr nah (<5 NM)
+                        const dAlt = Math.abs((ac.alt ?? 0) - data.alt);
+                        const nearBy = dLat < 0.08 && dLon < 0.08; // ~5 NM box
+                        if (!nearBy && dAlt > 5000) return false;
+                        return true;
+                    });
+                    window.vpTrafficData = filteredTraffic;
+                    if (window.vpTrafficMapVisible) {
+                        updateTrafficOnMap(filteredTraffic, data.alt);
+                    }
+                }
 
                 const ind = document.getElementById('liveGpsIndicator');
                 if (ind) {
@@ -644,23 +685,33 @@ window.connectToLiveGPS = function(syncId) {
                     }, 3000);
                 }
             }
+            if (data.type === 'traffic') {
+                window.vpTrafficData = data.aircraft || [];
+                if (window.vpTrafficMapVisible) {
+                    updateTrafficOnMap(window.vpTrafficData, window.lastLiveGpsPos?.alt);
+                }
+            }
         } catch (e) {
             console.error('[GPS] Fehler beim Lesen der Daten:', e);
         }
     };
 
     liveGpsSocket.onclose = () => {
-        console.warn('[GPS] ❌ Verbindung getrennt. Versuche Reconnect in 5 Sekunden...');
-        
         clearTimeout(gpsWatchdog);
         const ind = document.getElementById('liveGpsIndicator');
-        if (ind) { 
-            ind.innerHTML = '🛰️ OFF'; 
-            ind.style.color = '#666'; // Grau
+        if (ind) {
+            ind.innerHTML = '🛰️ OFF';
+            ind.style.color = '#666';
             ind.style.textShadow = 'none';
         }
 
-        setTimeout(() => connectToLiveGPS(syncId), 5000);
+        // Auto-HDG zurücksetzen damit es bei der nächsten Verbindung wieder greift
+        window._hdgAutoActivated = false;
+
+        // Exponentielles Backoff: 2s → 4s → 8s → max 15s (fängt Render.com Cold Starts sauber ab)
+        console.warn(`[GPS] ❌ Verbindung getrennt. Reconnect in ${(gpsReconnectDelay/1000).toFixed(0)}s...`);
+        setTimeout(() => connectToLiveGPS(syncId), gpsReconnectDelay);
+        gpsReconnectDelay = Math.min(gpsReconnectDelay * 2, 15000);
     };
 
     liveGpsSocket.onerror = () => {
@@ -678,7 +729,7 @@ function updateLivePlanePosition(lat, lon, alt, hdg) {
     if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
 
     const now = Date.now();
-    window.lastLiveGpsPos = { lat, lon, alt, hdg, t: now };
+    window.lastLiveGpsPos = { lat, lon, alt, hdg, t: now, gs: smoothedGS };
 
     // --- FEATURE 1: SNAIL TRAIL ---
     if (!liveSnailTrail) {
@@ -720,7 +771,21 @@ function updateLivePlanePosition(lat, lon, alt, hdg) {
                     vsEl.textContent = Math.round(vs);
                     vsEl.style.color = vs > 100 ? 'var(--green)' : (vs < -100 ? 'var(--red)' : '#fff');
                 }
+                // AGL wird in updateLivePlanePosition weiter unten gesetzt (nach bestIdx-Suche)
             }
+            // Smoothed GS/VS for prediction (EMA α=0.3)
+            smoothedGS = smoothedGS === 0 ? gs : smoothedGS * 0.7 + gs * 0.3;
+            smoothedVS = smoothedVS === 0 ? vs : smoothedVS * 0.7 + vs * 0.3;
+
+            // Auto-HDG: Bei erster echter GPS-Bewegung HDG-Modus aktivieren (nicht im Sim-Modus)
+            if (smoothedGS > 20 && !window._hdgAutoActivated
+                && !window.simModeActive
+                && typeof vpMode !== 'undefined' && vpMode === 'ROUTE'
+                && typeof vpToggleMode === 'function') {
+                window._hdgAutoActivated = true;
+                vpToggleMode();
+            }
+
             // Update last info for speed calculation
             lastGpsTickDetails = { lat, lon, alt, t: now };
         }
@@ -728,10 +793,184 @@ function updateLivePlanePosition(lat, lon, alt, hdg) {
         lastGpsTickDetails = { lat, lon, alt, t: now };
     }
 
+    // --- PREDICTION VECTORS ---
+    // Hilfsfunktion: Luftraum-Farbe für einen Vorhersagepunkt (synchron, für Marker-Einfärbung)
+    function _getAirspaceColorForPredPoint(pt) {
+        if (typeof activeAirspaces === 'undefined' || !activeAirspaces.length) return null;
+        if (typeof vpPointInPoly === 'undefined' || typeof airspaceLimitToFt === 'undefined') return null;
+        for (const as of activeAirspaces) {
+            if (!as.geometry || !as.lowerLimit || !as.upperLimit) continue;
+            if (as.type === 33) continue; // FIS überspringen
+            const lowerFt = airspaceLimitToFt(as.lowerLimit);
+            const upperFt = airspaceLimitToFt(as.upperLimit);
+            if (lowerFt === null || upperFt === null) continue;
+            const effLower = (as.lowerLimit.referenceDatum === 0) ? 0 : lowerFt;
+            if (pt.alt < effLower - 500 || pt.alt > upperFt + 500) continue;
+            const polys = [];
+            if (as.geometry.type === 'Polygon') polys.push(as.geometry.coordinates[0]);
+            else if (as.geometry.type === 'MultiPolygon') as.geometry.coordinates.forEach(mc => polys.push(mc[0]));
+            for (const poly of polys) {
+                if (vpPointInPoly({ lat: pt.lat, lon: pt.lon }, poly)) {
+                    return typeof getAirspaceStyle === 'function' ? getAirspaceStyle(as).color : '#f2c12e';
+                }
+            }
+        }
+        return null;
+    }
+    if (smoothedGS > 30 && typeof getDestinationPoint === 'function' && now - lastPredictionUpdate > 1000) {
+        lastPredictionUpdate = now;
+        const horizons = [1, 2, 5, 10];
+        const predPoints = horizons.map(min => {
+            const distNM = smoothedGS * (min / 60);
+            const pt = getDestinationPoint(lat, lon, distNM, hdg);
+            const predAlt = alt + (smoothedVS * min);
+            return { lat: pt.lat, lon: pt.lon, min, distNMAhead: distNM, altFt: Math.max(0, predAlt), alt: Math.max(0, predAlt), threat: 'green' };
+        });
+
+        // Für Vertikalprofil-Rendering bereitstellen
+        window.vpPredictionData = predPoints;
+
+        // Erweiterte Punkte für AWM (3 und 4 min) — nur intern, nicht auf Karte
+        const _awmExtra = [3, 4].map(min => {
+            const distNM = smoothedGS * (min / 60);
+            const pt = getDestinationPoint(lat, lon, distNM, hdg);
+            return { lat: pt.lat, lon: pt.lon, min, alt: Math.max(0, alt + smoothedVS * min) };
+        });
+        const _awmPredPoints = [...predPoints, ..._awmExtra];
+
+        const lineCoords = [[lat, lon], ...predPoints.map(p => [p.lat, p.lon])];
+
+        // Linie zeichnen/updaten
+        if (!predictionLine) {
+            predictionLine = L.polyline(lineCoords, {
+                color: '#ffffff',
+                weight: 2,
+                opacity: 0.7,
+                dashArray: '8, 6',
+                interactive: false
+            }).addTo(map);
+        } else {
+            predictionLine.setLatLngs(lineCoords);
+        }
+
+        // Lufträume positions-basiert nachladen wenn:
+        //   a) HDG-Modus — activeAirspaces muss positions-basiert sein, oder
+        //   b) Keine Route gesetzt — ohne Route wird fetchRouteAirspaces nie aufgerufen
+        //      → activeAirspaces bleibt sonst dauerhaft leer
+        // Im ROUTE-Modus MIT Route: NICHT aufrufen, sonst überschreibt der 10-NM-Ausschnitt
+        // die komplette Routen-Luftraumliste und Lufträume verschwinden aus dem Vertikalprofil.
+        const _isHdgModeNow = (typeof vpMode !== 'undefined' && vpMode === 'HDG');
+        const _hasRoute = !!(window._lastVpRouteKey);
+        if ((_isHdgModeNow || !_hasRoute) && typeof fetchRouteAirspaces === 'function') {
+            const hdgKey = `${lat.toFixed(1)}_${lon.toFixed(1)}`;
+            if (window._lastHdgAirspaceKey !== hdgKey) {
+                window._lastHdgAirspaceKey = hdgKey;
+                const hdgPts = [{ lat, lng: lon }, ...predPoints.map(p => ({ lat: p.lat, lng: p.lon }))];
+                fetchRouteAirspaces(hdgPts);
+            }
+        }
+
+        // Hindernisse + Städte positions-basiert laden wenn kein Flugplan gesetzt oder HDG-Modus
+        const _needsGpsData = _isHdgModeNow || !_hasRoute;
+        if (_needsGpsData) {
+            // Hindernisse: max. alle 2 Minuten UND bei Positionsänderung >~6km
+            const _obsKey = `${lat.toFixed(1)}_${lon.toFixed(1)}`;
+            const _obsNow = Date.now();
+            if ((window._lastGpsObsKey !== _obsKey || !window._lastGpsObsTime || (_obsNow - window._lastGpsObsTime) > 120000)
+                && typeof window.fetchGpsObstacles === 'function') {
+                window._lastGpsObsKey = _obsKey;
+                window._lastGpsObsTime = _obsNow;
+                window.fetchGpsObstacles(lat, lon);
+            }
+            // Städte: bei Positionsänderung >~700m (RAM-only, kein API-Limit)
+            const _cityKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
+            if (window._lastGpsCityKey !== _cityKey && typeof window.updateGpsCities === 'function') {
+                window._lastGpsCityKey = _cityKey;
+                window.updateGpsCities(lat, lon);
+            }
+        } else {
+            // Zurücksetzen damit beim nächsten Eintritt in GPS-Modus sofort geladen wird
+            window._lastGpsObsKey = null;
+            window._lastGpsCityKey = null;
+        }
+
+        // Airspace-Warnungen prüfen (Sprach-Alerts via AWM)
+        if (typeof checkAirspaceWarnings === 'function') checkAirspaceWarnings(_awmPredPoints);
+
+        // TAWS-Check: Prediction-Linie einfärben wenn taws.js geladen
+        if (typeof checkTerrainAlongPath === 'function') {
+            checkTerrainAlongPath(predPoints).then(results => {
+                if (!results || !predictionLine) return;
+                // Worst-case Threat bestimmt Linienfarbe
+                let worst = 'green';
+                for (const r of results) {
+                    if (r.threat === 'red') { worst = 'red'; break; }
+                    if (r.threat === 'amber') worst = 'amber';
+                }
+                const color = worst === 'red' ? '#ff2222' : worst === 'amber' ? '#ffaa00' : '#ffffff';
+                predictionLine.setStyle({ color });
+
+                // Marker-Farben: Terrain hat Priorität, danach Luftraum-Farbe
+                predictionMarkers.forEach((m, i) => {
+                    const pt = predPoints[i];
+                    const terrain = results[i];
+                    let c = '#ffffff';
+                    if (terrain?.threat === 'red')   c = '#ff2222';
+                    else if (terrain?.threat === 'amber') c = '#ffaa00';
+                    else if (pt) {
+                        // Luftraum-Check für visuelle Rückmeldung
+                        const asC = _getAirspaceColorForPredPoint(pt);
+                        if (asC) c = asC;
+                    }
+                    m.setStyle({ color: c, fillColor: c });
+                });
+
+                // Threats + Airspace-Farbe ans Vertikalprofil weitergeben
+                if (window.vpPredictionData) {
+                    results.forEach((r, i) => {
+                        if (!window.vpPredictionData[i]) return;
+                        window.vpPredictionData[i].threat = r.threat;
+                        // Airspace-Farbe: nur setzen wenn kein Terrain-Threat
+                        if (r.threat === 'green') {
+                            window.vpPredictionData[i].asColor = _getAirspaceColorForPredPoint(predPoints[i]) || null;
+                        } else {
+                            window.vpPredictionData[i].asColor = null;
+                        }
+                    });
+                }
+            });
+        }
+
+        // Zeitmarker zeichnen/updaten
+        while (predictionMarkers.length < predPoints.length) {
+            const idx = predictionMarkers.length;
+            const m = L.circleMarker([0, 0], {
+                radius: 4,
+                color: '#ffffff',
+                fillColor: '#ffffff',
+                fillOpacity: 0.9,
+                weight: 1.5,
+                interactive: false
+            }).addTo(map);
+            m.bindTooltip('', { permanent: true, direction: 'top', offset: [0, -8], className: 'prediction-tooltip' });
+            predictionMarkers.push(m);
+        }
+        predPoints.forEach((p, i) => {
+            predictionMarkers[i].setLatLng([p.lat, p.lon]);
+            predictionMarkers[i].setTooltipContent(`${p.min}m`);
+        });
+    } else if (smoothedGS <= 30) {
+        // Zu langsam → Prediction ausblenden
+        if (predictionLine) { predictionLine.remove(); predictionLine = null; }
+        predictionMarkers.forEach(m => m.remove());
+        predictionMarkers = [];
+    }
+
     // --- ICON A: KARTE ---
-    const svgIconHtml = `
-        <div style="width: var(--plane-size); height: var(--plane-size); filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)); position: relative;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 447.74 339.91" style="transform: rotate(${hdg}deg); transform-origin: center; width: 100%; height: 100%;">
+    // SVG nur einmal bauen, danach nur per CSS-Transform rotieren (kein innerHTML-Rebuild pro Paket!)
+    const _planeSvgTemplate = `
+        <div class="live-plane-inner" style="width: var(--plane-size); height: var(--plane-size); filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)); position: relative; transform: translate(-50%, -37%);">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 447.74 339.91" style="transform-origin: 50% 37%; width: 100%; height: 100%; will-change: transform;">
                 <path fill="var(--plane-color)" d="M447.22,118.14a2,2,0,0,0-1.48-.65H443a61.87,61.87,0,0,0-6.2-19.62,8.66,8.66,0,0,0-7.67-4.6H290.3a13.4,13.4,0,0,1-4.61-.81L259.8,83a10.84,10.84,0,0,1-7.09-8.94c-1.44-12.06-4.15-34.18-6.06-46.78a16.45,16.45,0,0,0-10.94-13.17c-.9-.31-1.81-.59-2.69-.82a1.94,1.94,0,0,1-1.4-1.37,29.46,29.46,0,0,0-5.37-10.72,3.45,3.45,0,0,0-5.28,0A29.37,29.37,0,0,0,215.6,12a2,2,0,0,1-1.4,1.37c-.88.23-1.79.51-2.69.82a16.46,16.46,0,0,0-10.95,13.17C198.67,39.84,196,62,194.51,74.09A10.84,10.84,0,0,1,187.42,83l-25.89,9.43a13.4,13.4,0,0,1-4.61.81H18a8.66,8.66,0,0,0-7.66,4.6,61.62,61.62,0,0,0-6.2,19.62H2a2,2,0,0,0-2,2.19l.63,6.83a2,2,0,0,0,2,1.82h.72v.33A71.32,71.32,0,0,0,6.5,150a49.32,49.32,0,0,0,8.4,16.31,5.49,5.49,0,0,0,4.28,2H196.94c.84,5.65,13.56,91.52,17.94,122h-50.2a11.94,11.94,0,0,0-11.92,11.92v13.57a11.94,11.94,0,0,0,11.92,11.92H224.5v11.4c0,.37.64.71,1,.71s1.1-.34,1.1-.71V327.8h59.82a11.94,11.94,0,0,0,11.92-11.92V302.31a11.94,11.94,0,0,0-11.92-11.92H232.34c4.38-30.49,17.1-116.36,17.93-122H428a5.53,5.53,0,0,0,4.29-2,49.32,49.32,0,0,0,8.4-16.31,71.64,71.64,0,0,0,3.14-21.38v-.33h1.24a2,2,0,0,0,2-1.82l.63-6.83A2,2,0,0,0,447.22,118.14Zm-4.62,1c0,.27.07.54.1.81l.09.87C442.74,120.3,442.67,119.74,442.6,119.19ZM443,123c0,.14,0,.29,0,.44s0,.58.05.86h0C443,123.9,443,123.46,443,123Zm.09,1.32v.06c0,.12,0,.24,0,.37C443.08,124.63,443.08,124.49,443.07,124.35Z"/>
             </svg>
         </div>
@@ -739,12 +978,15 @@ function updateLivePlanePosition(lat, lon, alt, hdg) {
 
     if (!liveGpsMarker) {
         const planeIcon = L.divIcon({
-            html: svgIconHtml,
+            html: _planeSvgTemplate,
             className: 'live-plane-marker',
-            iconSize: [60, 60],
-            iconAnchor: [30, 30]
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]     // Geo-Koordinate = top-left des Divs; inner div verschiebt sich per translate(-50%,-37%)
         });
         liveGpsMarker = L.marker([lat, lon], { icon: planeIcon, zIndexOffset: 9999 }).addTo(map);
+        // Initiale Rotation setzen
+        const svgEl = liveGpsMarker.getElement()?.querySelector('svg');
+        if (svgEl) svgEl.style.transform = `rotate(${hdg}deg)`;
 
         map.on('dragstart', () => { if (isAutoFollow) toggleAutoFollow(); });
 
@@ -764,25 +1006,175 @@ function updateLivePlanePosition(lat, lon, alt, hdg) {
         });
     } else {
         liveGpsMarker.setLatLng([lat, lon]);
-        const iconElement = liveGpsMarker.getElement();
-        if (iconElement) iconElement.innerHTML = svgIconHtml;
+        // Nur CSS-Transform updaten statt innerHTML neu zu bauen → GPU-beschleunigt, kein Reflow
+        const svgEl = liveGpsMarker.getElement()?.querySelector('svg');
+        if (svgEl) svgEl.style.transform = `rotate(${hdg}deg)`;
     }
 
     // --- ICON B: HÖHENPROFIL ---
-    if (typeof vpElevationData !== 'undefined' && vpElevationData && vpElevationData.length > 0) {
-        let bestDistNM = 0, bestDist = Infinity;
-        vpElevationData.forEach(p => {
-            let d = calcNav(lat, lon, p.lat, p.lon).dist;
-            if (d < bestDist) { bestDist = d; bestDistNM = p.distNM; }
-        });
-        if (bestDist < 3.0) {
-            const totalDist = vpElevationData[vpElevationData.length - 1].distNM;
+    // Optimiert: Binäre Suche nach dem nächsten Punkt auf der Route statt O(n) Brute-Force
+    if (typeof vpElevationData !== 'undefined' && vpElevationData && vpElevationData.length > 2) {
+        const ed = vpElevationData;
+        const totalDist = ed[ed.length - 1].distNM;
+
+        // Schnelle binäre Suche: Entlang der Route den nächsten Längengrad/Breitengrad-Match finden
+        let lo = 0, hi = ed.length - 1, bestIdx = 0, bestDist = Infinity;
+        // Grobe Eingrenzung: Route in ~8 Sprünge abschätzen, dann lokal suchen
+        const step = Math.max(1, Math.floor(ed.length / 8));
+        for (let i = 0; i < ed.length; i += step) {
+            const dLat = lat - ed[i].lat, dLon = lon - (ed[i].lon || ed[i].lng);
+            const approxDist = dLat * dLat + dLon * dLon; // Quadrat reicht für Vergleich
+            if (approxDist < bestDist) { bestDist = approxDist; bestIdx = i; }
+        }
+        // Lokal um den besten Treffer herum feinsuchen
+        const searchLo = Math.max(0, bestIdx - step);
+        const searchHi = Math.min(ed.length - 1, bestIdx + step);
+        for (let i = searchLo; i <= searchHi; i++) {
+            const dLat = lat - ed[i].lat, dLon = lon - (ed[i].lon || ed[i].lng);
+            const approxDist = dLat * dLat + dLon * dLon;
+            if (approxDist < bestDist) { bestDist = approxDist; bestIdx = i; }
+        }
+        // approxDist ist in Grad² – 1° ≈ 111 km ≈ 59.9 NM
+        const approxDistNM = Math.sqrt(bestDist) * 59.9;
+        window.vpLiveRouteDistNM = approxDistNM;
+
+        // AGL aus Terrain-Höhe an der nächstgelegenen Route-Position
+        const terrainFt = bestDist < 0.028 ? (ed[bestIdx].elevFt ?? 0) : 0;
+        const aglFt = Math.max(0, Math.round(alt - terrainFt));
+        const aglEl = document.getElementById('teleAGL');
+        if (aglEl) {
+            if (bestDist < 0.28) { // AGL nur anzeigen wenn nahe Route (~10 NM)
+                aglEl.textContent = aglFt;
+                aglEl.style.color = aglFt < 500 ? '#ff4444' : aglFt < 1000 ? '#ffcc44' : '#ffcc44';
+            } else {
+                aglEl.textContent = '—';
+                aglEl.style.color = '#ffcc44';
+            }
+        }
+
+        if (bestDist < 0.028) { // ~10 NM Schwelle für Icon-Anzeige
             if (typeof vpUpdateLiveAircraft === 'function') {
-                vpUpdateLiveAircraft(bestDistNM / totalDist, alt, hdg);
+                vpUpdateLiveAircraft(ed[bestIdx].distNM / totalDist, alt, hdg);
+            }
+        } else {
+            window.vpLiveRouteDistNM = 999;
+            if (typeof vpUpdateLiveAircraft === 'function') {
+                vpUpdateLiveAircraft(-1, alt, hdg);  // -1 = ausblenden
             }
         }
     }
 }
+
+// ─── TRAFFIC AUF KARTE ────────────────────────────────────────────────────────
+// Proximity-Matching: statt exaktem Key-Lookup wird der nächstgelegene
+// bestehende Marker gefunden und geupdated. Damit funktioniert es auch bei
+// wechselnden SimConnect-IDs (MSFS Online-Traffic) und Formationsflug.
+const TRAFFIC_MATCH_DEG = 0.025; // ~2 km Matching-Schwelle
+
+function _trafficIconHtml(hdg, relAltStr, relAltColor, callsign) {
+    return `<div style="position:relative; transform:translate(-10px,-13px); pointer-events:none; text-align:center;">
+        <svg class="trf-svg" viewBox="-8 -12 16 24" width="20" height="26"
+             style="transform:rotate(${hdg}deg); display:block; margin:0 auto;
+                    filter:drop-shadow(0 0 2px rgba(0,0,0,0.9));">
+            <ellipse cx="0" cy="0"  rx="1.8" ry="10" fill="#00ccff" opacity="0.95"/>
+            <ellipse cx="0" cy="-1" rx="8"   ry="1.8" fill="#00ccff" opacity="0.95"/>
+            <ellipse cx="0" cy="8"  rx="4"   ry="1.2" fill="#00ccff" opacity="0.85"/>
+        </svg>
+        <div class="trf-alt" style="font-size:8px;font-weight:bold;color:${relAltColor};
+             text-shadow:1px 1px 2px #000;line-height:1.1;white-space:nowrap;">${relAltStr}</div>
+        <div style="font-size:7px;color:#aaddff;text-shadow:1px 1px 2px #000;
+             line-height:1;white-space:nowrap;">${callsign}</div>
+    </div>`;
+}
+
+function updateTrafficOnMap(aircraft, ownAlt) {
+    if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+
+    const claimedKeys = new Set(); // Marker die in diesem Update bereits belegt wurden
+
+    for (const ac of aircraft) {
+        const relAlt = ownAlt != null ? ac.alt - ownAlt : null;
+        const relAltStr = relAlt != null
+            ? (relAlt >= 0 ? '+' : '') + Math.round(relAlt / 100) * 100 : '';
+        const relAltColor = relAlt == null ? '#aaa'
+            : Math.abs(relAlt) < 300 ? '#ff8800'
+            : relAlt > 0 ? '#44ff44' : '#aaaaaa';
+        const hdg = ac.hdg ?? 0;
+        const callsign = ac.callsign ?? ('AI-' + String(ac.id ?? (ac.lat + ',' + ac.lon)));
+
+        // Nächstgelegenen unbelegten Marker suchen
+        let bestKey = null, bestDist = TRAFFIC_MATCH_DEG;
+        for (const [key, t] of Object.entries(liveTrafficMarkers)) {
+            if (claimedKeys.has(key)) continue;
+            const d = Math.hypot(t.lat - ac.lat, t.lon - ac.lon);
+            if (d < bestDist) { bestDist = d; bestKey = key; }
+        }
+
+        if (bestKey) {
+            // Bestehenden Marker in-place aktualisieren
+            claimedKeys.add(bestKey);
+            liveTrafficMarkers[bestKey].lat = ac.lat;
+            liveTrafficMarkers[bestKey].lon = ac.lon;
+            liveTrafficMarkers[bestKey].marker.setLatLng([ac.lat, ac.lon]);
+            const el = liveTrafficMarkers[bestKey].marker.getElement();
+            if (el) {
+                const svgEl = el.querySelector('.trf-svg');
+                if (svgEl) svgEl.style.transform = `rotate(${hdg}deg)`;
+                const altEl = el.querySelector('.trf-alt');
+                if (altEl) { altEl.textContent = relAltStr; altEl.style.color = relAltColor; }
+            }
+        } else {
+            // Neuen Marker erstellen
+            const newKey = String(ac.id ?? (Date.now() + Math.random()));
+            claimedKeys.add(newKey);
+            const icon = L.divIcon({
+                html: _trafficIconHtml(hdg, relAltStr, relAltColor, callsign),
+                className: 'traffic-marker',
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
+            });
+            const marker = L.marker([ac.lat, ac.lon], {
+                icon, interactive: false, zIndexOffset: 5000
+            }).addTo(map);
+            liveTrafficMarkers[newKey] = { marker, lat: ac.lat, lon: ac.lon };
+        }
+    }
+
+    // Nicht beanspruchte Marker entfernen (Flieger aus der Range verschwunden)
+    for (const key of Object.keys(liveTrafficMarkers)) {
+        if (!claimedKeys.has(key)) {
+            liveTrafficMarkers[key].marker.remove();
+            delete liveTrafficMarkers[key];
+        }
+    }
+}
+
+window.toggleTrafficMap = function() {
+    window.vpTrafficMapVisible = !window.vpTrafficMapVisible;
+    const btn = document.getElementById('btnToggleTrafficMap');
+    if (btn) btn.classList.toggle('active', window.vpTrafficMapVisible);
+    if (!window.vpTrafficMapVisible) {
+        Object.values(liveTrafficMarkers).forEach(t => t.marker.remove());
+        liveTrafficMarkers = {};
+    } else if (window.vpTrafficData?.length) {
+        updateTrafficOnMap(window.vpTrafficData, window.lastLiveGpsPos?.alt);
+    }
+};
+
+// Sim-Modus: Flugzeug-Icon, Trail und Profil zurücksetzen
+window.hideLivePlane = function () {
+    if (liveGpsMarker) { liveGpsMarker.remove(); liveGpsMarker = null; }
+    if (liveSnailTrail) { liveSnailTrail.setLatLngs([]); }
+    // Prediction-Vektoren entfernen
+    if (predictionLine) { predictionLine.setLatLngs([]); }
+    predictionMarkers.forEach(m => { try { m.remove(); } catch(e) {} });
+    predictionMarkers = [];
+    // Profil zurücksetzen
+    if (typeof vpUpdateLiveAircraft === 'function') vpUpdateLiveAircraft(-1, 0, 0);
+    window.lastLiveGpsPos = null;
+    lastGpsTickDetails = null;
+    lastTrailPoint = null;
+};
 
 // Auto-Start & Login on app load
 document.addEventListener('DOMContentLoaded', () => {

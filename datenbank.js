@@ -5,7 +5,7 @@
 // 1. CORE AIRPORTS (Fallback & Europa-Fokus)
 const coreDB = { 
     "EDTW": { icao: "EDTW", n: "Winzeln-Schramberg1", lat: 48.279, lon: 8.428 }, 
-    "EDTF": { icao: "EDTF", n: "Freiburg1", lat: 48.023, lon: 7.828 },
+    "EDTF": { icao: "EDTF", n: "Freiburg", lat: 48.023, lon: 7.828 },
     "EDNY": { icao: "EDNY", n: "Friedrichshafen", lat: 47.671, lon: 9.511 }, 
     "EDDS": { icao: "EDDS", n: "Stuttgart", lat: 48.689, lon: 9.221 },
     "EDMA": { icao: "EDMA", n: "Augsburg", lat: 48.42, lon: 10.93 }, 

@@ -1,7 +1,7 @@
 {
-  "name": "GA Dispatcher",
-  "short_name": "GA Dispatcher",
-  "description": "GA Flight Dispatcher",
+  "name": "VFR Multitool",
+  "short_name": "VFR Multitool",
+  "description": "VFR Navigation & Dispatcher Tool for Flight Simulators",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",
