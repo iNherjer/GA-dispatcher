@@ -1,6 +1,6 @@
 # GA-Dispatcher-stable
 
-https://inherjer.github.io/GA-dispatcher/
+https://inherjer.github.io/VFR-Multitool/
 
 # GA-Dispatcher-Beta
 
